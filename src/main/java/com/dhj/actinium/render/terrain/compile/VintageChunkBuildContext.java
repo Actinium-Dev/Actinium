@@ -161,6 +161,29 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
         return builder;
     }
 
+    /** Counts staged and direct vertices without creating any new builders. */
+    public long countMeshVertices() {
+        long count = 0;
+        for (int i = 0; i < this.worldRenderers.length; i++) {
+            if (this.usedWorldRenderers[i]) {
+                count += this.worldRenderers[i].getVertexCount();
+            }
+        }
+
+        ChunkBuildBuffers buffers = this.getRenderBuffers();
+        for (var pass : buffers.getBuilderPasses()) {
+            var builder = buffers.get(pass);
+            if (pass.isSorted()) {
+                count += builder.getVertexBuffer(ModelQuadFacing.UNASSIGNED).count();
+            } else {
+                for (var facing : ModelQuadFacing.VALUES) {
+                    count += builder.getVertexBuffer(facing).count();
+                }
+            }
+        }
+        return count;
+    }
+
     public void convertVanillaDataToCeleritasData(ChunkBuildBuffers buffers) {
         var renderers = this.worldRenderers;
         var used = this.usedWorldRenderers;

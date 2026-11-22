@@ -1,5 +1,6 @@
 package com.dhj.actinium.render.terrain;
 
+import com.dhj.actinium.debug.WorldRenderInventory;
 import com.gtnewhorizons.angelica.glsm.GLSMMatrices;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.rendering.tesr.AngelicaTesrMeshCache;
@@ -36,6 +37,7 @@ import com.dhj.actinium.render.terrain.fog.GLStateManagerFogService;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -50,6 +52,39 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
     private boolean portalCamera;
     private ChunkRenderMatrices portalMatrices;
     private Viewport shadowPassPlayerViewport;
+    private @Nullable WorldRenderInventory worldRenderInventory;
+
+    /** Returns this renderer's diagnostic session when its terrain meshes carry inventory counts. */
+    public @Nullable WorldRenderInventory worldRenderInventory() {
+        if (this.worldRenderInventory == null && this.renderSectionManager != null) {
+            var terrain = this.renderSectionManager.terrainRenderInventory();
+            if (terrain != null) {
+                this.worldRenderInventory = new WorldRenderInventory(this.world, terrain,
+                        Minecraft.getMinecraft().gameDir.toPath());
+            }
+        }
+        return this.worldRenderInventory;
+    }
+
+    @Override
+    protected void initRenderer(CommandList commandList) {
+        this.closeRenderInventory();
+        super.initRenderer(commandList);
+    }
+
+    @Override
+    protected void unloadWorld() {
+        this.closeRenderInventory();
+        super.unloadWorld();
+    }
+
+    private void closeRenderInventory() {
+        var inventory = this.worldRenderInventory;
+        if (inventory != null) {
+            this.worldRenderInventory = null;
+            inventory.close();
+        }
+    }
 
     /**
      * @param shadowCollect when true, block entities are collected for the shadow pass instead of being drawn

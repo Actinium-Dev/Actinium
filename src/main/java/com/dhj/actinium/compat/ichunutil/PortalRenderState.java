@@ -11,7 +11,14 @@ import java.util.Objects;
  * Isolates the camera-state mirrors modified by iChun's recursive world rendering.
  */
 public final class PortalRenderState {
+    private static boolean renderingPortal;
+
     private PortalRenderState() {
+    }
+
+    /** Returns whether the render thread is drawing an iChunUtil portal view. */
+    public static boolean isRenderingPortal() {
+        return renderingPortal;
     }
 
     /**
@@ -32,9 +39,12 @@ public final class PortalRenderState {
             activeViewport
         );
 
+        boolean previousRenderingPortal = renderingPortal;
+        renderingPortal = true;
         try {
             portalRender.run();
         } finally {
+            renderingPortal = previousRenderingPortal;
             snapshot.restore();
         }
     }

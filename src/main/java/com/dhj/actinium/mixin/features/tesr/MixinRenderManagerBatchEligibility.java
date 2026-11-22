@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.features.tesr;
 
+import com.dhj.actinium.debug.WorldRenderInventory;
 import com.gtnewhorizons.angelica.rendering.tesr.TesrBrackets;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -28,6 +29,7 @@ public abstract class MixinRenderManagerBatchEligibility {
             original.call(render, entity, x, y, z, yaw, partialTicks);
             return;
         }
+        WorldRenderInventory.recordEntity(entity, render);
         TesrBrackets.renderEntity(render, entity, partialTicks,
             () -> original.call(render, entity, x, y, z, yaw, partialTicks));
     }
