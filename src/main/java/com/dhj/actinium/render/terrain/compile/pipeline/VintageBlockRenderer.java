@@ -4,6 +4,7 @@ import com.dhj.actinium.api.render.terrain.BlockQuadTransformerHolder;
 import com.dhj.actinium.compat.MissingModelCompat;
 import com.dhj.actinium.compat.componentmodelhider.ComponentModelHiderCompat;
 import com.dhj.actinium.compat.farmersfuturedelight.FarmersFutureDelightCompat;
+import com.dhj.actinium.compat.librarianlib.LibrarianLibGlowCompat;
 import net.coderbot.iris.debug.ShaderRegressionDebug;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
@@ -51,6 +52,7 @@ import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.dhj.actinium.world.cloned.ActiniumBlockAccess;
 import com.dhj.actinium.render.terrain.compile.VintageChunkBuildContext;
 import com.dhj.actinium.render.terrain.compile.VintageTranslucentMaterials;
+import com.dhj.actinium.render.terrain.compile.light.BlockQuadLightOverride;
 import com.dhj.actinium.render.terrain.compile.light.LightDataCache;
 import com.dhj.actinium.render.terrain.compile.light.VintageDiffuseProvider;
 import com.dhj.actinium.mixin.vintage.core.terrain.AccessorBlockColors;
@@ -79,6 +81,7 @@ public class VintageBlockRenderer {
     private final ArrayList<ContextAwareChunkVertexEncoder> usedContextEncoders = new ArrayList<>(4);
     private final BlockRenderContext blockRenderContext = new BlockRenderContext();
     private final boolean useRenderPassOptimization;
+    private final BlockQuadLightOverride quadLightOverride = LibrarianLibGlowCompat.create();
 
     private IBlockState currentState;
     private ActiniumBlockAccess currentBlockAccess;
@@ -87,6 +90,7 @@ public class VintageBlockRenderer {
     private int currentShaderBlockId;
     private BlockRenderLayer currentRenderLayer;
     private boolean currentWaterloggedWater;
+    private boolean overrideQuadLight;
 
     private final BakedQuadGroupAnalyzer analyzer = new BakedQuadGroupAnalyzer();
 
@@ -146,6 +150,7 @@ public class VintageBlockRenderer {
         this.currentBlockAccess = blockAccess;
         this.currentMetadata = state.getBlock().getMetaFromState(state);
         this.currentShaderMetadata = BlockMaterialMapping.resolveShaderMetadata(state, pos, blockAccess, this.currentMetadata);
+        IBlockState actualState = state;
         state = state.getBlock().getExtendedState(state, blockAccess, pos);
         this.currentState = state;
         this.currentWaterloggedWater = FarmersFutureDelightCompat.usesWaterIdentity(state, model, layer);
@@ -180,42 +185,45 @@ public class VintageBlockRenderer {
             BlockRenderingSettings.INSTANCE.shouldUseSeparateAo()
         );
 
-        for (var dir : EnumFacing.VALUES) {
-            var quads = model.getQuads(state, dir, rand);
+        this.overrideQuadLight = this.quadLightOverride != null
+                && this.quadLightOverride.beginBlock(blockAccess, actualState, pos);
+        try {
+            for (var dir : EnumFacing.VALUES) {
+                var quads = model.getQuads(state, dir, rand);
 
-            // The vanilla face-culling call stays at this call site on purpose: addon mixins
-            // @Redirect instructions inside renderBlock (see VintageBlockRendererBindingContractTest),
-            // so extracting it into a helper method would move it out of their reach. The Component
-            // Model Hider's neighbour rule is applied afterwards, and only when the vanilla predicate
-            // already culled the face: vanilla learns that rule from the hider's redirects inside
-            // BlockModelRenderer, which this fast mesher does not go through, so a hidden block would
-            // otherwise still occlude and punch a see-through hole into every adjacent block.
-            if (quads.isEmpty()
-                    || (!state.shouldSideBeRendered(blockAccess, pos, dir)
-                            && !ComponentModelHiderCompat.isNeighbourHidden(pos, dir))) {
-                continue;
-            }
+                // Keep the culling call in renderBlock for addon redirects. Hidden blocks do not occlude neighbours.
+                if (quads.isEmpty()
+                        || (!state.shouldSideBeRendered(blockAccess, pos, dir)
+                                && !ComponentModelHiderCompat.isNeighbourHidden(pos, dir))) {
+                    continue;
+                }
 
-            quads = BlockQuadTransformerHolder.transform(
-                    state, pos, blockAccess, layer, dir, quads);
-            if (quads.isEmpty()) {
-                continue;
-            }
+                quads = BlockQuadTransformerHolder.transform(
+                        state, pos, blockAccess, layer, dir, quads);
+                if (quads.isEmpty()) {
+                    continue;
+                }
 
-            this.currentQuadRenderingFlags = this.analyzer.getFlagsForRendering(VintageDiffuseProvider.fromEnumFacing(dir), BakedQuadView.ofList(quads));
-            renderQuadList(buffer, buffers, material, pos, dir, lighter, colorProvider, offset, quads);
-            this.renderedAnyQuad = true;
-        }
-
-        var quads = model.getQuads(state, null, rand);
-
-        if (!quads.isEmpty()) {
-            quads = BlockQuadTransformerHolder.transform(
-                    state, pos, blockAccess, layer, null, quads);
-            if (!quads.isEmpty()) {
-                this.currentQuadRenderingFlags = this.analyzer.getFlagsForRendering(ModelQuadFacing.UNASSIGNED, BakedQuadView.ofList(quads));
-                renderQuadList(buffer, buffers, material, pos, null, lighter, colorProvider, offset, quads);
+                this.currentQuadRenderingFlags = this.analyzer.getFlagsForRendering(VintageDiffuseProvider.fromEnumFacing(dir), BakedQuadView.ofList(quads));
+                renderQuadList(buffer, buffers, material, pos, dir, lighter, colorProvider, offset, quads);
                 this.renderedAnyQuad = true;
+            }
+
+            var quads = model.getQuads(state, null, rand);
+
+            if (!quads.isEmpty()) {
+                quads = BlockQuadTransformerHolder.transform(
+                        state, pos, blockAccess, layer, null, quads);
+                if (!quads.isEmpty()) {
+                    this.currentQuadRenderingFlags = this.analyzer.getFlagsForRendering(ModelQuadFacing.UNASSIGNED, BakedQuadView.ofList(quads));
+                    renderQuadList(buffer, buffers, material, pos, null, lighter, colorProvider, offset, quads);
+                    this.renderedAnyQuad = true;
+                }
+            }
+        } finally {
+            if (this.overrideQuadLight) {
+                this.quadLightOverride.endBlock();
+                this.overrideQuadLight = false;
             }
         }
 
@@ -301,6 +309,8 @@ public class VintageBlockRenderer {
 
             BakedQuadView quadView = (BakedQuadView)quad;
 
+            int packedLightOverride = this.overrideQuadLight
+                    ? this.quadLightOverride.getLight(quad) : BlockQuadLightOverride.UNCHANGED;
             var light = this.getVertexLight(lighter, pos, cullFace, quadView);
             var colors = this.getVertexColors(pos, colorProvider, quadView);
 
@@ -313,7 +323,7 @@ public class VintageBlockRenderer {
             this.prepareEncoder(buffer, pos);
 
             this.writeGeometry(localX, localY, localZ, buffer, offset, quadMaterial,
-                    quadView, colors, light, orientation);
+                    quadView, colors, light, orientation, packedLightOverride);
 
             TextureAtlasSprite sprite = (TextureAtlasSprite)quadView.celeritas$getSprite();
 
@@ -408,7 +418,8 @@ public class VintageBlockRenderer {
                                BakedQuadView quad,
                                int[] colors,
                                QuadLightData light,
-                               ModelQuadOrientation orientation)
+                               ModelQuadOrientation orientation,
+                               int packedLightOverride)
     {
         var vertices = this.vertices;
         ChunkColorWriter colorWriter = BlockRenderingSettings.INSTANCE.shouldUseSeparateAo()
@@ -447,7 +458,8 @@ public class VintageBlockRenderer {
             out.u = quad.getTexU(srcIndex);
             out.v = quad.getTexV(srcIndex);
 
-            out.light = ModelQuadUtil.mergeBakedLight(quad.getLight(srcIndex), quad.getVanillaLightEmission(), light.lm[srcIndex]);
+            out.light = packedLightOverride != BlockQuadLightOverride.UNCHANGED ? packedLightOverride
+                    : ModelQuadUtil.mergeBakedLight(quad.getLight(srcIndex), quad.getVanillaLightEmission(), light.lm[srcIndex]);
 
             out.vanillaNormal = vanillaNormal;
             out.trueNormal = trueNormal;
@@ -457,4 +469,3 @@ public class VintageBlockRenderer {
         vertexBuffer.push(vertices, material);
     }
 }
-

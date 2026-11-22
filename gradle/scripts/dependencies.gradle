@@ -258,6 +258,10 @@ dependencies {
     // FancyMissingModel inside the fast chunk meshing path; dev-verifies the shape rendering compat)
     modImplementation 'curse.maven:architecturecraft-tridev-277631:4344128'
 
+    // LibrarianLib Continuous: evaluate its block glow handlers during fast chunk meshing.
+    modCompileOnly 'curse.maven:librarianlib-continuous-1058274:6617935'
+    testImplementation 'curse.maven:librarianlib-continuous-1058274:6617935'
+
     // Scannable 1.6.3.26 (issue #94: its scanner overlay rendering conflicts with the Actinium render
     // pipeline -- see-through terrain without shaders, white ghosting with shaders; needs runtime repro)
     modImplementation 'curse.maven:scannable-266784:3146549'

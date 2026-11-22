@@ -77,6 +77,14 @@ class MixinLateTest {
             Set.copyOf(MixinLate.configsFor("embers"::equals, className -> false))
         );
 
+        assertEquals(Set.of(), Set.copyOf(MixinLate.configsFor("librarianlib"::equals, name -> false)));
+        assertEquals(
+            Set.of("mixins.actinium.librarianlib.json"),
+            Set.copyOf(MixinLate.configsFor(
+                "librarianlib"::equals, "com.teamwizardry.librarianlib.core.client.RenderHookHandler$blockHooks$1"::equals
+            ))
+        );
+
         assertEquals(
             Set.of(
                 "mixins.actinium.gibbed.json",
@@ -100,7 +108,8 @@ class MixinLateTest {
                 "mixins.actinium.obscuretooltips.json",
                 "mixins.actinium.dsurround.json",
                 "mixins.actinium.mekanism.json",
-                "mixins.actinium.embers.json"
+                "mixins.actinium.embers.json",
+                "mixins.actinium.librarianlib.json"
             ),
             Set.copyOf(MixinLate.configsFor(modId -> true, className -> true))
         );
