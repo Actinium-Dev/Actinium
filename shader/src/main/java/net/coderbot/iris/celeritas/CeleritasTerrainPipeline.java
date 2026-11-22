@@ -52,6 +52,7 @@ public class CeleritasTerrainPipeline {
 
     private final IntFunction<ProgramImages> createTerrainImages;
     private final IntFunction<ProgramImages> createShadowImages;
+    private final boolean writeStainedGlassDepth;
 
     @Getter
     @Accessors(fluent = true)
@@ -100,6 +101,10 @@ public class CeleritasTerrainPipeline {
         this.createShadowSamplers = createShadowSamplers;
         this.createTerrainImages = createTerrainImages;
         this.createShadowImages = createShadowImages;
+        this.writeStainedGlassDepth = translucentSource
+                .filter(source -> ProgramId.Water.getSourceName().equals(source.getName()))
+                .flatMap(source -> source.getDirectives().getBlendModeOverride())
+                .orElse(null) == BlendModeOverride.OFF;
 
         // Build program source map (local - only needed during construction)
         final EnumMap<IrisTerrainPass, Optional<ProgramSource>> gbufferProgramSource = new EnumMap<>(IrisTerrainPass.class);
@@ -222,6 +227,11 @@ public class CeleritasTerrainPipeline {
 
     public PassInfo getPassInfo(IrisTerrainPass pass) {
         return passInfoMap.get(pass);
+    }
+
+    /** A translucent g-buffer with blending disabled needs the nearest glass depth for compositing. */
+    public boolean shouldWriteStainedGlassDepth() {
+        return this.writeStainedGlassDepth;
     }
 
     public ProgramUniforms.Builder initUniforms(int programId) {

@@ -50,6 +50,7 @@ import net.coderbot.iris.block_rendering.BlockRenderingSettings;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.dhj.actinium.world.cloned.ActiniumBlockAccess;
 import com.dhj.actinium.render.terrain.compile.VintageChunkBuildContext;
+import com.dhj.actinium.render.terrain.compile.VintageTranslucentMaterials;
 import com.dhj.actinium.render.terrain.compile.light.LightDataCache;
 import com.dhj.actinium.render.terrain.compile.light.VintageDiffuseProvider;
 import com.dhj.actinium.mixin.vintage.core.terrain.AccessorBlockColors;
@@ -108,17 +109,12 @@ public class VintageBlockRenderer {
         this.currentWaterloggedWater = false;
     }
 
-    /**
-     * Resolves the terrain material for one block render pass. Translucent water and lava are
-     * routed to the dedicated fluid material so they keep depth writes without forcing ordinary
-     * translucent terrain into the fluid pass (#79).
-     */
     protected Material resolveRenderMaterial(ChunkBuildBuffers buffers, IBlockState state, BlockRenderLayer layer) {
         boolean isFluid = state.getMaterial() == WATER || state.getMaterial() == LAVA
                 || this.currentWaterloggedWater;
-        return isFluid && layer == BlockRenderLayer.TRANSLUCENT
-                ? buffers.getRenderPassConfiguration().defaultFluidMaterial()
-                : buffers.getRenderPassConfiguration().getMaterialForRenderType(layer);
+        var configuration = buffers.getRenderPassConfiguration();
+        return VintageTranslucentMaterials.select(configuration, layer, configuration.getMaterialForRenderType(layer),
+                state.getBlock(), isFluid, this.context.isWriteStainedGlassDepth());
     }
 
     public void renderBlock(IBlockState state, BlockPos pos, ActiniumBlockAccess blockAccess, BlockRenderLayer layer) {
@@ -310,7 +306,7 @@ public class VintageBlockRenderer {
 
             ModelQuadOrientation orientation = ModelQuadOrientation.NORMAL;
 
-            var quadMaterial = isCurrentFluid()
+            var quadMaterial = isCurrentFluid() || material == config.defaultFluidMaterial()
                     ? material
                     : BakedQuadGroupAnalyzer.chooseOptimalMaterial(this.currentQuadRenderingFlags, material, config, BakedQuadView.of(quad));
             ChunkModelBuilder buffer = (quadMaterial == material) ? defaultBuffer : buffers.get(quadMaterial);

@@ -6,6 +6,8 @@ import com.gtnewhorizons.angelica.glsm.hooks.GLSMHooks;
 import com.gtnewhorizons.angelica.glsm.hooks.PendingProgramSelection;
 import lombok.Getter;
 import net.coderbot.iris.Iris;
+import net.coderbot.iris.block_rendering.BlockRenderingSettings;
+import net.coderbot.iris.celeritas.CeleritasTerrainPipeline;
 import net.coderbot.iris.gl.framebuffer.MinecraftFramebufferHelper;
 import net.coderbot.iris.uniforms.SystemTimeUniforms;
 import dhj.embeddedt.embeddium.api.shader.ShaderProvider;
@@ -96,6 +98,8 @@ public class PipelineManager {
 		}
 		pipelineLastUsedNs.put(currentDimension, nowNs);
 
+		CeleritasTerrainPipeline terrain = pipeline.getCeleritasTerrainPipeline();
+		BlockRenderingSettings.INSTANCE.setWriteStainedGlassDepth(terrain != null && terrain.shouldWriteStainedGlassDepth());
 		updateGlsmHookConsumers();
 		clearStalePendingSelection();
 		return pipeline;
@@ -183,6 +187,7 @@ public class PipelineManager {
 		pipeline = null;
 		lastPreparedDimension = null;
 		versionCounterForSodiumShaderReload++;
+		BlockRenderingSettings.INSTANCE.setWriteStainedGlassDepth(false);
 		updateGlsmHookConsumers();
 		clearStalePendingSelection();
 
