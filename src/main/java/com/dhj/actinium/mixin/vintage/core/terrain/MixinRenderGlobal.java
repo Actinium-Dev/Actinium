@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.vintage.core.terrain;
 
+import com.dhj.actinium.debug.WorldRenderInventory;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
@@ -455,7 +456,9 @@ public abstract class MixinRenderGlobal implements SimpleWorldRenderer.Provider<
                 {
                     ++this.countEntitiesRendered;
                     long renderCallStartNanos = RenderDebugHooksHolder.beginRenderGlobalStageTiming();
-                    if (!EntityShadowReplay.replay(this.renderManager, entity, partialTicks, pass)) {
+                    if (EntityShadowReplay.replay(this.renderManager, entity, partialTicks, pass)) {
+                        WorldRenderInventory.recordReplayedEntity(entity, this.renderManager);
+                    } else {
                         this.renderManager.renderEntityStatic(entity, partialTicks, false);
                     }
                     if (renderCallStartNanos != 0L) {

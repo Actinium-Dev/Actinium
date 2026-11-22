@@ -42,6 +42,9 @@ import dhj.embeddedt.embeddium.api.shader.ShaderProvider;
 import dhj.embeddedt.embeddium.api.shader.ShaderProviderHolder;
 import com.dhj.actinium.compat.depthsupdate.DepthsUpdateCompat;
 import com.dhj.actinium.compat.fluxloading.FluxLoadingCompat;
+import com.dhj.actinium.compat.ichunutil.PortalRenderState;
+import com.dhj.actinium.debug.TerrainRenderInventory;
+import com.dhj.actinium.render.RenderWorldRecursionGuard;
 import com.dhj.actinium.world.WorldSlice;
 import com.dhj.actinium.world.cloned.ChunkRenderContext;
 import com.dhj.actinium.world.cloned.ClonedChunkSectionCache;
@@ -58,6 +61,7 @@ import java.util.Objects;
 
 public class VintageRenderSectionManager extends RenderSectionManager {
     private final WorldClient world;
+    private final @Nullable TerrainRenderInventory terrainInventory;
     @Getter
     private final ClonedChunkSectionCache sectionCache;
     private int shadowSearchSubmissions;
@@ -78,12 +82,27 @@ public class VintageRenderSectionManager extends RenderSectionManager {
     private final VintageChunkBuildContext captureContext;
 
     public VintageRenderSectionManager(RenderPassConfiguration<?> configuration, WorldClient world, int renderDistance, CommandList commandList, int minSection, int maxSection) {
-        super(configuration, () -> new VintageChunkBuildContext(world, configuration), ChunkRenderer::new, renderDistance, commandList, minSection, maxSection, ActiniumRuntime.options().performance.chunkBuilderThreads, true);
+        this(configuration, world, renderDistance, commandList, minSection, maxSection,
+                ActiniumRuntime.options().debug.enableRenderInventory ? new TerrainRenderInventory() : null);
+    }
+
+    private VintageRenderSectionManager(RenderPassConfiguration<?> configuration, WorldClient world, int renderDistance,
+                                        CommandList commandList, int minSection, int maxSection,
+                                        @Nullable TerrainRenderInventory terrainInventory) {
+        super(configuration, () -> new VintageChunkBuildContext(world, configuration),
+                (device, passes) -> new ChunkRenderer(device, passes, terrainInventory),
+                renderDistance, commandList, minSection, maxSection, ActiniumRuntime.options().performance.chunkBuilderThreads, true);
         this.world = world;
+        this.terrainInventory = terrainInventory;
         this.sectionCache = new ClonedChunkSectionCache(world);
         this.captureContext = new VintageChunkBuildContext(world, configuration);
         this.deferredScheduler = new DeferredMeshScheduler(configuration, this.getBuilder(), () -> new WorldSlice(world),
                 this::scheduleAsyncTask, this::cancelAsyncTask, this.getBuildResults());
+    }
+
+    /** Returns the session's terrain inventory when capture was enabled at renderer creation. */
+    public @Nullable TerrainRenderInventory terrainRenderInventory() {
+        return this.terrainInventory;
     }
 
     public static VintageRenderSectionManager create(ChunkVertexType vertexType, WorldClient world, int renderDistance, CommandList commandList) {
@@ -178,7 +197,7 @@ public class VintageRenderSectionManager extends RenderSectionManager {
         }
 
         ChunkBuilderMeshingTask task = new ChunkBuilderMeshingTask(render, context, frame, this.cameraPosition,
-                this.useRasterOcclusionCulling(), this.captureContext);
+                this.useRasterOcclusionCulling(), this.captureContext, this.terrainInventory != null);
         // submitRebuildTasks keeps the pending update until the job was scheduled, so it is the type
         // this rebuild was queued for.
         task.bindScheduler(this.deferredScheduler,
@@ -244,7 +263,11 @@ public class VintageRenderSectionManager extends RenderSectionManager {
             retrieveBBForList(mcData.culledBlockEntities);
             retrieveBBForList(mcData.globalBlockEntities);
         }
-        return super.updateSectionInfo(render, info);
+        boolean changed = super.updateSectionInfo(render, info);
+        if (this.terrainInventory != null && changed && info instanceof TerrainRenderInventory.SectionData data) {
+            this.terrainInventory.recordInstalled(render, data);
+        }
+        return changed;
     }
 
     @Override
@@ -323,12 +346,16 @@ public class VintageRenderSectionManager extends RenderSectionManager {
 
         private GlProgram<? extends ChunkShaderInterface> actiniumProgram;
         private boolean usingActiniumProgram;
+        private boolean terrainProgramAvailable;
         private final GpuTerrainCuller culler = createCuller();
         private final ReusableCachedBatch gpuBatch = new ReusableCachedBatch();
         private final ShadowVoxelizer shadowVoxelizer = ShadowVoxelizer.create();
+        private final @Nullable TerrainRenderInventory terrainInventory;
 
-        public ChunkRenderer(RenderDevice device, RenderPassConfiguration<?> renderPassConfiguration) {
+        public ChunkRenderer(RenderDevice device, RenderPassConfiguration<?> renderPassConfiguration,
+                             @Nullable TerrainRenderInventory terrainInventory) {
             super(device, renderPassConfiguration, GLStateManagerFogService.INSTANCE);
+            this.terrainInventory = terrainInventory;
 
             ShaderProvider provider = ShaderProviderHolder.getProvider();
             if (provider != null) {
@@ -374,6 +401,11 @@ public class VintageRenderSectionManager extends RenderSectionManager {
                     renderPass.vertexType().getVertexFormat(),
                     occlusionCamera, camera, this.useBlockFaceCulling());
                 super.render(matrices, commandList, renderLists, renderPass, occlusionCamera, camera);
+                if (this.terrainInventory != null && this.terrainProgramAvailable
+                        && !ShaderProviderHolder.isShadowPass() && !RenderWorldRecursionGuard.isNested()
+                        && !PortalRenderState.isRenderingPortal() && renderLists.hasPass(renderPass)) {
+                    this.terrainInventory.recordDrawCandidates(renderLists, renderPass);
+                }
             } finally {
                 if (this.culler != null) {
                     this.culler.endPass();
@@ -419,6 +451,7 @@ public class VintageRenderSectionManager extends RenderSectionManager {
                     this.activeProgram = (GlProgram<ChunkShaderInterface>) override;
                     this.actiniumProgram = override;
                     this.usingActiniumProgram = true;
+                    this.terrainProgramAvailable = true;
                     return;
                 }
             }
@@ -426,6 +459,7 @@ public class VintageRenderSectionManager extends RenderSectionManager {
             this.usingActiniumProgram = false;
             this.actiniumProgram = null;
             super.begin(pass);
+            this.terrainProgramAvailable = this.activeProgram != null;
         }
 
         @Override

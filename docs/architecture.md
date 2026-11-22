@@ -261,6 +261,9 @@ HUD 在 `RenderTickEvent.END` 绘制，此时 StellarCore/Gnetum 的 HUD 缓存�
 - **`command/`**：`TogglePassCommand` —— dev 环境调试命令，切换渲染 pass。
 - **`debug/`**：`ActiniumDiagnostics`（生产诊断日志）、`ActiniumStartupDebugConfig`、
   `CoreProfileContextAttributes`、`OpenGlVersion`（GL 版本检测）。
+  世界渲染清单启用后，区块任务将贡献网格的方块位置随构建结果交给渲染线程。
+  `TerrainRenderInventory` 按区块节累计已安装网格与主视图绘制候选，
+  `WorldRenderInventory` 记录实体渲染回调并将会话快照交给后台线程写入 TSV。
 - **`gui/`**：`ActiniumVideoOptionsScreen`（自绘视频选项屏）、`ActiniumGameOptionPages`、
   `ActiniumWindowModeController` / `FullscreenMode`、`MinecraftOptionsStorage` /
   `VanillaBooleanOptionBinding`、`VintageDrawContext` / `VintageInteractionContext`。

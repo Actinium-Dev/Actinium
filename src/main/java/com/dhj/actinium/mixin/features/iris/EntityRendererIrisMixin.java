@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.features.iris;
 
+import com.dhj.actinium.debug.WorldRenderInventory;
 import com.dhj.actinium.render.CloudRenderSettings;
 import com.dhj.actinium.render.GuiGlStateBoundary;
 import com.dhj.actinium.render.RenderWorldRecursionGuard;
@@ -81,10 +82,20 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
     @WrapMethod(method = "renderWorldPass(IFJ)V")
     private void actinium$guardRenderWorldPassRecursion(int pass, float partialTicks, long finishTimeNano, Operation<Void> original) {
         RenderWorldRecursionGuard.enter();
+        boolean outerPass = !RenderWorldRecursionGuard.isNested();
         try {
+            if (outerPass) {
+                WorldRenderInventory.beginWorldPass(this.mc);
+            }
             original.call(pass, partialTicks, finishTimeNano);
         } finally {
-            RenderWorldRecursionGuard.exit();
+            try {
+                if (outerPass) {
+                    WorldRenderInventory.endWorldPass();
+                }
+            } finally {
+                RenderWorldRecursionGuard.exit();
+            }
         }
     }
 

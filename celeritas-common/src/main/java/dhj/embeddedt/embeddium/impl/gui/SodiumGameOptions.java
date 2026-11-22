@@ -231,6 +231,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
     public static class DebugSettings {
         public boolean enableProductionDiagnostics = true;
         public boolean enableEntityRenderDiagnostics = false;
+        public boolean enableRenderInventory = false;
         public boolean ignoreFramebufferErrors = false;
         public boolean enableActiniumGlDebug = false;
         public boolean enableLwjglDebug = false;
