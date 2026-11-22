@@ -298,6 +298,8 @@ dependencies {
     // re-applies the skip and the build gate from ChunkBuilderMeshingTask. Compile-only: the compat
     // is guarded by Mods.COMPONENT_MODEL_HIDER, which is false whenever the mod is absent.
     modCompileOnly 'curse.maven:component-model-hider-940949:4885858'
+    // Modular Machinery CE 2.3.2, the controller model renderer targeted by the #326 mixin.
+    modCompileOnly 'curse.maven:modularmachinery-community-edition-817377:7372951'
 
     // NeverEnoughAnimation 1.0.7 (issue #145: its GUI open/close fade scales every item vertex
     // alpha through LightUtil/BufferBuilder mixins; Actinium's fast lit item path writes baked quad

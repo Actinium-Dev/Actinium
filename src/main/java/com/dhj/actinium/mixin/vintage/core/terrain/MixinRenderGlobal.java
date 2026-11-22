@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.dhj.actinium.compat.ichunutil.PortalViewportProvider;
+import com.dhj.actinium.compat.mmce.MmceControllerRenderCompat;
 import com.dhj.actinium.debug.GlStateDiffProbe;
 import com.dhj.actinium.render.BoundingBoxOutline;
 import com.dhj.actinium.render.ManagedCodeBoundary;
@@ -362,6 +363,7 @@ public abstract class MixinRenderGlobal implements SimpleWorldRenderer.Provider<
             }
         }
 
+        MmceControllerRenderCompat.finishBlockEntityPass(pass);
         this.mc.entityRenderer.disableLightmap();
         this.mc.profiler.endSection();
         ci.cancel();
@@ -520,4 +522,3 @@ public abstract class MixinRenderGlobal implements SimpleWorldRenderer.Provider<
         return renderPlayer || !playerEntity;
     }
 }
-

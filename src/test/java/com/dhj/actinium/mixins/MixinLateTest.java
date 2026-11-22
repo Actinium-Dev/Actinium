@@ -78,6 +78,11 @@ class MixinLateTest {
         );
 
         assertEquals(
+            Set.of("mixins.actinium.mmce.json"),
+            Set.copyOf(MixinLate.configsFor("modularmachinery"::equals, className -> false))
+        );
+
+        assertEquals(
             Set.of(
                 "mixins.actinium.gibbed.json",
                 "mixins.actinium.ichunutil.json",
@@ -100,7 +105,8 @@ class MixinLateTest {
                 "mixins.actinium.obscuretooltips.json",
                 "mixins.actinium.dsurround.json",
                 "mixins.actinium.mekanism.json",
-                "mixins.actinium.embers.json"
+                "mixins.actinium.embers.json",
+                "mixins.actinium.mmce.json"
             ),
             Set.copyOf(MixinLate.configsFor(modId -> true, className -> true))
         );
