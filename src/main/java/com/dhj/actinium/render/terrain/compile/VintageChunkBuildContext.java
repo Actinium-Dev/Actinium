@@ -67,6 +67,8 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
     private final RenderPassConfiguration<?> renderPassConfiguration;
     private final LightDataCache lightDataCache;
     private final boolean useRenderPassOptimization;
+    @Getter
+    private final boolean writeStainedGlassDepth;
     private final BlockRenderContext vanillaBlockRenderContext = new BlockRenderContext();
 
     // Per-task buffers owned by the deferred scheduler while this context renders a captured block.
@@ -86,6 +88,7 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
         this.blockRenderer = new VintageBlockRenderer(this, lightDataCache);
         this.textureAtlas = (TextureMapExtension) Minecraft.getMinecraft().getTextureMapBlocks();
         this.useRenderPassOptimization = ActiniumRuntime.options().performance.useRenderPassOptimization;
+        this.writeStainedGlassDepth = BlockRenderingSettings.INSTANCE.shouldWriteStainedGlassDepth();
     }
 
     /**
@@ -193,6 +196,20 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
             return;
         }
 
+        VanillaQuadContext context = this.createVanillaBlockContext(pos, state, layer);
+        if (buffer instanceof ChunkBufferBuilder chunkBuffer && !chunkBuffer.isAllowRenderPassOptimization()) {
+            context = context.keepRenderPass();
+        }
+        extension.actinium$setActiveQuadContext(context);
+    }
+
+    private VanillaQuadContext createVanillaBlockContext(BlockPos pos, IBlockState state, BlockRenderLayer layer) {
+        if (this.writeStainedGlassDepth && layer == BlockRenderLayer.TRANSLUCENT
+                && VintageTranslucentMaterials.isStainedGlass(state.getBlock())) {
+            // Keep the source state until the quad's terrain material and shader ID are selected together.
+            return new VanillaQuadContext(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15, state,
+                    ExtendedDataHelper.BLOCK_RENDER_TYPE);
+        }
         boolean waterloggedWater = FarmersFutureDelightCompat.usesWaterIdentity(state, layer);
         Block shaderBlock = waterloggedWater ? Blocks.WATER : state.getBlock();
         int shaderMetadata = waterloggedWater
@@ -210,7 +227,7 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
                 ? ExtendedDataHelper.FLUID_RENDER_TYPE
                 : ExtendedDataHelper.BLOCK_RENDER_TYPE;
 
-        VanillaQuadContext context = new VanillaQuadContext(
+        return new VanillaQuadContext(
                 pos.getX() & 15,
                 pos.getY() & 15,
                 pos.getZ() & 15,
@@ -218,10 +235,6 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
                 renderType,
                 (byte) state.getLightValue(this.worldSlice, pos)
         );
-        if (buffer instanceof ChunkBufferBuilder chunkBuffer && !chunkBuffer.isAllowRenderPassOptimization()) {
-            context = context.keepRenderPass();
-        }
-        extension.actinium$setActiveQuadContext(context);
     }
 
     public void beginVanillaFluidRender(BufferBuilder buffer, BlockPos pos, IBlockState state) {
@@ -362,12 +375,15 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
             }
             ModelQuadFacing facing = QuadUtil.findNormalFace(trueNormal);
             VanillaQuadContext quadContext = q < quadContexts.size() ? quadContexts.get(q) : null;
+            IBlockState sourceState = quadContext == null ? null : quadContext.deferredBlockState();
             if (quadContext != null) {
                 quadContext = resolveDeferredBlockContext(quadContext);
             }
             boolean isFluidQuad = quadContext != null && quadContext.renderType() == ExtendedDataHelper.FLUID_RENDER_TYPE;
-            Material correctMaterial = isFluidQuad
-                    ? VanillaQuadMaterial.selectFluid(material, configuration, layer)
+            Material translucentMaterial = VintageTranslucentMaterials.select(configuration, layer, material,
+                    sourceState == null ? null : sourceState.getBlock(), isFluidQuad, this.writeStainedGlassDepth);
+            Material correctMaterial = isFluidQuad || translucentMaterial != material
+                    ? translucentMaterial
                     : materialSelector.choose(quadContext, facing, sprite, quad);
 
             ChunkModelBuilder builder = buffers.get(correctMaterial);

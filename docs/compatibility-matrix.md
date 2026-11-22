@@ -341,6 +341,17 @@ Windows 10、NVIDIA GeForce RTX 5070 Laptop GPU（驱动 610.74）。
 | Derivative Main                  | d24.4.14      | 部分    | 开启、景深（DoF）开关与重复 Apply、维度切换、重载；手持动态光照；普通草、单格花、双格高草与 Farmer's Future Delight 1.5.1 蓝色矢车菊摆动（2026-11-07 用户实机确认） | 地形/实体/水/天空等完整场景清单与 Distant Horizons 组合未验证 | `fix/derivative-plant-materials` |
 | SEUS PTGI HRR                      | Test 2.1      | 无法启用 | -                                                              | 光影包不能成功开启 | `f261611`   |
 
+### 天空前的染色玻璃
+
+Derivative Main d24.4.14 和 Revelation dev 在合成时用 `depthtex0` 判断像素是否属于天空。
+半透明地形关闭深度写入时，天空前的染色玻璃仍保留深度值 `1.0`，合成阶段跳过玻璃的颜色。
+当 `gbuffers_water` 声明 `blend.gbuffers_water=off` 时，原版染色玻璃和染色玻璃板复用现有的半透明深度写入批次。
+材质 ID 仍按实际方块编码，`depthtex1` 记录绘制半透明地形之前的深度。
+Ender IO 储罐外壳使用普通半透明地形批次，储罐内部的液体由 Forge pass 1 绘制。
+
+`build` 和 `RenderTargetsTranslucentDepthGLTest` 已通过。OpenGL 回归测试验证两种玻璃均写入
+`depthtex0`，以及 `depthtex1` 保留天空深度。Outlands Relauncher 实例中的光影视觉回归与 Ender IO 储罐场景待实机确认。
+
 ## 模组与环境
 
 `performance.deferred_block_ids` 是 C09 引入的本地判据，默认空列表表示所有方块保持构建线程路径；

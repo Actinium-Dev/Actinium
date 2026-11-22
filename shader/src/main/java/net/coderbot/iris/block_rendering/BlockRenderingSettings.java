@@ -58,6 +58,7 @@ public class BlockRenderingSettings {
 	private boolean disableDirectionalShading;
 	private boolean useSeparateAo;
 	private boolean useExtendedVertexFormat;
+	private boolean writeStainedGlassDepth;
 	@Setter
 	private boolean hasSnowyEntries;
 	@Getter
@@ -233,6 +234,19 @@ public class BlockRenderingSettings {
 
 		this.reloadRequired = true;
 		this.useExtendedVertexFormat = useExtendedVertexFormat;
+	}
+
+	/** Returns whether the active terrain program defers stained-glass blending to the composite. */
+	public boolean shouldWriteStainedGlassDepth() {
+		return this.writeStainedGlassDepth;
+	}
+
+	/** Marks the chunk meshes for rebuilding when the glass depth policy changes. */
+	public void setWriteStainedGlassDepth(boolean writeStainedGlassDepth) {
+		if (this.writeStainedGlassDepth != writeStainedGlassDepth) {
+			this.writeStainedGlassDepth = writeStainedGlassDepth;
+			this.reloadRequired = true;
+		}
 	}
 
 	public static long packBlockPos(int x, int y, int z) {

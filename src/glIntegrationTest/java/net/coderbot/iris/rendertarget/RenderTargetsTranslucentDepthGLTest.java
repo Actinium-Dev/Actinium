@@ -1,14 +1,27 @@
 package net.coderbot.iris.rendertarget;
 
+import com.dhj.actinium.render.terrain.compile.VintageTranslucentMaterials;
+import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.GLSMDepthStencilAlpha;
 import com.gtnewhorizons.angelica.glsm.GLSMFramebuffer;
 import com.gtnewhorizons.angelica.glsm.GLStateManagerIntegrationFixture;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
+import dhj.embeddedt.embeddium.impl.render.chunk.RenderPassConfiguration;
+import dhj.embeddedt.embeddium.impl.render.chunk.compile.sorting.QuadPrimitiveType;
+import dhj.embeddedt.embeddium.impl.render.chunk.terrain.TerrainRenderPass;
+import dhj.embeddedt.embeddium.impl.render.chunk.terrain.material.Material;
+import dhj.embeddedt.embeddium.impl.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
+import dhj.embeddedt.embeddium.impl.render.chunk.vertex.format.ChunkMeshFormats;
+import net.coderbot.iris.celeritas.IrisCeleritasChunkShaderInterface;
 import net.coderbot.iris.gl.framebuffer.GlFramebuffer;
 import net.coderbot.iris.gl.texture.DepthBufferFormat;
 import net.coderbot.iris.shaderpack.PackDirectives;
 import net.coderbot.iris.shaderpack.PackDirectivesFixtures;
+import net.minecraft.init.Blocks;
+import net.minecraft.init.Bootstrap;
+import net.minecraft.util.BlockRenderLayer;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.lwjgl.BufferUtils;
@@ -18,8 +31,11 @@ import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GLCapabilities;
 
 import java.nio.FloatBuffer;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * Covers the depth copy the deferred pipeline takes before the translucent pass. Bloom compatibility layers call
@@ -96,6 +112,78 @@ class RenderTargetsTranslucentDepthGLTest extends GLStateManagerIntegrationFixtu
         sceneFramebuffer.bind();
         GLSMDepthStencilAlpha.glClearDepth(depth);
         GLSMFramebuffer.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+    }
+
+    @Test
+    void stainedGlassOverSkyWritesSceneDepthAndPreservesTheOpaqueSnapshot() {
+        Bootstrap.register();
+        BlockRenderLayer layer = BlockRenderLayer.TRANSLUCENT;
+        Material translucent = material("translucent", TerrainRenderPass.Semantic.TRANSLUCENT, false);
+        Material fluid = material("water", TerrainRenderPass.Semantic.WATER, true);
+        var configuration = new RenderPassConfiguration<>(
+                Map.of(layer, translucent), Map.of(layer, List.of(fluid.pass, translucent.pass)),
+                translucent, translucent, translucent, fluid);
+
+        PackDirectives directives = PackDirectivesFixtures.colortex0();
+        DepthBufferFormat format = DepthBufferFormat.DEPTH24_STENCIL8;
+        DepthTexture sceneDepth = new DepthTexture(SIZE, SIZE, format);
+        RenderTargets targets = new RenderTargets(SIZE, SIZE, sceneDepth.getTextureId(), 0, format,
+                directives.getRenderTargetDirectives().getRenderTargetSettings(), directives);
+        GlFramebuffer sceneFramebuffer = new GlFramebuffer();
+        GlFramebuffer snapshotFramebuffer = new GlFramebuffer();
+        float previousClearDepth = GL11.glGetFloat(GL11.GL_DEPTH_CLEAR_VALUE);
+        boolean previousDepthMask = GLStateManager.getDepthState().isMaskEnabled();
+        try {
+            sceneFramebuffer.addDepthAttachment(sceneDepth.getTextureId());
+            sceneFramebuffer.noDrawBuffers();
+            snapshotFramebuffer.addDepthAttachment(targets.getDepthTextureNoTranslucents().getTextureId());
+            snapshotFramebuffer.noDrawBuffers();
+
+            for (var glass : List.of(Blocks.STAINED_GLASS, Blocks.STAINED_GLASS_PANE)) {
+                Material glassMaterial = VintageTranslucentMaterials.select(
+                        configuration, layer, translucent, glass, false, true);
+                assertSame(translucent, VintageTranslucentMaterials.select(
+                        configuration, layer, translucent, glass, false, false));
+
+                GLSMDepthStencilAlpha.glDepthMask(true);
+                writeSceneDepth(sceneFramebuffer, 1.0F);
+                targets.onLevelRenderStart();
+                targets.copyPreTranslucentDepth();
+
+                GLSMDepthStencilAlpha.glDepthMask(IrisCeleritasChunkShaderInterface.shouldWriteDepth(glassMaterial.pass, false));
+                writeSceneDepth(sceneFramebuffer, TRANSLUCENT_DEPTH);
+
+                assertEquals(TRANSLUCENT_DEPTH, readTranslucentDepth(sceneFramebuffer), DEPTH_TOLERANCE,
+                        "depthtex0 must identify the glass pixel as a surface");
+                assertEquals(1.0F, readTranslucentDepth(snapshotFramebuffer), DEPTH_TOLERANCE,
+                        "depthtex1 must preserve the sky behind the glass");
+            }
+
+            assertSame(translucent, VintageTranslucentMaterials.select(
+                    configuration, layer, translucent, Blocks.ICE, false, true));
+            assertSame(fluid, VintageTranslucentMaterials.select(
+                    configuration, layer, translucent, Blocks.WATER, true, false));
+        } finally {
+            GLSMDepthStencilAlpha.glDepthMask(previousDepthMask);
+            GLSMDepthStencilAlpha.glClearDepth(previousClearDepth);
+            GLSMFramebuffer.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
+            snapshotFramebuffer.destroy();
+            sceneFramebuffer.destroy();
+            targets.destroy();
+            sceneDepth.destroy();
+        }
+    }
+
+    private static Material material(String name, TerrainRenderPass.Semantic semantic, boolean writesDepth) {
+        TerrainRenderPass pass = TerrainRenderPass.builder()
+                .name(name)
+                .semantic(semantic)
+                .writesDepth(writesDepth)
+                .useReverseOrder(true)
+                .primitiveType(QuadPrimitiveType.TRIANGULATED)
+                .vertexType(ChunkMeshFormats.COMPACT)
+                .build();
+        return new Material(pass, AlphaCutoffParameter.ZERO, true);
     }
 
     private static float readTranslucentDepth(GlFramebuffer probeFramebuffer) {
