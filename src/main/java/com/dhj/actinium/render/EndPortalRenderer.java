@@ -128,7 +128,7 @@ public final class EndPortalRenderer {
 
             boolean precomposed = false;
             if (!fadeHook && EndPortalCompositeLogic.shouldPrecompose(shaderPackInUse, layers.size())) {
-                int compositeTexture = EndPortalCompositeRenderer.texture(layers);
+                int compositeTexture = EndPortalCompositeRenderer.texture(layers, Minecraft.getMinecraft().getTextureManager());
                 if (compositeTexture != 0) {
                     GLSMTextures.glBindTexture(GL11.GL_TEXTURE_2D, compositeTexture);
                     GLStateManager.disableBlend();
