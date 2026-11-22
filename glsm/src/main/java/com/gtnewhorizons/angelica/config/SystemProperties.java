@@ -20,20 +20,26 @@ public final class SystemProperties {
      */
     public static final boolean FORCE_ORPHAN_STREAMING = Boolean.getBoolean("angelica.debug.forceOrphanStreaming");
 
-    /**
-     * Core profile version to request, written as {@code major.minor} (for example {@code 4.5}).
-     * Empty or unparsable leaves the choice to the probe over the platform ceiling.
-     */
-    public static final String GL_PROFILE = System.getProperty("angelica.glProfile", "");
+    /** Identifies the OpenGL version override in startup diagnostics and video settings. */
+    public static final String KEY_GL_PROFILE = "angelica.glProfile";
+
+    /** Core profile version override, written as {@code major.minor}. */
+    public static final String GL_PROFILE = System.getProperty(KEY_GL_PROFILE, "");
+
+    /** Identifies the backend override in early window selection and video settings. */
+    public static final String KEY_USE_SDL_GPU = "angelica.sdlgpu.enable";
 
     /**
      * Forces the SDL GPU render backend on or off, overriding the configuration value. Null when
      * unset, so the configuration value decides.
      */
-    public static final Boolean SDL_GPU_OVERRIDE = parseBooleanOverride("angelica.sdlgpu.enable");
+    public static final Boolean SDL_GPU_OVERRIDE = parseBooleanOverride(KEY_USE_SDL_GPU);
 
-    /** Backend override shared with the early window selection. */
-    public static final String KEY_USE_SDL_GPU = "angelica.sdlgpu.enable";
+    /** Identifies the SDL GPU driver override in video settings. */
+    public static final String KEY_SDL_GPU_DRIVER = "angelica.sdlgpu.driver";
+
+    /** Overrides the SDL GPU driver chosen by the configuration value. Null when unset. */
+    public static final String SDL_GPU_DRIVER_OVERRIDE = parseStringOverride(KEY_SDL_GPU_DRIVER);
 
     /** Existing LWJGL service override consumed by Actinium's embedded renderer. */
     public static final String KEY_CELERITAS_LWJGL_SERVICE = "actinium.lwjglService";
@@ -61,9 +67,6 @@ public final class SystemProperties {
     public static boolean debugTooling() {
         return isDeobf();
     }
-
-    /** Overrides the SDL GPU driver chosen by the configuration value. Null when unset. */
-    public static final String SDL_GPU_DRIVER_OVERRIDE = parseStringOverride("angelica.sdlgpu.driver");
 
     private static Boolean parseBooleanOverride(String key) {
         final String raw = System.getProperty(key);

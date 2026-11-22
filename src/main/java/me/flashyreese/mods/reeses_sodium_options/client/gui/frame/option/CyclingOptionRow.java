@@ -15,10 +15,9 @@ import me.flashyreese.mods.reeses_sodium_options.client.gui.option.RsoOption;
 import net.minecraft.client.gui.GuiScreen;
 
 import java.util.List;
+import java.util.Objects;
 
 final class CyclingOptionRow extends AbstractOptionRow {
-    private static final int MAX_CONTENT_WIDTH = 70;
-
     private final RsoOption option;
 
     CyclingOptionRow(LayoutBounds dim, GuiTheme theme, OptionStateStore optionStateStore, RsoOption option) {
@@ -33,7 +32,7 @@ final class CyclingOptionRow extends AbstractOptionRow {
 
     @Override
     protected int controlContentWidth() {
-        return Math.min(MAX_CONTENT_WIDTH, this.font.width(this.displayValue()));
+        return this.font.width(this.displayValue());
     }
 
     @Override
@@ -85,7 +84,12 @@ final class CyclingOptionRow extends AbstractOptionRow {
 
     @Override
     protected boolean controlKeyPressed(KeyEvent event) {
-        if (!this.isRowFocused() || !event.isSelection()) {
+        return this.isRowFocused() && event.isSelection() && this.activateControl();
+    }
+
+    @Override
+    protected boolean activateControl() {
+        if (!this.option.isEnabled() || this.option.shouldHideControl()) {
             return false;
         }
 
@@ -94,15 +98,12 @@ final class CyclingOptionRow extends AbstractOptionRow {
         return true;
     }
 
-    @Override
-    protected boolean activateControl() {
-        this.cycleControl(GuiScreen.isShiftKeyDown());
-
-        return true;
-    }
-
     private Component displayValue() {
         Component value = Component.from(this.option.getElementName(this.option.getPendingValue()));
+        int availableWidth = this.getWidth() / 2;
+        if (this.font.width(value) > availableWidth) {
+            value = Component.literal(this.truncateTextToFit(value.getString(), availableWidth));
+        }
 
         return this.option.isEnabled() ? value : this.formatDisabledControlValue(value);
     }
@@ -133,7 +134,7 @@ final class CyclingOptionRow extends AbstractOptionRow {
 
     private void cycleControl(boolean reverse) {
         Object nextValue = this.nextValue(reverse);
-        if (java.util.Objects.equals(nextValue, this.option.getPendingValue())) {
+        if (Objects.equals(nextValue, this.option.getPendingValue())) {
             return;
         }
 
@@ -144,26 +145,17 @@ final class CyclingOptionRow extends AbstractOptionRow {
     private Object nextValue(boolean reverse) {
         Object[] values = this.option.getAllowedValues();
         Object currentValue = this.option.getPendingValue();
-        int valueIndex = 0;
+        if (values.length == 0) {
+            return currentValue;
+        }
 
+        int direction = reverse ? -1 : 1;
         for (int i = 0; i < values.length; i++) {
-            if (values[i] == currentValue) {
-                valueIndex = i;
-                break;
+            if (Objects.equals(values[i], currentValue)) {
+                return values[Math.floorMod(i + direction, values.length)];
             }
         }
 
-        for (int i = 0; i < values.length; i++) {
-            valueIndex = reverse
-                    ? (valueIndex + values.length - 1) % values.length
-                    : (valueIndex + 1) % values.length;
-            Object nextValue = values[valueIndex];
-
-            if (this.option.isValueAllowed(nextValue)) {
-                return nextValue;
-            }
-        }
-
-        return currentValue;
+        return reverse ? values[values.length - 1] : values[0];
     }
 }

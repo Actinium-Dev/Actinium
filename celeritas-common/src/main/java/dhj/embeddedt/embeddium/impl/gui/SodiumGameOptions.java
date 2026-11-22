@@ -122,7 +122,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         public int itemRendererCacheSize = 512;
         public AsyncOcclusionMode asyncOcclusionMode = AsyncOcclusionMode.ONLY_SHADOW;
         public boolean useRasterOcclusionCulling = true;
-        public GpuCullingMode gpuCullingMode = GpuCullingMode.CPU_ONLY;
+        public GpuCullingMode gpuCullingMode = GpuCullingMode.COMPUTE;
     }
 
     public static class AdvancedSettings {
@@ -130,6 +130,8 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         public boolean renderBackendSdlGpu = false;
         /** Preferred SDL GPU driver; an empty value selects the platform default. */
         public String renderBackendDriver = "";
+        /** OpenGL core profile ceiling as major * 10 + minor. Zero probes from the platform maximum. */
+        public int glVersion = 0;
         /** Limits queued GPU frames and their associated resource lifetime. */
         public int sdlGpuFramesInFlight = 2;
         /** Presents GPU frames on a separate executor. */
@@ -145,7 +147,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         public boolean useFastLitItemDisplayLists = true;
 
         public int cpuRenderAheadLimit = 0;
-        public MultiDrawMode multiDrawMode = MultiDrawMode.DIRECT;
+        public MultiDrawMode multiDrawMode = MultiDrawMode.INDIRECT;
         public StreamingUploadStrategy streamingUploadStrategy = StreamingUploadStrategy.MAP_BUFFER_RANGE;
     }
 

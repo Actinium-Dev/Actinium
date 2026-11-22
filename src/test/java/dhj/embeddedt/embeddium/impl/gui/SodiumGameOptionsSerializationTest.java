@@ -64,6 +64,24 @@ class SodiumGameOptionsSerializationTest {
     }
 
     @Test
+    void legacyRendererSettingsDefaultToAutomaticOpenGlAndSaveTheSelectedVersion() throws IOException {
+        Files.createDirectories(TEST_CONFIG_PATH.getParent());
+        Files.writeString(TEST_CONFIG_PATH, """
+                {"advanced":{"render_backend_sdl_gpu":true,"render_backend_driver":"vulkan"}}
+                """);
+
+        SodiumGameOptions options = SodiumGameOptions.load(TEST_CONFIG_NAME);
+        assertEquals(0, options.advanced.glVersion, "legacy options should keep probing OpenGL automatically");
+        options.advanced.glVersion = 45;
+        options.save();
+
+        SodiumGameOptions reloaded = SodiumGameOptions.load(TEST_CONFIG_NAME);
+        assertEquals(options.advanced.glVersion, reloaded.advanced.glVersion);
+        assertTrue(reloaded.advanced.renderBackendSdlGpu);
+        assertEquals("vulkan", reloaded.advanced.renderBackendDriver);
+    }
+
+    @Test
     void performanceIndicatorSurvivesASaveAndReload() {
         SodiumGameOptions options = SodiumGameOptions.load(TEST_CONFIG_NAME);
         options.performanceIndicator.enabled = true;

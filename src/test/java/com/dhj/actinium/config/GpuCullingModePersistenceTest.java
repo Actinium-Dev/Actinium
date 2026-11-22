@@ -33,10 +33,10 @@ class GpuCullingModePersistenceTest {
     @Test
     void selectedModeSurvivesASaveAndReload() throws IOException {
         SodiumGameOptions options = SodiumGameOptions.load(CONFIG_NAME);
-        options.performance.gpuCullingMode = GpuCullingMode.COMPUTE;
+        options.performance.gpuCullingMode = GpuCullingMode.CPU_ONLY;
 
         SodiumGameOptions.writeToDisk(options);
 
-        assertEquals(GpuCullingMode.COMPUTE, SodiumGameOptions.load(CONFIG_NAME).performance.gpuCullingMode);
+        assertEquals(GpuCullingMode.CPU_ONLY, SodiumGameOptions.load(CONFIG_NAME).performance.gpuCullingMode);
     }
 }

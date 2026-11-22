@@ -8,10 +8,10 @@ import com.gtnewhorizons.angelica.config.GLVersionChoice;
 import com.gtnewhorizons.angelica.config.SystemProperties;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import com.gtnewhorizons.angelica.glsm.backend.BackendOptions;
+import net.minecraft.util.Util;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.LWJGLException;
-import org.lwjgl.LWJGLUtil;
 import org.lwjgl.opengl.ContextAttribs;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
@@ -61,11 +61,11 @@ public final class CoreProfileDisplayCreator {
     }
 
     private static void createWithFallback(PixelFormat format, boolean lwjglDebug) throws LWJGLException {
-        final boolean macos = LWJGLUtil.getPlatform() == LWJGLUtil.PLATFORM_MACOSX;
-        final GLVersionChoice requested = GLVersionChoice.of(requestedGlVersion(), macos ? 41 : 46);
-        final int maxMajor = requested == GLVersionChoice.AUTO ? 4 : requested.version() / 10;
-        final int maxMinor = requested == GLVersionChoice.AUTO ? (macos ? 1 : 6) : requested.version() % 10;
-        int maxProbe = maxMajor * 10 + maxMinor;
+        final int ceiling = glVersionCeiling();
+        final GLVersionChoice requested = GLVersionChoice.of(requestedGlVersion(), ceiling);
+        int maxProbe = requested == GLVersionChoice.AUTO ? ceiling : requested.version();
+        final int maxMajor = maxProbe / 10;
+        final int maxMinor = maxProbe % 10;
         Exception lastException = null;
         String lastRejection = null;
 
@@ -207,22 +207,24 @@ public final class CoreProfileDisplayCreator {
         }
     }
 
-    /**
-     * Resolves the core profile version to request. {@link SystemProperties#GL_PROFILE} wins when it
-     * parses, otherwise the configuration value recorded by {@link BackendOptions} decides. Zero
-     * leaves the choice to the probe, which {@link GLVersionChoice#of} resolves to
-     * {@link GLVersionChoice#AUTO}.
-     */
+    /** Returns the highest core profile version the platform can request. */
+    public static int glVersionCeiling() {
+        return Util.getOSType() == Util.EnumOS.OSX ? 41 : 46;
+    }
+
+    /** Returns the packed JVM override, or -1 when the configuration decides the version. */
+    public static int glVersionOverride() {
+        return Math.max(-1, parseGlProfile(SystemProperties.GL_PROFILE.trim()));
+    }
+
     private static int requestedGlVersion() {
-        final String raw = SystemProperties.GL_PROFILE.trim();
-        if (raw.isEmpty()) {
-            return BackendOptions.configGlVersion();
-        }
-        final int parsed = parseGlProfile(raw);
+        final int parsed = glVersionOverride();
         if (parsed >= 0) {
             return parsed;
         }
-        LOGGER.warn("Ignoring unparsable angelica.glProfile value '{}'", raw);
+        if (!SystemProperties.GL_PROFILE.isBlank()) {
+            LOGGER.warn("Ignoring unparsable {} value '{}'", SystemProperties.KEY_GL_PROFILE, SystemProperties.GL_PROFILE);
+        }
         return BackendOptions.configGlVersion();
     }
 

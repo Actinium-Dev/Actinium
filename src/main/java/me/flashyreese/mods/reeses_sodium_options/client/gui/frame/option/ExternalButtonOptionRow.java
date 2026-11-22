@@ -13,8 +13,9 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.text.TextFormatting;
 
 final class ExternalButtonOptionRow extends AbstractOptionRow {
-    private static final int CONTENT_WIDTH = 65;
+    private static final int MIN_CONTENT_WIDTH = 65;
     private static final Component BASE_BUTTON_TEXT = Component.translatable("sodium.options.open_external_page_button");
+    private static final Component ARROW = Component.literal(" >");
 
     private final GuiScreen screen;
     private final RsoOption option;
@@ -32,7 +33,7 @@ final class ExternalButtonOptionRow extends AbstractOptionRow {
 
     @Override
     protected int controlContentWidth() {
-        return CONTENT_WIDTH;
+        return Math.max(MIN_CONTENT_WIDTH, this.font.width(this.buttonText()));
     }
 
     @Override
@@ -66,13 +67,18 @@ final class ExternalButtonOptionRow extends AbstractOptionRow {
             label = BASE_BUTTON_TEXT;
         }
 
+        int availableWidth = Math.max(MIN_CONTENT_WIDTH, this.getWidth() / 2) - this.font.width(ARROW);
+        if (this.font.width(label) > availableWidth) {
+            label = Component.literal(this.truncateTextToFit(label.getString(), availableWidth));
+        }
+
         if (!this.option.isEnabled()) {
             return label.copy().withStyle(TextFormatting.STRIKETHROUGH, TextFormatting.GRAY);
         }
 
         return Component.empty()
                 .append(label.copy().withStyle(TextFormatting.UNDERLINE))
-                .append(Component.literal(" >").withStyle(Style.EMPTY.withColor(this.theme.theme)));
+                .append(ARROW.copy().withStyle(Style.EMPTY.withColor(this.theme.theme)));
     }
 
     @Override

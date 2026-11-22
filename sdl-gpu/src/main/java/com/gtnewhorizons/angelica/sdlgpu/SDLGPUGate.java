@@ -29,16 +29,16 @@ import java.util.List;
 import static org.lwjgl.sdl.SDLVideo.SDL_WINDOW_METAL;
 import static org.lwjgl.sdl.SDLVideo.SDL_WINDOW_VULKAN;
 
-/** Selects SDL GPU before Outlands freezes the window backend. */
+/** Selects SDL GPU before the host freezes the window backend. */
 public final class SDLGPUGate {
     private static final Logger LOG = LogManager.getLogger("Actinium/SDLGPU");
     private static final String BACKEND_ID = "actinium-sdl-gpu";
     public static final int REQUIREMENTS_REVISION = 2;
     private static final List<Check> REQUIREMENTS = List.of(
         new Check("/org/lwjgl/sdl/SDLGPU.class", "SDL GPU bindings are missing"),
-        new Check("/org/lwjgl/MainThread.class", "Outlands main-thread API is missing"),
-        new Check("/org/lwjgl/opengl/DisplayEvents.class", "Outlands window lifecycle callbacks are missing"),
-        new Check("/net/minecraftforge/client/render/RenderBackendSelection.class", "Outlands render backend API is missing"),
+        new Check("/org/lwjgl/MainThread.class", "Main-thread API is missing"),
+        new Check("/org/lwjgl/opengl/DisplayEvents.class", "Window lifecycle callbacks are missing"),
+        new Check("/net/minecraftforge/client/render/RenderBackendSelection.class", "Host render backend API is missing"),
         new Check("/org/lwjgl/util/shaderc/Shaderc.class", "LWJGL shaderc bindings are missing"),
         new Check("/org/lwjgl/util/spvc/Spvc.class", "LWJGL SPIRV-Cross bindings are missing"));
     private static final Check MISSING_REQUIREMENT = DependencyVerifier.firstMissing(SDLGPUGate.class, REQUIREMENTS);

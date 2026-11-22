@@ -4,6 +4,7 @@ import com.dhj.actinium.gui.rso.compat.Component;
 import dhj.embeddedt.embeddium.api.options.OptionIdentifier;
 import dhj.embeddedt.embeddium.api.options.control.CyclingControl;
 import dhj.embeddedt.embeddium.api.options.control.ExternalButtonControl;
+import dhj.embeddedt.embeddium.api.options.control.ReadOnlyTextControl;
 import dhj.embeddedt.embeddium.api.options.control.SliderControl;
 import dhj.embeddedt.embeddium.api.options.control.TickBoxControl;
 import dhj.embeddedt.embeddium.api.options.structure.OptionImpact;
@@ -12,6 +13,7 @@ import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextComponentTranslation;
 import dhj.embeddedt.embeddium.api.options.structure.Option;
 import dhj.embeddedt.embeddium.impl.gui.framework.TextComponent;
+import dhj.embeddedt.embeddium.impl.gui.options.TextProvider;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -118,6 +120,10 @@ public final class RsoOption {
         return this.delegate.getControl() instanceof ExternalButtonControl;
     }
 
+    public boolean isReadOnlyText() {
+        return this.delegate.getControl() instanceof ReadOnlyTextControl;
+    }
+
     /** Returns the slider lower bound (meaningful only when isSlider). */
     public int sliderMin() {
         return ((SliderControl) this.delegate.getControl()).getMin();
@@ -151,7 +157,9 @@ public final class RsoOption {
                 return convertText(names[i]);
             }
         }
-        return new TextComponentString(value.toString());
+        return value instanceof TextProvider provider
+                ? convertText(provider.getLocalizedName())
+                : new TextComponentString(value.toString());
     }
 
     /** Returns whether the cycling control accepts a value (meaningful only when isCycling). */

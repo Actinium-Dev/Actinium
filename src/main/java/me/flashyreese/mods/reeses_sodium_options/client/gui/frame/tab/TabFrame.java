@@ -82,6 +82,13 @@ public class TabFrame extends AbstractFrame {
         this.buildFrame();
     }
 
+    /** Expands the target group and scrolls the selected tab into view. */
+    public void revealTab(Tab<?> tab) {
+        this.tabRail.showRestoredSelectedTab(tab);
+        this.scrollSelectedTabIntoView.set(true);
+        this.setTab(Optional.of(tab));
+    }
+
     public void refreshFromState() {
         int selectedPageScrollOffset = this.optionPageScrollBarOffset.getOrDefault(0);
         this.tabSelection.restorePersistedTab(this.tabRail::showRestoredSelectedTab);

@@ -25,7 +25,6 @@ import dhj.embeddedt.embeddium.impl.render.culling.GpuCulling;
 import dhj.embeddedt.embeddium.impl.render.culling.GpuCullingMode;
 import com.dhj.actinium.render.terrain.GpuCullingSettings;
 import com.dhj.actinium.runtime.ActiniumRuntime;
-import com.dhj.actinium.startup.SdlGpuBootstrap;
 import com.gtnewhorizons.angelica.config.AngelicaConfig;
 import dhj.embeddedt.embeddium.api.options.structure.OptionFlag;
 import dhj.embeddedt.embeddium.api.options.structure.OptionGroup;
@@ -179,6 +178,8 @@ public class ActiniumGameOptionPages {
 
     public static OptionPage general() {
         List<OptionGroup> groups = new ArrayList<>();
+
+        groups.add(GraphicsOptionPage.link(sodiumOpts));
         groups.add(OptionGroup.createBuilder()
                 .setId(StandardOptions.Group.RENDERING)
                 .add(OptionImpl.createBuilder(int.class, vanillaOpts)
@@ -537,52 +538,6 @@ public class ActiniumGameOptionPages {
         List<OptionGroup> groups = new ArrayList<>();
 
         groups.add(OptionGroup.createBuilder()
-                .setId(OptionIdentifier.create("actinium", "render_backend"))
-                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
-                        .setId(OptionIdentifier.create("actinium", "sdl_gpu", boolean.class))
-                        .setName(TextComponent.translatable("options.actinium.sdl_gpu"))
-                        .setTooltip(TextComponent.translatable("options.actinium.sdl_gpu.tooltip"))
-                        .setControl(TickBoxControl::new)
-                        .setBinding((opts, value) -> opts.advanced.renderBackendSdlGpu = value,
-                                opts -> opts.advanced.renderBackendSdlGpu)
-                        .setEnabledPredicate(SdlGpuBootstrap::isSupported)
-                        .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
-                        .setDefaultValue(false)
-                        .build())
-                .add(OptionImpl.createBuilder(SodiumGameOptions.SdlGpuDriver.class, sodiumOpts)
-                        .setId(OptionIdentifier.create("actinium", "sdl_driver", SodiumGameOptions.SdlGpuDriver.class))
-                        .setName(TextComponent.translatable("options.actinium.sdl_driver"))
-                        .setTooltip(TextComponent.translatable("options.actinium.sdl_driver.tooltip"))
-                        .setControl(opt -> new CyclingControl<>(opt, SodiumGameOptions.SdlGpuDriver.class))
-                        .setBinding((opts, value) -> opts.advanced.renderBackendDriver = value.id(),
-                                opts -> SodiumGameOptions.SdlGpuDriver.fromId(opts.advanced.renderBackendDriver))
-                        .setEnabledPredicate(SdlGpuBootstrap::isSupported)
-                        .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
-                        .setDefaultValue(SodiumGameOptions.SdlGpuDriver.AUTO)
-                        .build())
-                .add(OptionImpl.createBuilder(int.class, sodiumOpts)
-                        .setId(OptionIdentifier.create("actinium", "sdl_frames_in_flight", int.class))
-                        .setName(TextComponent.translatable("options.actinium.sdl_frames_in_flight"))
-                        .setTooltip(TextComponent.translatable("options.actinium.sdl_frames_in_flight.tooltip"))
-                        .setControl(opt -> new SliderControl(opt, 1, 3, 1, ControlValueFormatter.number()))
-                        .setBinding((opts, value) -> opts.advanced.sdlGpuFramesInFlight = value,
-                                opts -> opts.advanced.sdlGpuFramesInFlight)
-                        .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
-                        .setDefaultValue(2)
-                        .build())
-                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
-                        .setId(OptionIdentifier.create("actinium", "sdl_presenter_thread", boolean.class))
-                        .setName(TextComponent.translatable("options.actinium.sdl_presenter_thread"))
-                        .setTooltip(TextComponent.translatable("options.actinium.sdl_presenter_thread.tooltip"))
-                        .setControl(TickBoxControl::new)
-                        .setBinding((opts, value) -> opts.advanced.sdlGpuPresenterThread = value,
-                                opts -> opts.advanced.sdlGpuPresenterThread)
-                        .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
-                        .setDefaultValue(true)
-                        .build())
-                .build());
-
-        groups.add(OptionGroup.createBuilder()
                 .setId(StandardOptions.Group.CPU_SAVING)
                 .add(OptionImpl.createBuilder(int.class, sodiumOpts)
                         .setId(StandardOptions.Option.CPU_FRAMES_AHEAD.cast())
@@ -601,7 +556,7 @@ public class ActiniumGameOptionPages {
                         .setControl(option -> new CyclingControl<>(option, ActiniumGameOptionPages::allowedMultiDrawModes))
                         .setBinding((opts, value) -> opts.advanced.multiDrawMode = value, opts -> opts.advanced.multiDrawMode)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setDefaultValue(MultiDrawMode.DIRECT)
+                        .setDefaultValue(MultiDrawMode.INDIRECT)
                         .build()
                 )
                 .add(OptionImpl.createBuilder(GpuCullingMode.class, sodiumOpts)
@@ -617,7 +572,7 @@ public class ActiniumGameOptionPages {
                         .setEnabledPredicate(GpuCulling::isAvailable)
                         .setImpact(OptionImpact.HIGH)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setDefaultValue(GpuCullingMode.CPU_ONLY)
+                        .setDefaultValue(GpuCullingMode.COMPUTE)
                         .build()
                 )
                 .add(OptionImpl.createBuilder(SodiumGameOptions.StreamingUploadStrategy.class, sodiumOpts)
