@@ -1,6 +1,6 @@
 # Actinium 兼容性矩阵
 
-最后更新：2026-11-18。
+最后更新：2026-11-22。
 
 状态定义：`已验证` 表示在记录的版本和场景中通过；`部分` 表示能运行但存在已知缺口；
 `无法启用` 表示光影包不能成功开启；`未验证` 不代表不兼容。更新记录时必须填写 Actinium commit、
@@ -8,6 +8,14 @@
 
 本轮验证环境：Actinium `30c7ffb`、Java 25.0.3、Cleanroom 0.5.12-alpha、Distant Horizons 3.1.2-b、
 Windows 10、NVIDIA GeForce RTX 5070 Laptop GPU（驱动 610.74）。
+
+> 2026-11-22 追加：LibrarianLib Continuous（CurseForge `1058274:6617935`）的方块发光回调在
+> Actinium 快速区块构建后仍尝试回写原版 `BufferBuilder`。快速路径将顶点写入区块网格缓冲区，
+> 因此 Random PSIdeas（`302313:3215550`）发光板可触发 `GlowingHandler.relightQuads` 越界。
+> 修复后，快速路径按 LibrarianLib 的方块处理器逐 quad 写入发光 lightmap，并跳过对原版缓冲区
+> 的回写；走原版渲染路径的方块继续使用 LibrarianLib 的回调。Actinium `0b21f7be` 加本修复的
+> 构建在 Windows 11、Java 25、Cleanroom 0.6.13-alpha、关闭光影的整合包中进入世界，
+> CleanMix 日志确认兼容 Mixin 已应用，客户端日志未再出现该越界；开光影的视觉效果待验证。
 
 > 2026-11-18 追加：BSL_v10.1p1 下，关闭世界附魔光效后丢出附魔书会让后续实体全部进入
 > `GLINT` 发光程序，已修复并由用户实机确认。`MixinRenderItemDroppedInstancing` 在 `HEAD` 取消

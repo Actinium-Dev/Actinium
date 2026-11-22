@@ -17,6 +17,7 @@ public class ChunkBufferBuilder extends BufferBuilder {
     private final BlockRenderLayer layer;
     private boolean forceVanillaRendering;
     private boolean allowRenderPassOptimization = true;
+    private boolean fastModelRender;
 
     public ChunkBufferBuilder(int bufferSize, VintageChunkBuildContext context, BlockRenderLayer layer) {
         super(bufferSize);
@@ -56,5 +57,16 @@ public class ChunkBufferBuilder extends BufferBuilder {
 
     public void setAllowRenderPassOptimization(boolean allowRenderPassOptimization) {
         this.allowRenderPassOptimization = allowRenderPassOptimization;
+    }
+
+    public void setFastModelRender(boolean fastModelRender) {
+        this.fastModelRender = fastModelRender;
+    }
+
+    /** Claims the dispatcher result for the post-render glow hook. */
+    public boolean consumeFastModelRender() {
+        boolean rendered = this.fastModelRender;
+        this.fastModelRender = false;
+        return rendered;
     }
 }

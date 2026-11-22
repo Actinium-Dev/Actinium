@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.vintage.core.terrain;
 
+import com.dhj.actinium.compat.librarianlib.LibrarianLibGlowCompat;
 import com.dhj.actinium.render.terrain.compile.ChunkBlockRendererRouter;
 import com.dhj.actinium.render.terrain.compile.ChunkBufferBuilder;
 import com.dhj.actinium.world.cloned.ActiniumBlockAccess;
@@ -47,10 +48,19 @@ public class MixinBlockRendererDispatcher {
     ) {
         if (ChunkBlockRendererRouter.shouldUseFastRenderer(world, buffer)) {
             ChunkBufferBuilder chunkBuffer = (ChunkBufferBuilder)buffer;
-            return chunkBuffer.getContext().getBlockRenderer()
+            boolean rendered = chunkBuffer.getContext().getBlockRenderer()
                     .renderModel(model, state, pos, (ActiniumBlockAccess)world, chunkBuffer.getLayer(),
                             chunkBuffer.isAllowRenderPassOptimization());
+            if (LibrarianLibGlowCompat.IS_LOADED) {
+                // Even a fully culled model must not relight quads from an earlier vanilla draw.
+                chunkBuffer.setFastModelRender(true);
+            }
+            return rendered;
         }
-        return original.call(renderer, world, model, state, pos, buffer, checkSides);
+        boolean rendered = original.call(renderer, world, model, state, pos, buffer, checkSides);
+        if (LibrarianLibGlowCompat.IS_LOADED && buffer instanceof ChunkBufferBuilder chunkBuffer) {
+            chunkBuffer.setFastModelRender(false);
+        }
+        return rendered;
     }
 }

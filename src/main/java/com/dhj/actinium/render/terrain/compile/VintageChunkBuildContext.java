@@ -285,6 +285,7 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
     public void endVanillaRender(BufferBuilder buffer) {
         if (buffer instanceof ChunkBufferBuilder chunkBuffer) {
             chunkBuffer.setForceVanillaRendering(false);
+            chunkBuffer.setFastModelRender(false);
         }
         if (buffer instanceof BufferBuilderExtension extension) {
             extension.actinium$setActiveQuadContext(null);
