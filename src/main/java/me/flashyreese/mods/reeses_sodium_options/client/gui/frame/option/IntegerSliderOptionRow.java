@@ -190,13 +190,12 @@ final class IntegerSliderOptionRow extends AbstractOptionRow {
             this.updatePrecisionMode(true, this.lastDragMouseX);
         }
 
-        if (!this.isRowFocused()) {
+        if (!this.isRowFocused() || !this.option.isEnabled() || this.option.shouldHideControl()) {
             return false;
         }
 
         if (event.isSelection()) {
-            this.editMode = !this.editMode;
-            return true;
+            return this.activateControl();
         }
 
         if (this.editMode) {
@@ -212,6 +211,10 @@ final class IntegerSliderOptionRow extends AbstractOptionRow {
 
     @Override
     protected boolean activateControl() {
+        if (!this.option.isEnabled() || this.option.shouldHideControl()) {
+            return false;
+        }
+
         this.editMode = !this.editMode;
 
         return true;

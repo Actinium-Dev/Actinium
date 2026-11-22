@@ -29,6 +29,7 @@ public final class StandardOptions {
         public static final OptionIdentifier<Void> QUALITY = OptionIdentifier.create(ACTINIUM_MOD_NAME, "quality");
         public static final OptionIdentifier<Void> PERFORMANCE = OptionIdentifier.create(ACTINIUM_MOD_NAME, "performance");
         public static final OptionIdentifier<Void> ADVANCED = OptionIdentifier.create(ACTINIUM_MOD_NAME, "advanced");
+        public static final OptionIdentifier<Void> GRAPHICS = OptionIdentifier.create(ACTINIUM_MOD_NAME, "graphics");
         public static final OptionIdentifier<Void> DEBUG = OptionIdentifier.create(ACTINIUM_MOD_NAME, "debug");
         public static final OptionIdentifier<Void> SHADERS = OptionIdentifier.create(EMBEDDIUM_MOD_ID, "shaders");
     }

@@ -1,9 +1,9 @@
 package com.dhj.actinium.compat.sodium;
 
 import com.dhj.actinium.gui.ActiniumGameOptionPages;
+import com.dhj.actinium.gui.GraphicsOptionPage;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import net.irisshaders.iris.compat.sodium.IrisConfigEntryPoint;
-import dhj.embeddedt.embeddium.api.options.structure.StandardOptions;
 import dhj.embeddedt.embeddium.impl.gui.SodiumGameOptions;
 import dhj.embeddedt.embeddium.impl.gui.options.CommonOptionPages;
 import dhj.embeddedt.embeddium.api.options.structure.OptionPage;
@@ -31,25 +31,16 @@ public final class ActiniumOptionPages {
                 ActiniumGameOptionPages.general(),
                 ActiniumGameOptionPages.quality(),
                 CommonOptionPages.performance(options),
-                ActiniumGameOptionPages.advanced(),
-                ActiniumGameOptionPages.debug()));
+                ActiniumGameOptionPages.advanced()));
+        appendGraphicsAndDebug(pages, options);
         pages.addAll(new IrisConfigEntryPoint().createPages());
-        return List.copyOf(retainEnabledPages(pages, options));
+        return List.copyOf(pages);
     }
 
-    /**
-     * Returns the candidate pages the supplied configuration exposes. While
-     * {@code enableDebugTab} is off the DEBUG page is dropped here, so it never
-     * reaches the tab rail, the search index, or the apply/undo sweep. The
-     * decision stays separate from the page builders because those need a client
-     * locale and GL context, which the unit tests deliberately do without.
-     */
-    static List<OptionPage> retainEnabledPages(List<OptionPage> pages, SodiumGameOptions options) {
+    static void appendGraphicsAndDebug(List<OptionPage> pages, SodiumGameOptions options) {
+        pages.add(GraphicsOptionPage.create(options));
         if (options.enableDebugTab) {
-            return pages;
+            pages.add(ActiniumGameOptionPages.debug());
         }
-        return pages.stream()
-                .filter(page -> !StandardOptions.Pages.DEBUG.equals(page.getId()))
-                .toList();
     }
 }

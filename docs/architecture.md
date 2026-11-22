@@ -59,7 +59,7 @@ moltenvk（独立分发，不参与主 jar 合并）
 
 `sdl-gpu` 子项目依赖 GLSM，通过根项目合并进分发 jar。上游来源为 Angelica `8e099e95`，包含 GPU device、命令缓冲、纹理与缓冲资源、GLSL 交叉编译、管线与交换链呈现。开发环境使用 Outlands `feat/non-gl-render-backend-lifecycle` 的窗口事件接口（本地依赖 `2026.11.11-2`），LWJGL Java 绑定与 native 包统一为 `3.4.3`。
 
-后端候选由启动代码检查宿主和依赖后注册到 `RenderBackendCandidates`。SDL provider 不写入分发服务清单，旧 Cleanroom 保留原 OpenGL 服务；SDL 类型只从宿主检查通过的分支加载。`advanced.render_backend_sdl_gpu`、`render_backend_driver`、`sdl_gpu_frames_in_flight` 与 `sdl_gpu_presenter_thread` 在窗口创建前读取，修改后须重启。
+后端候选由启动代码检查宿主和依赖后注册到 `RenderBackendCandidates`。SDL provider 不写入分发服务清单，旧 Cleanroom 保留原 OpenGL 服务。SDL 类型只从宿主检查通过的分支加载。视频设置的「图形」页将后端选择、驱动、并行帧数、呈现线程和 OpenGL 版本保存到 `advanced`。启动代码在窗口创建前读取这些设置，修改后须重启。`advanced.gl_version` 控制 OpenGL 核心上下文的探测上限，`0` 从平台上限开始自动探测。
 
 Outlands 管理窗口和输入，并提供与 lwjgl3ify 对应的创建、销毁、能力覆盖及共享 drawable 入口。Actinium 通过回调认领无 GL 窗口，显式 transformer 负责 SDL 专用的呈现与共享 drawable 生命周期。GLSM 继续持有每个 drawable 的逻辑状态，SDL 后端将其应用到自己的 frame/context。退出前必须等待执行中的 GPU 提交并释放窗口认领，再销毁宿主窗口。
 

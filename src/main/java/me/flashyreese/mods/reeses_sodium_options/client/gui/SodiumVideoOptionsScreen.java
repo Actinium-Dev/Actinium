@@ -9,6 +9,8 @@ import com.dhj.actinium.gui.rso.compat.GuiGraphicsExtractor;
 import com.dhj.actinium.gui.rso.compat.KeyEvent;
 import com.dhj.actinium.gui.rso.compat.MouseButtonEvent;
 import com.dhj.actinium.gui.rso.compat.ScreenDirection;
+import dhj.embeddedt.embeddium.api.options.OptionIdentifier;
+import dhj.embeddedt.embeddium.api.options.structure.ExternalPage;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.frame.AbstractFrame;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.frame.BasicFrame;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.frame.option.OptionRow;
@@ -49,6 +51,7 @@ public class SodiumVideoOptionsScreen extends GuiScreen implements PreviousScree
     private SearchTextFieldWidget searchTextField;
     private AbstractFrame rootFrame;
     private TabFrame tabFrame;
+    private OptionIdentifier<?> requestedPage;
     private GuiEventListener focused;
     private ComponentPath previousArrowFocusPath;
     private GuiEventListener currentArrowFocusLeaf;
@@ -83,6 +86,33 @@ public class SodiumVideoOptionsScreen extends GuiScreen implements PreviousScree
 
     public TabFrame rso$getTabFrame() {
         return this.tabFrame;
+    }
+
+    /** Selects a page after the current input callback has finished dispatching. */
+    public void showPage(OptionIdentifier<?> pageId) {
+        this.requestedPage = Objects.requireNonNull(pageId);
+    }
+
+    private void activateRequestedPage() {
+        if (this.requestedPage == null) {
+            return;
+        }
+
+        OptionIdentifier<?> pageId = this.requestedPage;
+        this.requestedPage = null;
+        this.tabFrame.getTabs().stream()
+                .filter(tab -> pageId.equals(tab.getPage().getId()) && !(tab.getPage() instanceof ExternalPage))
+                .findFirst()
+                .ifPresent(tab -> {
+                    this.searchTextField.clearText();
+                    this.uiState.clearSelectedOptions();
+                    this.clearArrowNavigationMemory();
+                    this.rootFrame.setFocused(null);
+                    this.tabFrame.revealTab(tab);
+                    if (!this.restoreFocusedOptionForSelectedTab()) {
+                        this.setFocused(this.rootFrame);
+                    }
+                });
     }
 
     // Hackalicious! Rebuild UI
@@ -229,6 +259,7 @@ public class SodiumVideoOptionsScreen extends GuiScreen implements PreviousScree
 
     @Override
     public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+        this.activateRequestedPage();
         this.drawDefaultBackground();
         this.updateControls();
         GuiGraphicsExtractor guiGraphics = new GuiGraphicsExtractor();
@@ -341,7 +372,7 @@ public class SodiumVideoOptionsScreen extends GuiScreen implements PreviousScree
                 return;
             }
 
-            if (this.isApplyShortcut(keyCode)) {
+            if (this.isApplyShortcut(keyCode) && !this.isExternalButtonFocused()) {
                 if (this.anyOptionChanged()) {
                     this.applyAllOptions();
                     this.updateControls();
@@ -394,6 +425,11 @@ public class SodiumVideoOptionsScreen extends GuiScreen implements PreviousScree
 
     private boolean isSearchTextFieldFocused() {
         return this.searchTextField != null && this.searchTextField.isFocused();
+    }
+
+    private boolean isExternalButtonFocused() {
+        OptionRow row = this.getFocusedOptionRow();
+        return row != null && row.getOption().isEnabled() && row.getOption().isExternalButton();
     }
 
     private boolean clearSearchText() {
@@ -488,6 +524,7 @@ public class SodiumVideoOptionsScreen extends GuiScreen implements PreviousScree
     }
 
     private void afterInput(String previousTabKey) {
+        this.activateRequestedPage();
         if (this.isSearchTextFieldFocused()) {
             return;
         }

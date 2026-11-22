@@ -1,12 +1,13 @@
 package com.dhj.actinium.startup;
 
-import com.dhj.actinium.config.ActiniumConfig;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.gtnewhorizons.angelica.glsm.backend.BackendOptions;
 import com.gtnewhorizons.angelica.glsm.backend.BackendStartGuard;
 import com.gtnewhorizons.angelica.config.SystemProperties;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.hooks.GLSMConfig;
+import com.gtnewhorizons.angelica.glsm.loading.DependencyVerifier;
+import com.gtnewhorizons.angelica.glsm.loading.DependencyVerifier.Check;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUDisplayBridge;
 import org.apache.logging.log4j.LogManager;
@@ -21,23 +22,37 @@ import dhj.embeddedt.embeddium.impl.gui.SodiumGameOptions;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
-/** Reads the renderer choice before window creation and isolates optional Outlands classes. */
+/** Reads the renderer choice before window creation and isolates optional host APIs. */
 public final class SdlGpuBootstrap {
     private static final Logger LOGGER = LogManager.getLogger("Actinium");
-    private static final boolean SUPPORTED = hasResource("net/minecraftforge/client/render/RenderBackendSelection.class")
-        && hasResource("org/lwjgl/opengl/DisplayEvents.class") && hasResource("org/lwjgl/MainThread.class")
-        && hasResource("org/lwjgl/sdl/SDLGPU.class");
+    private static final Check MISSING_HOST_REQUIREMENT = DependencyVerifier.firstMissing(SdlGpuBootstrap.class, List.of(
+        new Check("/net/minecraftforge/client/render/RenderBackendSelection.class", "Host render backend API"),
+        new Check("/org/lwjgl/opengl/DisplayEvents.class", "Window lifecycle callbacks"),
+        new Check("/org/lwjgl/MainThread.class", "Main-thread API"),
+        new Check("/org/lwjgl/sdl/SDLGPU.class", "LWJGL SDL GPU bindings")
+    ));
     private static boolean initialized;
     private static boolean requested;
+    private static volatile StartupSettings startupSettings;
 
     private SdlGpuBootstrap() {}
 
-    private static boolean hasResource(String path) {
-        return SdlGpuBootstrap.class.getClassLoader().getResource(path) != null;
+    public static boolean isSupported() {
+        return MISSING_HOST_REQUIREMENT == null;
     }
 
-    public static boolean isSupported() { return SUPPORTED; }
+    /** Reports the first missing dependency without registering the backend or creating a device. */
+    public static String missingRequirement() {
+        return isSupported() ? Outlands.missingRequirement() : MISSING_HOST_REQUIREMENT.errorMessage();
+    }
+
+    /** Compares the applied renderer settings with those consumed before window creation. */
+    public static boolean restartRequired(SodiumGameOptions.AdvancedSettings current) {
+        StartupSettings startup = startupSettings;
+        return startup != null && startup.differsFrom(current);
+    }
 
     public static synchronized void initialize() {
         if (initialized) return;
@@ -55,19 +70,20 @@ public final class SdlGpuBootstrap {
                 LOGGER.error("Could not save the OpenGL backend selection after repeated SDL startup failures", failure);
             }
         }
-        BackendOptions.latch(advanced.renderBackendSdlGpu, advanced.renderBackendDriver, ActiniumConfig.glVersion);
+        BackendOptions.latch(advanced.renderBackendSdlGpu, advanced.renderBackendDriver, advanced.glVersion);
         GLSMConfig.sdlGpuFramesInFlight = advanced.sdlGpuFramesInFlight;
         GLSMConfig.sdlGpuPresenterThread = advanced.sdlGpuPresenterThread;
         requested = BackendOptions.sdlGpuRequested();
+        startupSettings = StartupSettings.capture(advanced);
         if (!requested) return;
-        if (SUPPORTED) {
+        if (isSupported()) {
             Outlands.initialize();
         } else {
-            LOGGER.warn("SDL GPU requires Outlands with the render backend API; using OpenGL for this launch");
+            LOGGER.warn("Using OpenGL for this launch because SDL GPU is missing {}", MISSING_HOST_REQUIREMENT.errorMessage());
         }
     }
 
-    public static boolean isActive() { return requested && SUPPORTED && Outlands.isActive(); }
+    public static boolean isActive() { return requested && isSupported() && Outlands.isActive(); }
 
     public static void ensureDrawableInstalled() {
         if (isActive()) Outlands.ensureDrawableInstalled();
@@ -79,7 +95,7 @@ public final class SdlGpuBootstrap {
 
     public static boolean createDisplay(PixelFormat format) {
         initialize();
-        if (!requested || !SUPPORTED || !Outlands.isSelected()) return false;
+        if (!requested || !isSupported() || !Outlands.isSelected()) return false;
         Display.create(format);
         return true;
     }
@@ -102,7 +118,19 @@ public final class SdlGpuBootstrap {
         GLStateManager.glClear(GL11.GL_COLOR_BUFFER_BIT);
     }
 
+    record StartupSettings(boolean sdlGpu, String driver, int glVersion, int framesInFlight, boolean presenterThread) {
+        static StartupSettings capture(SodiumGameOptions.AdvancedSettings options) {
+            return new StartupSettings(options.renderBackendSdlGpu, options.renderBackendDriver, options.glVersion,
+                options.sdlGpuFramesInFlight, options.sdlGpuPresenterThread);
+        }
+
+        boolean differsFrom(SodiumGameOptions.AdvancedSettings current) {
+            return !this.equals(capture(current));
+        }
+    }
+
     private static final class Outlands {
+        private static String missingRequirement() { return SDLGPUGate.missingRequirement(); }
         private static void initialize() { SDLGPUGate.registerBackend(); }
         private static boolean isActive() { return SDLGPUGate.isActive(); }
         private static boolean isSelected() { return SDLGPUGate.isSelected(); }

@@ -55,7 +55,7 @@ abstract class AbstractOptionRow extends BaseWidget implements ContainerEventHan
         this.option = option;
         this.actionButtons = new OptionActionButtonController(
                 this::visibleBounds,
-                () -> this.option,
+                () -> this.option.isReadOnlyText() ? null : this.option,
                 this::playClickSound
         );
     }
@@ -71,9 +71,6 @@ abstract class AbstractOptionRow extends BaseWidget implements ContainerEventHan
 
     @Override
     public void extractRenderState(@NonNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float delta) {
-        // Collapse no-op changes (value back to applied) so change tracking stays
-        // accurate. Done here as an explicit per-frame step rather than inside
-        // isActive/canUndo, keeping those queries free of side effects.
         OptionUndoAction.normalizeEquivalentChange(this.option);
 
         if (!isLeftMouseButtonDown()) {

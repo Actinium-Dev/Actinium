@@ -2,6 +2,7 @@ package me.flashyreese.mods.reeses_sodium_options.client.gui.frame.option;
 
 import dhj.embeddedt.embeddium.api.options.control.CyclingControl;
 import dhj.embeddedt.embeddium.api.options.control.ExternalButtonControl;
+import dhj.embeddedt.embeddium.api.options.control.ReadOnlyTextControl;
 import dhj.embeddedt.embeddium.api.options.control.SliderControl;
 import dhj.embeddedt.embeddium.api.options.control.TickBoxControl;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.layout.LayoutBounds;
@@ -60,8 +61,6 @@ final class OptionRowFactory {
     }
 
     private OptionRow createOptionRow(Option<?> option, LayoutBounds dim) {
-        // The embeddium option model carries no upstream Control objects; the
-        // concrete control type selects the row implementation directly.
         return switch (option) {
             case Option<?> o when o.getControl() instanceof TickBoxControl ->
                     new BooleanOptionRow(dim, this.theme, this.optionStateStore, new RsoOption(o));
@@ -71,6 +70,9 @@ final class OptionRowFactory {
                     new CyclingOptionRow(dim, this.theme, this.optionStateStore, new RsoOption(o));
             case Option<?> o when o.getControl() instanceof ExternalButtonControl ->
                     new ExternalButtonOptionRow(this.screen, dim, this.theme, this.optionStateStore, new RsoOption(o));
+            case Option<?> o when o.getControl() instanceof ReadOnlyTextControl ->
+                    new ReadOnlyTextOptionRow(dim, this.theme, this.optionStateStore, new RsoOption(o),
+                            (ReadOnlyTextControl) o.getControl());
             default -> this.createUnsupportedRow(option, dim);
         };
     }
