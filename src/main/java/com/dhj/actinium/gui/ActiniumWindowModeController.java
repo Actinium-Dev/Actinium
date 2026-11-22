@@ -231,7 +231,7 @@ public final class ActiniumWindowModeController {
             WindowBackends.get().setExclusiveFullscreen(false);
         }
         setFullscreenState(client, false);
-        updateClientDisplaySize(client);
+        synchronizeDisplaySize(client);
     }
 
     private static void applyExclusiveFullscreen(Minecraft client) {
@@ -244,7 +244,7 @@ public final class ActiniumWindowModeController {
         WindowBackends.get().setExclusiveFullscreen(true);
         windowedGeometryCaptured = true;
         setFullscreenState(client, true);
-        updateClientDisplaySize(client);
+        synchronizeDisplaySize(client);
     }
 
     private static void applyBorderlessFullscreen(Minecraft client) {
@@ -255,7 +255,7 @@ public final class ActiniumWindowModeController {
         windowedGeometryCaptured = true;
         borderlessActive = true;
         setFullscreenState(client, true);
-        updateClientDisplaySize(client);
+        synchronizeDisplaySize(client);
     }
 
     private static void setFullscreenState(Minecraft client, boolean fullscreen) {
@@ -263,19 +263,11 @@ public final class ActiniumWindowModeController {
         client.gameSettings.fullScreen = fullscreen;
     }
 
-    private static void updateClientDisplaySize(Minecraft client) {
-        int width, height;
-        if (borderlessSupported) {
-            width = Display.getFramebufferWidth();
-            height = Display.getFramebufferHeight();
-        } else {
-            width = Display.getWidth();
-            height = Display.getHeight();
-        }
-
-        if (width > 0 && height > 0) {
-            client.displayWidth = width;
-            client.displayHeight = height;
+    /** Keeps the client framebuffer and GUI in sync with the dimensions published by Display. */
+    public static void synchronizeDisplaySize(Minecraft client) {
+        final int width = Display.getWidth();
+        final int height = Display.getHeight();
+        if (width > 0 && height > 0 && (width != client.displayWidth || height != client.displayHeight)) {
             client.resize(width, height);
         }
     }

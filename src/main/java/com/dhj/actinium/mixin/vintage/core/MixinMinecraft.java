@@ -46,6 +46,12 @@ public class MixinMinecraft {
         ci.cancel();
     }
 
+    @Inject(method = "checkWindowResize", at = @At("RETURN"))
+    private void actinium$synchronizeDisplaySize(CallbackInfo ci) {
+        // The frame pacer's extra event pump can publish a size whose resize flag is cleared by the next pump.
+        ActiniumWindowModeController.synchronizeDisplaySize((Minecraft) (Object) this);
+    }
+
     @Inject(method = "getLimitFramerate", at = @At("HEAD"), cancellable = true)
     private void actinium$useLoadingScreenFramerateLimit(CallbackInfoReturnable<Integer> cir) {
         Minecraft minecraft = (Minecraft) (Object) this;

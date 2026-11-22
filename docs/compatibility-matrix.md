@@ -416,6 +416,22 @@ Ender IO 储罐外壳使用普通半透明地形批次，储罐内部的液体�
 | FindMe | 已验证 | 无侵入（延迟粒子批处理捕获并回放深度测试开关，刷新后恢复入口状态） | 1.1.0-8 + HEI 4.35.0（issue #202）：无光影时箱子定位粒子几乎不可见的问题已修复；原因为 FindMe 临时关闭深度测试的绘制被延迟到其重新开启深度测试后执行，而批处理遗漏了该状态。用户实机验证通过，详见 [docs/compat/findme.md](compat/findme.md) |
 | Farmers-Future-Delight | 已验证 | 兼容门控（`compat/farmersfuturedelight`：mesher 补含水方块的 translucent 层，含水渲染按水身份与 fluid 材质写出） | 含水方块的水面在光影下按承载方块材质渲染（没有波浪/反射/折射，包侧水下雾与水体合成不生效）：模组的水面 quads 只在 TRANSLUCENT 层输出，而它让原版方块进入该层、让水面带上水的 `mc_Entity` 各靠一处 OptiFine 侧 ASM，Actinium 的区块管线都不经过；识别依据为 `waterlogged` 属性、`Material.WATER` 与水面模型类名，不引用模组类。1.5.1 已由用户实机确认（Actinium `ef89ffd9`、Complementary Unbound r5.9.3 与 MakeUp-UltraFast 9.4c，2026-11-05）；stored-fluid 路径与非水流体见 [docs/compat/farmersfuturedelight.md](compat/farmersfuturedelight.md) |
 
+## 客户端窗口尺寸
+
+拖动窗口边缘或切换全屏后，画面偶尔仍按旧尺寸绘制。Cleanroom 的 LWJGLXX 和 Outlands
+会在处理窗口消息时发布新尺寸，并在下一轮无尺寸事件时清除 `Display.wasResized()` 标志。
+当帧调度在 Minecraft 检查尺寸后处理了变化，下一帧的事件处理可能先清掉标志。
+Cleanroom 的像素尺寸回调还可以独立更新 framebuffer 尺寸。
+
+Actinium 在原有尺寸检查结束后比较 `Display` 与客户端的宽高。宽高均为正数且发生变化时，
+调用 `Minecraft.resize()` 更新界面、主 framebuffer 和原版 shader group。
+全屏切换使用同一尺寸比较。
+
+2026-11-22，用户确认完成实机测试。实例日志记录 Cleanroom `0.6.13-alpha` 和经 Forge 实例
+启动的 Outlands `2026.11.21` 加载 `alpha-0.0.14-faa233d50-window-resize`，两者使用
+OpenGL 后端。事件回放覆盖连续两轮消息处理、仅像素尺寸变化、全屏切换、零尺寸及重复检查。
+完整构建和 Forge 分发包加载检查通过。
+
 ## 验证记录模板
 
 ```text
