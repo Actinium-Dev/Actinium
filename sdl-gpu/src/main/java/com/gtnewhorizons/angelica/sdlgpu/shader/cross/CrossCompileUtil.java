@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class CrossCompileUtil {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     public static final AtomicInteger SHADER_DUMP_COUNTER = new AtomicInteger();
 

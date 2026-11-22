@@ -44,7 +44,7 @@ import static org.lwjgl.system.MemoryStack.*;
  * Per-frame command buffer lifecycle: acquire, render pass, submit. Emulates OpenGL's per-context client state.
  */
 public final class FrameManager {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final Tracy.ZoneId Z_SDL_FENCE_WAIT = Tracy.zoneId("sdlFenceWait", Tracy.COLOR_SWAP);
     private static final Tracy.ZoneId Z_SDL_SUBMIT = Tracy.zoneId("sdlSubmit", Tracy.COLOR_SWAP);

@@ -80,7 +80,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
  */
 public final class ShaderManager {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private final Device device;
     private Consumer<ProgramObject> uniformReleaseListener;

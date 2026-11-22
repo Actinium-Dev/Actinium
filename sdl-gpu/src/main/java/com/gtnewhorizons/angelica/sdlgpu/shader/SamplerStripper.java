@@ -13,7 +13,7 @@ import java.util.Set;
 
 public final class SamplerStripper {
 
-    private static final Logger LOGGER = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOGGER = LogManager.getLogger("Actinium-SDLGPU");
 
     private SamplerStripper() {}
 

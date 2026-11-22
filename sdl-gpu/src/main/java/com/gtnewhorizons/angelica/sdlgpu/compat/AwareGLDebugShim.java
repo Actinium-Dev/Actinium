@@ -30,7 +30,7 @@ public final class AwareGLDebugShim {
             LOG.info("GLUtil.setupDebugMessageCallback ignored: {} has no driver message stream. Run with -Dorg.lwjgl.util.Debug=true to enable it.", BackendManager.RENDER_BACKEND.getName());
             return null;
         }
-        final GLDebugMessageCallback proc = GLDebugMessageCallback.create((source, type, id, severity, length, message, userParam) -> stream.println("[Angelica] GL debug message: " + GLDebugMessageCallback.getMessage(length, message)));
+        final GLDebugMessageCallback proc = GLDebugMessageCallback.create((source, type, id, severity, length, message, userParam) -> stream.println("[Actinium] GL debug message: " + GLDebugMessageCallback.getMessage(length, message)));
         GLSMDraws.registerDebugMessageListener(proc::invoke, 0L);
         return proc;
     }

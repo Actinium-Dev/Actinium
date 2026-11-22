@@ -14,7 +14,7 @@ import static org.lwjgl.sdl.SDLVersion.SDL_VERSIONNUM;
 
 // SDL < 3.4.14 METAL_WaitForFences busy-spins on the completion flag; poll + park there instead.
 public final class FenceWait {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
     public static final long FOREVER = Long.MAX_VALUE;
 
     static final long SPIN_NS = 20_000L;

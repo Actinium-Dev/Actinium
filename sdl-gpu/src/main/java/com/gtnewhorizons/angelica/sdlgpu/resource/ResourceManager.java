@@ -69,7 +69,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
  * GPU resource lifecycle: buffers, textures, samplers, FBO state, transfer pool.
  */
 public final class ResourceManager {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final String D3D12_CLEAR_DEPTH_PROP   = SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_DEPTH_FLOAT;
     private static final String D3D12_CLEAR_STENCIL_PROP = SDL_PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER;

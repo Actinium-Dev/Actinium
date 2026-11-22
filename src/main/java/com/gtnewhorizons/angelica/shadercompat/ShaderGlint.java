@@ -33,7 +33,7 @@ import static org.joml.Math.clamp;
  */
 public final class ShaderGlint {
 
-    private static final Logger LOGGER = LogManager.getLogger("Angelica/ShaderGlint");
+    private static final Logger LOGGER = LogManager.getLogger("Actinium/ShaderGlint");
 
     private static final ResourceLocation GLINT_MASK = new ResourceLocation("textures/misc/enchanted_item_glint.png");
     public static final int TINT_SLOTS = 64;

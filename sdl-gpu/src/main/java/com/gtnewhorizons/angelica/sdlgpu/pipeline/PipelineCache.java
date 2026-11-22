@@ -35,7 +35,7 @@ import static org.lwjgl.sdl.SDLGPU.*;
 import static org.lwjgl.system.MemoryStack.*;
 
 public final class PipelineCache {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final Tracy.ZoneId Z_SDL_PIPELINE_CREATE = Tracy.zoneId("sdlPipelineCreate", Tracy.COLOR_CLIENT);
 

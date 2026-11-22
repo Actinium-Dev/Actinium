@@ -34,7 +34,7 @@ import java.util.function.Supplier;
  * compute shader re-runs the vertex shader for each captured vertex and performs the writes.
  */
 public final class VertexWriteReplayer {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final int MAX_CAPTURES = 1 << 16;
     private static final int[] COMPONENT_SIZE = { 4, 2, 1, 1, 2, 2, 4, 4, 4, 4, 4, 4 };

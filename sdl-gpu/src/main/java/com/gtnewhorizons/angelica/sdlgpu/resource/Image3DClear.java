@@ -14,7 +14,7 @@ import org.lwjgl.opengl.GL43;
 
 public final class Image3DClear {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
     private static final String SOURCE = "angelica:sdlgpu/clear_image3d.csh";
     private static final int LOCAL_SIZE = 4;
 

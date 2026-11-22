@@ -20,7 +20,7 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 
 public final class ReadbackShadows {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final class Slot {
         long transferBuffer;

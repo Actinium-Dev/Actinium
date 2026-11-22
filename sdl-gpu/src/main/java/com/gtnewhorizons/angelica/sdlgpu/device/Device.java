@@ -37,7 +37,7 @@ import static org.lwjgl.sdl.SDLVideo.*;
 import static org.lwjgl.system.MemoryUtil.memUTF8;
 
 public final class Device {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final int FRAMES_IN_FLIGHT = Math.min(Math.max(GLSMConfig.sdlGpuFramesInFlight, 1), RenderBackend.MAX_FRAMES_IN_FLIGHT);
 

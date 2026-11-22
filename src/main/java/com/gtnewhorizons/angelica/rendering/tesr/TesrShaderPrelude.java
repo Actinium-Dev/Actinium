@@ -15,7 +15,7 @@ final class TesrShaderPrelude {
     static final String LAYER_SAMPLER = "angelica_LayerTexture";
     static final String LIGHTMAP_SAMPLER = "angelica_LightmapTexture";
 
-    private static final Logger LOG = LogManager.getLogger("AngelicaTesrShaders");
+    private static final Logger LOG = LogManager.getLogger("ActiniumTesrShaders");
     private static final String VERSION_DIRECTIVE = "#version";
     private static final ObjectOpenHashSet<String> WARNED_VERSION = new ObjectOpenHashSet<>();
 
@@ -141,7 +141,7 @@ final class TesrShaderPrelude {
         final int start = skipCommentsAndWhitespace(body);
         if (!body.startsWith(VERSION_DIRECTIVE, start)) return body;
         if (WARNED_VERSION.add(shaderName)) {
-            LOG.warn("TESR shader {} declares #version; Angelica supplies it, the line is ignored", shaderName);
+            LOG.warn("TESR shader {} declares #version; Actinium supplies the version and ignores that line", shaderName);
         }
         final int end = body.indexOf('\n', start);
         return end < 0 ? "" : body.substring(end + 1);

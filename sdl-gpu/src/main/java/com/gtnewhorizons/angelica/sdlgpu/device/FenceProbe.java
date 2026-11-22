@@ -11,7 +11,7 @@ import static org.lwjgl.sdl.SDLGPU.SDL_ReleaseGPUFence;
 import static org.lwjgl.sdl.SDLGPU.SDL_WaitForGPUFences;
 
 final class FenceProbe {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private FenceProbe() {}
 

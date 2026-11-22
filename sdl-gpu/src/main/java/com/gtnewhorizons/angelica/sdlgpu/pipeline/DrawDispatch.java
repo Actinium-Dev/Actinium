@@ -21,7 +21,7 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.sdl.SDLGPU.*;
 
 public final class DrawDispatch {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
     private static final int FAN_INDEX_BUFFER_INITIAL = 64 * 1024;
 
     /** Transfers generated triangle-fan indices through the backend's ordered upload queue. */

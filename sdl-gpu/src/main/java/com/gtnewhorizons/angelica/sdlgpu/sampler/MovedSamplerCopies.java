@@ -29,7 +29,7 @@ import static org.lwjgl.sdl.SDLGPU.SDL_GPU_TEXTUREUSAGE_SAMPLER;
  * bind the texture directly.
  */
 public final class MovedSamplerCopies {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
     private static final int UNUSED_FRAMES_BEFORE_RELEASE = 8;
 
     private static final class Copy {

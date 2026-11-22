@@ -21,7 +21,7 @@ import static org.lwjgl.sdl.SDLSurface.SDL_FLIP_NONE;
 import static org.lwjgl.sdl.SDLSurface.SDL_FLIP_VERTICAL;
 
 public final class TextureOps {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private final Device device;
     private final FrameManager frameManager;

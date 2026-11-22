@@ -26,7 +26,7 @@ import static org.lwjgl.system.MemoryUtil.memUTF8;
 
 public final class DxbcCrossCompile {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
     private static final String BACKEND = "DXBC";
 
     private static final CrossCompileCache CACHE = new CrossCompileCache("dxbc", () -> CrossCompileUtil.spvcId() + '|' + D3DCompiler.LIBRARY_ID, DxbcCrossCompile::crossCompileUncached);
