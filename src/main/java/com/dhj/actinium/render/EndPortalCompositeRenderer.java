@@ -3,14 +3,13 @@ package com.dhj.actinium.render;
 import com.gtnewhorizons.angelica.client.rendering.GlUniformFloat2v;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
+import com.gtnewhorizons.angelica.glsm.hooks.BatchStateGuard;
 import com.gtnewhorizons.angelica.glsm.states.Color4;
 import com.gtnewhorizons.angelica.glsm.states.ColorMask;
 import com.gtnewhorizons.angelica.glsm.states.ViewportState;
 import net.coderbot.iris.Iris;
 import net.coderbot.iris.pipeline.WorldRenderingPipeline;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureManager;
-import net.minecraft.client.renderer.texture.TextureUtil;
 import net.minecraft.util.ResourceLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -66,45 +65,55 @@ public final class EndPortalCompositeRenderer {
     private EndPortalCompositeRenderer() {
     }
 
-    /** Starts a new client frame for per-tier cache invalidation. */
     public static void beginFrame() {
         frame++;
     }
 
     /**
-     * Returns the current precomposed texture, or zero when initialization failed and the caller must use its old path.
+     * Returns the precomposed texture, or zero when precomposition is unavailable.
      */
-    static int texture(List<EndPortalLayers.Layer> layers) {
+    static int texture(List<EndPortalLayers.Layer> layers, TextureManager textures) {
         if (!EndPortalCompositeLogic.shouldPrecompose(true, layers.size()) || unavailable) {
             return 0;
         }
 
-        return EndPortalActivePassScope.run(markProgramUsed -> {
-            try {
-                if (program == null) {
+        final int layerCount = layers.size();
+        final CacheEntry cached = CACHE.get(layerCount);
+        if (cached != null && !EndPortalCompositeLogic.needsUpdate(cached.lastUpdatedFrame, frame)) {
+            return cached.texture;
+        }
+
+        // A pending TESR batch can rebind the world framebuffer during a guarded GL state change.
+        BatchStateGuard.beforeChange();
+        BatchStateGuard.suspend();
+        try {
+            return EndPortalActivePassScope.run(markProgramUsed -> {
+                try {
+                    if (program == null) {
+                        markProgramUsed.run();
+                        initialize();
+                    }
+                    CacheEntry entry = CACHE.computeIfAbsent(layerCount, ignored -> createCacheEntry());
                     markProgramUsed.run();
-                    initialize();
-                }
-                CacheEntry entry = CACHE.computeIfAbsent(layers.size(), ignored -> createCacheEntry());
-                if (EndPortalCompositeLogic.needsUpdate(entry.lastUpdatedFrame, frame)) {
-                    markProgramUsed.run();
-                    update(entry, layers);
+                    update(entry, layers, textures);
                     entry.lastUpdatedFrame = frame;
+                    return entry.texture;
+                } catch (RuntimeException exception) {
+                    unavailable = true;
+                    LOGGER.error("Disabling end portal precomposition after an OpenGL failure", exception);
+                    return 0;
                 }
-                return entry.texture;
-            } catch (RuntimeException exception) {
-                unavailable = true;
-                LOGGER.error("Disabling end portal precomposition after an OpenGL failure", exception);
-                return 0;
-            }
-        }, EndPortalCompositeRenderer::restoreActivePass);
+            }, EndPortalCompositeRenderer::restoreActivePass);
+        } finally {
+            BatchStateGuard.resume();
+        }
     }
 
     /** Releases compositor resources before the current OpenGL context is destroyed. */
     public static void destroy() {
         for (CacheEntry entry : CACHE.values()) {
             GLSMFramebuffer.glDeleteFramebuffers(entry.framebuffer);
-            TextureUtil.deleteTexture(entry.texture);
+            GLSMTextures.glDeleteTextures(entry.texture);
         }
         CACHE.clear();
         if (emptyVao != 0) {
@@ -213,16 +222,15 @@ public final class EndPortalCompositeRenderer {
                     GLSMFramebuffer.glDeleteFramebuffers(framebuffer);
                 }
                 if (texture != 0) {
-                    TextureUtil.deleteTexture(texture);
+                    GLSMTextures.glDeleteTextures(texture);
                 }
             }
         }
     }
 
-    private static void update(CacheEntry entry, List<EndPortalLayers.Layer> layers) {
+    private static void update(CacheEntry entry, List<EndPortalLayers.Layer> layers, TextureManager textures) {
         SavedState saved = SavedState.capture();
         try {
-            TextureManager textures = Minecraft.getMinecraft().getTextureManager();
             GLSMTextures.glActiveTexture(GL13.GL_TEXTURE0);
             textures.bindTexture(END_SKY_TEXTURE);
             int endSky = GLStateManager.getBoundTextureForServerState();
