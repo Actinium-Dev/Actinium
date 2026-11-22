@@ -65,7 +65,8 @@ class MixinConfigurationTest {
         "mixins.actinium.obscuretooltips.json",
         "mixins.actinium.dsurround.json",
         "mixins.actinium.mekanism.json",
-        "mixins.actinium.embers.json"
+        "mixins.actinium.embers.json",
+        "mixins.actinium.mmce.json"
     );
     private static final List<String> CONFIGS = MAIN_CONFIGS;
 

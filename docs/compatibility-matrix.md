@@ -354,6 +354,7 @@ Windows 10、NVIDIA GeForce RTX 5070 Laptop GPU（驱动 610.74）。
 | 组件               | 状态   | 接入方式                               | 备注               |
 |------------------|------|------------------------------------|------------------|
 | Cleanroom Loader | 必需   | Forge/Cleanroom 启动与 MixinBootstrap | 当前目标运行环境         |
+| Modular Machinery CE | 已验证（基因构造器） | 条件 Mixin（成型模型批次与透明组状态） | GreedyCraft2-T 使用 MMCE 2.3.2、GeckoLib 3.0.31 与 Complementary Shaders v4.7.2，实机确认机器本体和玻璃罩恢复显示。见 [兼容说明](compat/modular-machinery-ce.md) |
 | Forge SplashProgress | 已验证（dev 启动） | GLSM 对 reset / VAO bind 生命周期操作串行化，reset 后保留当前 VAO 的空跟踪状态 | issue #216：Cleanroom 0.6.13-alpha、CleanMix 0.7.2、MixinBooter 11.8、Java 25.0.1；用户确认修复后 dev 可正常启动，详见 [docs/compat/forge-splash-progress.md](compat/forge-splash-progress.md)，commit `7a5b9361` |
 | Immersive Engineering | 部分（Solas V3.7b 场景已验证） | 无 Mixin（Iris `BlockTrans` 默认 blend 状态修正） | 0.12-98：Garden Cloche 玻璃不透明（issue #197）已由用户在 Solas V3.7b 下确认修复；ITT 3.2 与 Photon v1.3b 因各自 1.12.2 shader fallback 仍呈现泛白/发黑，详见 [docs/compat/immersiveengineering.md](compat/immersiveengineering.md) |
 | AE2 Unofficial Extended Life | 已验证 | 无 Mixin（`CUTOUT` 材质改为非 mipped + 地形着色器消费 `useMip` 位） | 0.56.6（CurseForge 570458:5411078，issue #191）：已供电 ME 控制器的彩色光效随距离变淡/消失已修复并经用户实机确认（`Render Pass 合并` 开/关、mipmap 等级 0 与 4 均通过），详见 [docs/compat/ae2.md](compat/ae2.md) |
