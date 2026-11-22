@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public final class AngelicaWorkers {
-    private static final Logger LOGGER = LogManager.getLogger("Angelica");
+    private static final Logger LOGGER = LogManager.getLogger("Actinium");
 
     private static final long IDLE_TIMEOUT_SECONDS = 120;
 
@@ -86,15 +86,15 @@ public final class AngelicaWorkers {
 
             resolveThreads();
             final AtomicInteger threadCounter = new AtomicInteger();
-            final ThreadFactory factory = r -> new Worker(r, "Angelica-Worker-" + threadCounter.getAndIncrement());
+            final ThreadFactory factory = r -> new Worker(r, "Actinium-Worker-" + threadCounter.getAndIncrement());
             final ThreadPoolExecutor tpe = new ThreadPoolExecutor(resolvedThreads, resolvedThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), factory);
             tpe.prestartAllCoreThreads();
             executor = tpe;
-            LOGGER.debug("Created Angelica worker pool with {} prestarted threads", resolvedThreads);
+            LOGGER.debug("Created Actinium worker pool with {} prestarted threads", resolvedThreads);
 
             if (scheduler == null || scheduler.isShutdown()) {
                 scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-                    final Thread t = new Thread(r, "Angelica-Worker-Scheduler");
+                    final Thread t = new Thread(r, "Actinium-Worker-Scheduler");
                     t.setDaemon(true);
                     return t;
                 });
@@ -215,7 +215,7 @@ public final class AngelicaWorkers {
             final long idleSeconds = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - lastActivityTime);
 
             if (idleSeconds >= IDLE_TIMEOUT_SECONDS && inFlight.get() == 0) {
-                LOGGER.debug("Shutting down idle Angelica worker pool after {} seconds", idleSeconds);
+                LOGGER.debug("Shutting down idle Actinium worker pool after {} seconds", idleSeconds);
                 current.shutdown();
                 executor = null;
                 scheduler.shutdown();

@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class VertexAttribs {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private final Set<Long> warnedDivisorKeys = ConcurrentHashMap.newKeySet();
 

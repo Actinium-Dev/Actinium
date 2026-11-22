@@ -15,7 +15,7 @@ import java.util.function.UnaryOperator;
 /** Decides whether instrumentation is worth emitting this frame. */
 public final class CaptureGate {
 
-    private static final Logger LOGGER = LogManager.getLogger("Angelica");
+    private static final Logger LOGGER = LogManager.getLogger("Actinium");
     private static final boolean IS_LINUX = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("linux");
     private static final Path PROC_SELF_MAPS = Paths.get("/proc/self/maps");
     private static final String[] CAPTURE_ENV = { "RENDERDOC_CAPTURE_KEYPRESS", "ENABLE_VULKAN_RENDERDOC_CAPTURE", "RENDERDOC_HOOK_EGL" };

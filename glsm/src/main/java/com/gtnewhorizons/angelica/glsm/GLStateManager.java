@@ -823,7 +823,7 @@ public class GLStateManager {
 
             GLDebug.initDebugState();
 
-            GLDebug.debugMessage("Angelica Debug Annotator Initialized");
+            GLDebug.debugMessage("Actinium Debug Annotator Initialized");
         }
 
         final GLContextState glCtx = ctx();

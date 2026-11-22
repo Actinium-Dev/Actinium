@@ -12,7 +12,7 @@ import org.apache.logging.log4j.Logger;
 
 
 public final class FFPTrace {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
     private static final String PREFIX = "[FFPTrace] ";
     private static final int MAX_KEYS = 512;
 

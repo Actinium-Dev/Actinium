@@ -64,7 +64,7 @@ final class CloudLayerRenderer {
     private static final Tracy.ZoneId Z_DRAW = Tracy.zoneId("cloudDraw", Tracy.COLOR_CLIENT);
     private static final Tracy.ZoneId Z_ASYNC_BUILD = Tracy.zoneId("cloudAsyncBuild", Tracy.COLOR_CLIENT);
     private static final Executor BUILD_THREAD = Executors.newSingleThreadExecutor(task -> {
-        final Thread thread = new Thread(task, "Angelica Cloud Builder");
+        final Thread thread = new Thread(task, "Actinium Cloud Builder");
         thread.setDaemon(true);
         thread.setPriority(Thread.NORM_PRIORITY - 1);
         return thread;

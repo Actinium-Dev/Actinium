@@ -24,7 +24,7 @@ import org.lwjgl.util.shaderc.Shaderc;
 import static org.lwjgl.sdl.SDLGPU.*;
 
 public final class ImageAtomicsProbe {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final String SOURCE = "angelica:sdlgpu/atomic_probe.csh";
     public static final int MTL_LANGUAGE_VERSION_3_1 = (3 << 16) + 1;

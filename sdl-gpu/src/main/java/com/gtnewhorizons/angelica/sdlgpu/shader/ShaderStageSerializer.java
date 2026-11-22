@@ -33,7 +33,7 @@ import static com.gtnewhorizons.angelica.glsm.shader.ShaderCacheIO.writeSortedSt
 import static com.gtnewhorizons.angelica.glsm.shader.ShaderCacheIO.writeStr;
 
 final class ShaderStageSerializer {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     record Stage(byte[] spirv, StageReflection reflection, GraphicsBindingMap bindingMap, Set<String> boolUniforms, String source) {}
 

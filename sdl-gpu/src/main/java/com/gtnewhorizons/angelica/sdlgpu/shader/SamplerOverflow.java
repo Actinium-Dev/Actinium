@@ -23,7 +23,7 @@ import java.util.Set;
  */
 public final class SamplerOverflow {
 
-    private static final Logger LOGGER = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOGGER = LogManager.getLogger("Actinium-SDLGPU");
 
     public static final int SAMPLER_SLOTS = ContextState.MAX_SAMPLERS;
     public static final int TEXTURE_SLOTS = ContextState.MAX_IMAGE_UNITS;

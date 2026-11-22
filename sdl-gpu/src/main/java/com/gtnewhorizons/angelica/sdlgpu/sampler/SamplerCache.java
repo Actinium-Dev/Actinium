@@ -12,7 +12,7 @@ import static org.lwjgl.sdl.SDLGPU.SDL_ReleaseGPUSampler;
 
 public final class SamplerCache {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     public record Key(int minFilter, int magFilter, int wrapS, int wrapT, int wrapR, float minLod, float maxLod, float lodBias, float maxAnisotropy, int compareMode, int compareFunc) {}
 

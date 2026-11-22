@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets;
 
 public final class TesrShaderPrograms {
 
-    private static final Logger LOG = LogManager.getLogger("AngelicaTesrShaders");
+    private static final Logger LOG = LogManager.getLogger("ActiniumTesrShaders");
 
     private static final int UNKNOWN = 0;
     private static final int READY = 1;

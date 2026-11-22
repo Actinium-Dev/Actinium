@@ -19,7 +19,7 @@ import java.nio.file.Files;
  */
 public final class BackendStartGuard {
 
-    private static final Logger LOGGER = LogManager.getLogger("Angelica/BackendStartGuard");
+    private static final Logger LOGGER = LogManager.getLogger("Actinium/BackendStartGuard");
 
     static final int STRIKE_LIMIT = 3;
 

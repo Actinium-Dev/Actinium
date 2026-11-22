@@ -35,7 +35,7 @@ public final class AngelicaTesrMeshCache {
 
     private static final BatchRendererSink SINK = new BatchRendererSink();
     public static final AngelicaTesrMeshCache INSTANCE = new AngelicaTesrMeshCache(new GtnhMeshBackend(), System::currentTimeMillis);
-    private static final Logger LOG = LogManager.getLogger("AngelicaTesrMeshCache");
+    private static final Logger LOG = LogManager.getLogger("ActiniumTesrMeshCache");
 
     public static long cacheHits;
     public static long cacheMisses;

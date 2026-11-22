@@ -13,7 +13,7 @@ import static org.lwjgl.sdl.SDLVideo.SDL_GetCurrentVideoDriver;
 
 public final class VideoDriverRecovery {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final String X11 = "x11";
 

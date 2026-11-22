@@ -17,7 +17,7 @@ import java.util.List;
 import static com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess.applyEdits;
 
 public final class UscaledRetype {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     static final String SUFFIX = "_i";
 

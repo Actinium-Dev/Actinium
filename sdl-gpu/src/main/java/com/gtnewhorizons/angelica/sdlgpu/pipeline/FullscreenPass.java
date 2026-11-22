@@ -30,7 +30,7 @@ import static org.lwjgl.sdl.SDLGPU.*;
 /** Shared fullscreen shaders and sampler, owned and released by the backend. */
 public final class FullscreenPass {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final String VERTEX_SOURCE = "angelica:sdlgpu/clear_attachment.vsh";
 

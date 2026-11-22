@@ -25,7 +25,7 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.sdl.SDLGPU.*;
 
 public final class ComputeBinder implements ComputeDispatchSink {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
     private static final Tracy.ZoneId Z_SDL_COMPUTE_PASS = Tracy.zoneId("sdlComputePass", Tracy.COLOR_TERRAIN);
     private final IntOpenHashSet loggedRoWithoutReadUsage = new IntOpenHashSet();
     private final LongOpenHashSet loggedMissingBindings = new LongOpenHashSet();

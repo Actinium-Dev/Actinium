@@ -12,7 +12,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.lwjgl.opengl.GL32;
 
 public final class FenceTracker {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final Tracy.ZoneId Z_SDL_FENCE_WAIT = Tracy.zoneId("sdlFenceWait", Tracy.COLOR_SWAP);
 

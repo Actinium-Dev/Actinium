@@ -35,7 +35,7 @@ public final class TransferThread {
     private static final long P_TRANSFER_UNPARKS_ELIDED = Tracy.plotHandle("sdl.transferUnparksElided");
     private static final Tracy.ZoneId Z_SDL_UPLOAD = Tracy.zoneId("sdlUpload", Tracy.COLOR_WORKER);
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU-Transfer");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU-Transfer");
     private boolean warnedNullTextureUpload;
 
     private static final AtomicLong SEQ = new AtomicLong();

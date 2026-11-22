@@ -15,7 +15,7 @@ import static org.lwjgl.sdl.SDLGPU.nSDL_BindGPUFragmentStorageTextures;
 import static org.lwjgl.sdl.SDLGPU.nSDL_BindGPUVertexStorageTextures;
 
 public final class StorageTextureBinder {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private final ResourceManager resourceManager;
     private final ShaderManager shaderManager;

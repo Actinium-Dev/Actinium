@@ -23,7 +23,7 @@ import static org.lwjgl.system.MemoryUtil.memUTF8;
 
 public final class MslCrossCompile {
 
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
     private static final String BACKEND = "MSL";
 
     private static final int SPVC_MSL_2_2 = mslVersion(2, 2, 0);

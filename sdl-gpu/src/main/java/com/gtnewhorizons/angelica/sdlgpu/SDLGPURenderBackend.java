@@ -132,7 +132,7 @@ import static org.lwjgl.sdl.SDLSurface.SDL_FLIP_VERTICAL;
 
 /** SDL GPU implementation of {@link RenderBackend}. */
 public class SDLGPURenderBackend extends RenderBackend {
-    private static final Logger LOG = LogManager.getLogger("Angelica-SDLGPU");
+    private static final Logger LOG = LogManager.getLogger("Actinium-SDLGPU");
 
     private static final Tracy.ZoneId Z_SDL_INDIRECT_DRAW = Tracy.zoneId("sdlIndirectDraw", Tracy.COLOR_TERRAIN);
 

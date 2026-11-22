@@ -39,7 +39,7 @@ import java.lang.reflect.Method;
  */
 public final class ParticleDescriptorRegistry {
 
-    private static final Logger LOGGER = LogManager.getLogger("Angelica/Particles");
+    private static final Logger LOGGER = LogManager.getLogger("Actinium/Particles");
 
     /**
      * Names the particle draw method can carry at runtime. The mod jar is reobfuscated, so the source

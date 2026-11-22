@@ -37,7 +37,7 @@ public class AngelicaLateTweaker implements ITweaker {
             ModernSplashOverlayCompat.markIfLoadedBeforeRedirector();
             LateRedirectorInstaller.install();
         } catch (Exception e) {
-            LOGGER.warn("Failed to install Angelica redirector late", e);
+            LOGGER.warn("Failed to install the Actinium redirector late", e);
         } finally {
             // Instantiating the redirector above forces the first class loads through the
             // mixin transformer, so mixin select/prepare has completed by this point. If a
