@@ -45,6 +45,7 @@ import com.dhj.actinium.compat.ctm.CtmLayerCompat;
 import com.dhj.actinium.compat.farmersfuturedelight.FarmersFutureDelightCompat;
 import com.dhj.actinium.compat.fluidlogged.FluidloggedCompat;
 import com.dhj.actinium.compat.snowrealmagic.SnowRealMagicCompat;
+import com.dhj.actinium.debug.TerrainRenderInventory.SectionData;
 import com.dhj.actinium.render.terrain.deferred.DeferredBlock;
 import com.dhj.actinium.render.terrain.deferred.DeferredMeshScheduler;
 import com.dhj.actinium.render.terrain.deferred.DeferredSectionMesh;
@@ -91,6 +92,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
     private final Vector3d camera;
     private final ChunkRenderContext renderContext;
     private final boolean rasterOcclusion;
+    private final boolean captureRenderInventory;
 
     /**
      * Context the render-thread capture renders with. It belongs to the section manager and is never
@@ -118,13 +120,15 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
     private MinecraftBuiltRenderSectionData<TextureAtlasSprite, TileEntity> renderData;
 
     public ChunkBuilderMeshingTask(RenderSection render, ChunkRenderContext context, int time, Vector3d camera,
-                                   boolean rasterOcclusion, VintageChunkBuildContext captureContext) {
+                                   boolean rasterOcclusion, VintageChunkBuildContext captureContext,
+                                   boolean captureRenderInventory) {
         this.render = render;
         this.buildTime = time;
         this.camera = camera;
         this.renderContext = context;
         this.rasterOcclusion = rasterOcclusion;
         this.captureContext = captureContext;
+        this.captureRenderInventory = captureRenderInventory;
     }
 
     /**
@@ -159,7 +163,9 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
     public ChunkBuildOutput execute(ChunkBuildContext context, CancellationToken cancellationToken) {
         long start = System.nanoTime();
         VintageChunkBuildContext buildContext = (VintageChunkBuildContext)context;
-        MinecraftBuiltRenderSectionData<TextureAtlasSprite, TileEntity> renderData = new MinecraftBuiltRenderSectionData<>();
+        SectionData inventory = this.captureRenderInventory ? new SectionData() : null;
+        MinecraftBuiltRenderSectionData<TextureAtlasSprite, TileEntity> renderData =
+                inventory != null ? inventory : new MinecraftBuiltRenderSectionData<>();
         this.renderData = renderData;
         this.deferredRenders.clear();
 
@@ -254,6 +260,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                             Material deferredMaterial = null;
 
                             if (!hidden) {
+                                long before = inventory != null && canRenderOffThread ? buildContext.countMeshVertices() : 0;
                                 BlockRenderLayer shaderLayerOverride = blockTypeIds != null ? blockTypeIds.get(block) : null;
 
                                 if (!canRenderOffThread) {
@@ -273,6 +280,9 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                                         this.renderBlockLayer(block, blockState, blockPos, slice, layer, false, buildContext);
                                     }
                                 }
+                                if (inventory != null && canRenderOffThread && buildContext.countMeshVertices() > before) {
+                                    inventory.record(block, blockPos);
+                                }
                             }
 
                             if (!canRenderOffThread) {
@@ -284,7 +294,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                                             blockState));
                                 }
                             } else if (FluidloggedCompat.IS_LOADED) {
-                                FluidloggedCompat.renderFluidState(slice, blockPos, blockState, buildContext, dispatcher);
+                                renderStoredFluid(slice, blockPos, blockState, buildContext, dispatcher, inventory);
                             }
 
                             if (blockState.isOpaqueCube()) {
@@ -396,6 +406,17 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         return true;
     }
 
+    private static void renderStoredFluid(ActiniumBlockAccess slice, BlockPos pos, IBlockState state,
+                                          VintageChunkBuildContext context, BlockRendererDispatcher dispatcher,
+                                          @Nullable SectionData inventory) {
+        long before = inventory == null ? 0 : context.countMeshVertices();
+        FluidloggedCompat.renderFluidState(slice, pos, state, context, dispatcher);
+        if (inventory != null && context.countMeshVertices() > before) {
+            Block fluid = FluidloggedCompat.getStoredFluidBlock(slice, pos.getX(), pos.getY(), pos.getZ());
+            inventory.record(Objects.requireNonNull(fluid, "Meshed stored fluid block"), pos);
+        }
+    }
+
     private void renderThroughDispatcher(BlockRendererDispatcher dispatcher, IBlockState blockState, BlockPos blockPos,
                                          ActiniumBlockAccess slice, net.minecraft.util.BlockRenderLayer outputLayer,
                                          boolean allowRenderPassOptimization, VintageChunkBuildContext buildContext) {
@@ -485,6 +506,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
         DeferredSlice slice = mesh.slice;
         DeferredCapture capture = Objects.requireNonNull(mesh.capture, "Deferred capture");
         VintageChunkBuildContext buildContext = this.captureContext;
+        SectionData inventory = this.renderData instanceof SectionData data ? data : null;
 
         int minX = this.render.getOriginX();
         int minY = this.render.getOriginY();
@@ -507,6 +529,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                     DeferredBlock block = deferred.block();
                     blockPos.setPos(block.x(), block.y(), block.z());
                     buildContext.getBlockRenderer().resetSharedState();
+                    long before = inventory == null ? 0 : buildContext.countMeshVertices();
 
                     for (int pass = 0; pass < VintageChunkBuildContext.LAYERS.length; pass++) {
                         if ((block.passMask() & (1 << pass)) == 0) {
@@ -521,8 +544,11 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                         this.captureLayer(capture, buildContext, block, layer, startVertex);
                     }
 
+                    if (inventory != null && buildContext.countMeshVertices() > before) {
+                        inventory.record(block.block(), blockPos);
+                    }
                     if (FluidloggedCompat.IS_LOADED) {
-                        this.captureFluidRender(capture, buildContext, slice, blockPos, deferred.state());
+                        this.captureFluidRender(capture, buildContext, slice, blockPos, deferred.state(), inventory);
                     }
                 }
             } finally {
@@ -567,15 +593,15 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
 
     /** Captures the Fluidlogged fluid of one deferred block, which renders through the same buffers. */
     private void captureFluidRender(DeferredCapture capture, VintageChunkBuildContext buildContext, DeferredSlice slice,
-                                    BlockPos pos, IBlockState state) {
+                                    BlockPos pos, IBlockState state, @Nullable SectionData inventory) {
         int[] startVertices = this.captureStartVertices;
 
         for (int layer = 0; layer < startVertices.length; layer++) {
             startVertices[layer] = buildContext.getBufferForLayer(VintageChunkBuildContext.LAYERS[layer]).getVertexCount();
         }
 
-        FluidloggedCompat.renderFluidState(slice, pos, state, buildContext,
-                Minecraft.getMinecraft().getBlockRendererDispatcher());
+        renderStoredFluid(slice, pos, state, buildContext, Minecraft.getMinecraft().getBlockRendererDispatcher(),
+                inventory);
 
         for (int layer = 0; layer < startVertices.length; layer++) {
             this.captureLayer(capture, buildContext, null, VintageChunkBuildContext.LAYERS[layer],
@@ -660,6 +686,9 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
 
         if (!meshes.isEmpty()) {
             renderData.hasBlockGeometry = true;
+        }
+        if (renderData instanceof SectionData inventory) {
+            inventory.finish(renderData.hasBlockGeometry);
         }
 
         return new ChunkBuildOutput(this.render, renderData, meshes, this.buildTime);
