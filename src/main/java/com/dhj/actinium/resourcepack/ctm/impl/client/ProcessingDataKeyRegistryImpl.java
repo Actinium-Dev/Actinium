@@ -1,0 +1,68 @@
+// Derived from Continuity-For-Actinium (4281538), PepperCode1 and contributors.
+// SPDX-License-Identifier: LGPL-3.0-only
+package com.dhj.actinium.resourcepack.ctm.impl.client;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+import javax.annotation.Nullable;
+
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import com.dhj.actinium.resourcepack.ctm.api.client.ProcessingDataKey;
+import com.dhj.actinium.resourcepack.ctm.api.client.ProcessingDataKeyRegistry;
+import net.minecraft.util.ResourceLocation;
+
+public final class ProcessingDataKeyRegistryImpl implements ProcessingDataKeyRegistry {
+	public static final ProcessingDataKeyRegistryImpl INSTANCE = new ProcessingDataKeyRegistryImpl();
+
+	private final Map<ResourceLocation, ProcessingDataKey<?>> keyMap = new Object2ObjectOpenHashMap<>();
+	private final List<ProcessingDataKey<?>> allResettable = new ObjectArrayList<>();
+	private final List<ProcessingDataKey<?>> allResettableView = Collections.unmodifiableList(allResettable);
+
+	private int registeredAmount = 0;
+	private boolean frozen;
+
+	@Override
+	public <T> ProcessingDataKey<T> registerKey(ResourceLocation id, Supplier<T> valueSupplier, Consumer<T> valueResetAction) {
+		if (frozen) {
+			throw new IllegalArgumentException("Cannot register processing data key for ID '" + id + "' to frozen registry");
+		}
+		ProcessingDataKey<?> oldKey = keyMap.get(id);
+		if (oldKey != null) {
+			throw new IllegalArgumentException("Cannot override processing data key registration for ID '" + id + "'");
+		}
+		ProcessingDataKeyImpl<T> key = new ProcessingDataKeyImpl<>(id, registeredAmount, valueSupplier, valueResetAction);
+		keyMap.put(id, key);
+		if (valueResetAction != null) {
+			allResettable.add(key);
+		}
+		registeredAmount++;
+		return key;
+	}
+
+	@Override
+	@Nullable
+	public ProcessingDataKey<?> getKey(ResourceLocation id) {
+		return keyMap.get(id);
+	}
+
+	@Override
+	public int getRegisteredAmount() {
+		return registeredAmount;
+	}
+
+	public void init() {
+	}
+
+	public void setFrozen() {
+		frozen = true;
+	}
+
+	public List<ProcessingDataKey<?>> getAllResettable() {
+		return allResettableView;
+	}
+}

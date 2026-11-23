@@ -14,6 +14,8 @@ for the full license text or legal advice.
 | --- | --- | --- | --- | --- |
 | Angelica / GLSM | https://github.com/GTNewHorizons/Angelica | `glsm/`, `sdl-gpu/`, portions of `src/main/java/com/gtnewhorizons/angelica/`, Angelica resources | LGPL-3.0, with additional file-level notices | GLSM introduced in `119f607`; expanded with GTNHLib in `83ea1b7`; SDL-GPU synchronized from `8e099e952921a53ea5db88414e1071135f716ed4`; display-list fixes adapted from `2b46b4f602dfd7c6b5dd67f42acd853adfa1d9c6` and `8840c2109ffb3603d95c72b18373abfb5fdd87b8` |
 | Angelica sky color blending | https://github.com/GTNewHorizons/Angelica | `src/main/java/com/dhj/actinium/world/biome/SkyColorCache.java`, `src/main/java/com/dhj/actinium/mixin/vintage/core/terrain/MixinWorldSkyColor.java` | LGPL-3.0 | adapted to Minecraft 1.12.2 from `233c74e0d71cb61a7046e06b085ea391c216e986` |
+| Continuity for Actinium | https://github.com/Actinium-Dev/Continuity-For-Actinium | `src/main/java/com/dhj/actinium/resourcepack/ctm/`, `src/main/resources/actinium-builtin-packs/` | LGPL-3.0; see `META-INF/actinium-continuity-LGPL-3.0.txt` | rules and optional resource packs from `42815380cb16c28ffb2762ae4caa8975a1e6b8f3`; Continuity by PepperCode1, NeoContinuity by Argon4W |
+| Angelica MCPatcherForge | https://github.com/GTNewHorizons/Angelica | resource pack behavior in `src/main/java/com/dhj/actinium/resourcepack/` | original MCPatcher MIT, Mist475 changes LGPL-3.0; see `META-INF/actinium-mcpatcher-notice.txt` | behavioral reference `996fb54cb05e256ea6039f4e2c8457a221a179b7`; no Angelica MCPatcher resource assets are distributed |
 | GTNHLib | https://github.com/GTNewHorizons/GTNHLib | `GTNHLib/` | LGPL-3.0, plus file-level notices | `83ea1b7` |
 | Iris | https://github.com/IrisShaders/Iris | `shader/src/main/java/net/coderbot/iris/`, Iris API/resources, Iris-oriented mixins | LGPL-3.0 | full pipeline import in `79306ba`; resource mappings below |
 | Celeritas renderer | historical Celeritas/Embeddium/Sodium-derived code | `celeritas-common/` | mixed upstream provenance; preserve file-level notices and consult source history | present in standalone extraction `6167e49`, split to its current tree in `2835afe` |
@@ -46,6 +48,8 @@ next bulk upstream refresh.
   `844542b8440f1ce6479d2914c212d099ff9d264c`, LGPL-3.0).
 - Shader compatibility behavior is informed by OptiFine/ShadersMod conventions; shader packs
   themselves are not distributed by this repository.
+- OptiFine 1.12.2 HD U G5 is a reference for resource pack syntax and observable behavior.
+  Actinium does not distribute the OptiFine jar or its classes.
 - The public Sodium maintainer comment at
   https://github.com/CaffeineMC/sodium/issues/2400#issuecomment-2038560656 states that ports to very
   old Minecraft versions do not compete with Sodium. Actinium records this as public context for

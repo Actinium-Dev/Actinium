@@ -5,6 +5,8 @@ import com.dhj.actinium.compat.MissingModelCompat;
 import com.dhj.actinium.compat.componentmodelhider.ComponentModelHiderCompat;
 import com.dhj.actinium.compat.farmersfuturedelight.FarmersFutureDelightCompat;
 import com.dhj.actinium.compat.librarianlib.LibrarianLibGlowCompat;
+import com.dhj.actinium.resourcepack.color.ResourcePackColors;
+import com.dhj.actinium.resourcepack.ctm.TerrainPackRules.OutputQuad;
 import net.coderbot.iris.debug.ShaderRegressionDebug;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
@@ -23,6 +25,7 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.WorldType;
 import net.minecraftforge.client.model.pipeline.VertexBufferConsumer;
+import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.registries.IRegistryDelegate;
 import dhj.embeddedt.embeddium.api.util.ColorARGB;
 import dhj.embeddedt.embeddium.impl.model.light.LightMode;
@@ -60,6 +63,7 @@ import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
 
 import java.util.Arrays;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -98,6 +102,7 @@ public class VintageBlockRenderer {
 
     private IBakedModel preparedModel;
     private boolean renderedAnyQuad;
+    private OutputQuad packQuad;
 
 
     public VintageBlockRenderer(VintageChunkBuildContext context, LightDataCache cache) {
@@ -158,10 +163,24 @@ public class VintageBlockRenderer {
         this.currentRenderLayer = layer;
 
         var buffers = this.context.getRenderBuffers();
-        var material = resolveRenderMaterial(buffers, state, layer);
+        var packGeometry = TerrainPackGeometry.capture();
+        BlockRenderLayer sourceLayer = MinecraftForgeClient.getRenderLayer();
+        if (sourceLayer == null) {
+            sourceLayer = layer;
+        }
+        BlockRenderLayer targetLayer = packGeometry == null ? layer : packGeometry.targetLayer(state, layer, !allowRenderPassOptimization);
+        this.currentRenderLayer = targetLayer;
+        var material = resolveRenderMaterial(buffers, state, targetLayer);
         var buffer = buffers.get(material);
 
         long rand = MathHelper.getPositionRandom(pos);
+        IBlockState modelState = state;
+        IBakedModel blockModel = model;
+        var pane = packGeometry == null || !packGeometry.needsPaneGroups(state) ? null
+                : packGeometry.preparePane(state, blockAccess, pos, sourceLayer, rand, side -> {
+            var faces = blockModel.getQuads(modelState, side, rand);
+            return faces.isEmpty() ? faces : BlockQuadTransformerHolder.transform(modelState, pos, blockAccess, layer, side, faces);
+        });
 
         IBlockColor colorProvider = this.blockColors.get(state.getBlock().delegate);
 
@@ -189,7 +208,7 @@ public class VintageBlockRenderer {
                 && this.quadLightOverride.beginBlock(blockAccess, actualState, pos);
         try {
             for (var dir : EnumFacing.VALUES) {
-                var quads = model.getQuads(state, dir, rand);
+                var quads = pane == null ? model.getQuads(state, dir, rand) : pane.quads(dir);
 
                 // Keep the culling call in renderBlock for addon redirects. Hidden blocks do not occlude neighbours.
                 if (quads.isEmpty()
@@ -198,26 +217,44 @@ public class VintageBlockRenderer {
                     continue;
                 }
 
-                quads = BlockQuadTransformerHolder.transform(
-                        state, pos, blockAccess, layer, dir, quads);
+                if (pane == null) {
+                    quads = BlockQuadTransformerHolder.transform(state, pos, blockAccess, layer, dir, quads);
+                }
                 if (quads.isEmpty()) {
                     continue;
                 }
 
-                this.currentQuadRenderingFlags = this.analyzer.getFlagsForRendering(VintageDiffuseProvider.fromEnumFacing(dir), BakedQuadView.ofList(quads));
-                renderQuadList(buffer, buffers, material, pos, dir, lighter, colorProvider, offset, quads);
-                this.renderedAnyQuad = true;
+                var transformed = packGeometry == null ? null
+                        : packGeometry.transform(state, blockAccess, pos, sourceLayer, targetLayer,
+                                !allowRenderPassOptimization, dir, rand, quads, pane);
+                if (transformed != null) {
+                    quads = new PackBakedQuads(transformed);
+                }
+                if (!quads.isEmpty()) {
+                    this.currentQuadRenderingFlags = this.analyzer.getFlagsForRendering(VintageDiffuseProvider.fromEnumFacing(dir), BakedQuadView.ofList(quads));
+                    renderQuadList(buffer, buffers, material, pos, dir, lighter, colorProvider, offset, quads);
+                    this.renderedAnyQuad = true;
+                }
             }
 
-            var quads = model.getQuads(state, null, rand);
+            var quads = pane == null ? model.getQuads(state, null, rand) : pane.quads(null);
 
             if (!quads.isEmpty()) {
-                quads = BlockQuadTransformerHolder.transform(
-                        state, pos, blockAccess, layer, null, quads);
+                if (pane == null) {
+                    quads = BlockQuadTransformerHolder.transform(state, pos, blockAccess, layer, null, quads);
+                }
                 if (!quads.isEmpty()) {
-                    this.currentQuadRenderingFlags = this.analyzer.getFlagsForRendering(ModelQuadFacing.UNASSIGNED, BakedQuadView.ofList(quads));
-                    renderQuadList(buffer, buffers, material, pos, null, lighter, colorProvider, offset, quads);
-                    this.renderedAnyQuad = true;
+                    var transformed = packGeometry == null ? null
+                            : packGeometry.transform(state, blockAccess, pos, sourceLayer, targetLayer,
+                                    !allowRenderPassOptimization, null, rand, quads, pane);
+                    if (transformed != null) {
+                        quads = new PackBakedQuads(transformed);
+                    }
+                    if (!quads.isEmpty()) {
+                        this.currentQuadRenderingFlags = this.analyzer.getFlagsForRendering(ModelQuadFacing.UNASSIGNED, BakedQuadView.ofList(quads));
+                        renderQuadList(buffer, buffers, material, pos, null, lighter, colorProvider, offset, quads);
+                        this.renderedAnyQuad = true;
+                    }
                 }
             }
         } finally {
@@ -278,14 +315,33 @@ public class VintageBlockRenderer {
         boolean applyDirectionalShading = quad.hasShade() && !BlockRenderingSettings.INSTANCE.shouldDisableDirectionalShading();
         lighter.calculate(quad, pos.getX(), pos.getY(), pos.getZ(), light, VintageDiffuseProvider.fromEnumFacingOrUnassigned(cullFace), quad.getLightFace(), applyDirectionalShading, true);
 
+        if (this.packQuad != null && this.packQuad.light() != null) {
+            var minimum = this.packQuad.light();
+            for (int vertex = 0; vertex < 4; vertex++) {
+                light.lm[vertex] = TerrainPackGeometry.applyMinimumLight(light.lm[vertex], minimum);
+            }
+            if (minimum.block() == 15 && minimum.sky() == 15) {
+                Arrays.fill(light.br, 1.0f);
+            }
+        }
+
         return light;
     }
 
     private int[] getVertexColors(BlockPos pos, IBlockColor colorProvider, BakedQuadView quad) {
         final int[] vertexColors = this.quadColors;
+        var state = this.packQuad != null && this.packQuad.tintState() != null
+                ? this.packQuad.tintState() : this.currentState;
+        if (state != this.currentState) {
+            colorProvider = this.blockColors.get(state.getBlock().delegate);
+        }
+        int tint = this.packQuad == null ? quad.getColorIndex() : this.packQuad.tintIndex();
+        int custom = ResourcePackColors.block(state, this.currentBlockAccess, pos, tint);
 
-        if (colorProvider != null && quad.hasColor()) {
-            Arrays.fill(vertexColors, 0xFF000000 | ColorARGB.toABGR(colorProvider.colorMultiplier(this.currentState, this.currentBlockAccess, pos, quad.getColorIndex())));
+        if (custom != -1) {
+            Arrays.fill(vertexColors, 0xff000000 | ColorARGB.toABGR(custom));
+        } else if (colorProvider != null && tint >= 0) {
+            Arrays.fill(vertexColors, 0xff000000 | ColorARGB.toABGR(colorProvider.colorMultiplier(state, this.currentBlockAccess, pos, tint)));
         } else {
             Arrays.fill(vertexColors, 0xFFFFFFFF);
         }
@@ -293,10 +349,52 @@ public class VintageBlockRenderer {
         return vertexColors;
     }
 
+    private void renderPackQuads(List<OutputQuad> quads, ChunkBuildBuffers buffers, Material baseMaterial, BlockPos pos,
+            EnumFacing side, LightPipeline lighter, IBlockColor provider, Vec3d offset) {
+        BlockRenderLayer previous = this.currentRenderLayer;
+        int previousFlags = this.currentQuadRenderingFlags;
+        this.currentQuadRenderingFlags = BakedQuadGroupAnalyzer.USE_ALL_THINGS & ~BakedQuadGroupAnalyzer.USE_RENDER_PASS_OPTIMIZATION;
+        try {
+            for (OutputQuad quad : quads) {
+                this.packQuad = quad;
+                this.currentRenderLayer = quad.layer();
+                var material = quad.layer() == previous ? baseMaterial : resolveRenderMaterial(buffers, this.currentState, quad.layer());
+                this.renderQuadList(buffers.get(material), buffers, material, pos, side, lighter, provider, offset,
+                        List.of(quad.quad()));
+            }
+        } finally {
+            this.currentRenderLayer = previous;
+            this.currentQuadRenderingFlags = previousFlags;
+            this.packQuad = null;
+        }
+    }
+
+    private static final class PackBakedQuads extends AbstractList<BakedQuad> {
+        private final List<OutputQuad> quads;
+
+        private PackBakedQuads(List<OutputQuad> quads) {
+            this.quads = quads;
+        }
+
+        @Override
+        public BakedQuad get(int index) {
+            return quads.get(index).quad();
+        }
+
+        @Override
+        public int size() {
+            return quads.size();
+        }
+    }
+
     private void renderQuadList(ChunkModelBuilder defaultBuffer, ChunkBuildBuffers buffers,
                                 Material material, BlockPos pos, EnumFacing cullFace,
                                 LightPipeline lighter, IBlockColor colorProvider, Vec3d offset,
                                 List<BakedQuad> quads) {
+        if (quads instanceof PackBakedQuads packQuads) {
+            this.renderPackQuads(packQuads.quads, buffers, material, pos, cullFace, lighter, colorProvider, offset);
+            return;
+        }
         int localX = pos.getX() & 15, localY = pos.getY() & 15, localZ = pos.getZ() & 15;
         var config = buffers.getRenderPassConfiguration();
         //noinspection ForLoopReplaceableByForEach
@@ -458,8 +556,10 @@ public class VintageBlockRenderer {
             out.u = quad.getTexU(srcIndex);
             out.v = quad.getTexV(srcIndex);
 
-            out.light = packedLightOverride != BlockQuadLightOverride.UNCHANGED ? packedLightOverride
+            int packedLight = packedLightOverride != BlockQuadLightOverride.UNCHANGED ? packedLightOverride
                     : ModelQuadUtil.mergeBakedLight(quad.getLight(srcIndex), quad.getVanillaLightEmission(), light.lm[srcIndex]);
+            out.light = this.packQuad != null && this.packQuad.light() != null
+                    ? TerrainPackGeometry.applyMinimumLight(packedLight, this.packQuad.light()) : packedLight;
 
             out.vanillaNormal = vanillaNormal;
             out.trueNormal = trueNormal;

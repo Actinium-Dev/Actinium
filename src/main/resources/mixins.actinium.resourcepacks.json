@@ -6,6 +6,9 @@
   "minVersion": "0.8.5",
   "compatibilityLevel": "JAVA_8",
   "client": [
+    "MixinBuiltinResourcePacks",
+    "MixinPackQuadBrightness",
+    "MixinStainedPaneCulling",
     "color.MixinActiniumCloudColors",
     "color.MixinArmorColors",
     "color.MixinBannerDyeColors",

@@ -19,6 +19,7 @@ import net.minecraft.util.ReportedException;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraftforge.client.ForgeHooksClient;
+import net.minecraftforge.client.MinecraftForgeClient;
 import dhj.embeddedt.embeddium.impl.asm.ProxyClassGenerator;
 import dhj.embeddedt.embeddium.impl.render.chunk.RenderSection;
 import dhj.embeddedt.embeddium.impl.render.chunk.compile.ChunkBuildBuffers;
@@ -42,6 +43,7 @@ import dhj.embeddedt.embeddium.api.shader.buffer.VanillaQuadContext;
 import com.dhj.actinium.compat.architecturecraft.ArchitectureCraftCompat;
 import com.dhj.actinium.compat.componentmodelhider.ComponentModelHiderCompat;
 import com.dhj.actinium.compat.ctm.CtmLayerCompat;
+import com.dhj.actinium.render.terrain.compile.pipeline.TerrainPackGeometry;
 import com.dhj.actinium.compat.farmersfuturedelight.FarmersFutureDelightCompat;
 import com.dhj.actinium.compat.fluidlogged.FluidloggedCompat;
 import com.dhj.actinium.compat.snowrealmagic.SnowRealMagicCompat;
@@ -383,6 +385,25 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                 return true;
             }
 
+            if (blockState.getRenderType() == EnumBlockRenderType.MODEL && TerrainPackGeometry.capture() != null) {
+                var previous = MinecraftForgeClient.getRenderLayer();
+                boolean renderedSource = false;
+                try {
+                    for (var source : VintageChunkBuildContext.LAYERS) {
+                        ForgeHooksClient.setRenderLayer(source);
+                        if (block.canRenderInLayer(blockState, source)) {
+                            this.renderThroughDispatcher(dispatcher, blockState, blockPos, slice, layer, false, buildContext);
+                            renderedSource = true;
+                        }
+                    }
+                } finally {
+                    ForgeHooksClient.setRenderLayer(previous);
+                }
+                if (renderedSource) {
+                    return true;
+                }
+            }
+
             block.canRenderInLayer(blockState, layer);
 
             if (blockState.getRenderType() == EnumBlockRenderType.MODEL && ActiniumRuntime.options().performance.useFastBlockRenderer
@@ -524,6 +545,7 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
             ComponentModelHiderCompat.beginBuild();
 
             try {
+                var startVertices = new int[VintageChunkBuildContext.LAYERS.length];
                 for (int index = 0; index < this.deferredRenders.size(); index++) {
                     DeferredRender deferred = this.deferredRenders.get(index);
                     DeferredBlock block = deferred.block();
@@ -531,17 +553,23 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
                     buildContext.getBlockRenderer().resetSharedState();
                     long before = inventory == null ? 0 : buildContext.countMeshVertices();
 
+                    for (int pass = 0; pass < startVertices.length; pass++) {
+                        startVertices[pass] = buildContext.getExistingVertexCount(VintageChunkBuildContext.LAYERS[pass]);
+                    }
                     for (int pass = 0; pass < VintageChunkBuildContext.LAYERS.length; pass++) {
                         if ((block.passMask() & (1 << pass)) == 0) {
                             continue;
                         }
 
                         net.minecraft.util.BlockRenderLayer layer = VintageChunkBuildContext.LAYERS[pass];
-                        int startVertex = buildContext.getBufferForLayer(layer).getVertexCount();
-
                         this.renderBlockLayer(block.block(), deferred.state(), blockPos, slice, layer,
                                 block.isShaderPackOverride(), buildContext);
-                        this.captureLayer(capture, buildContext, block, layer, startVertex);
+                    }
+                    for (int pass = 0; pass < startVertices.length; pass++) {
+                        var layer = VintageChunkBuildContext.LAYERS[pass];
+                        if (buildContext.getExistingVertexCount(layer) != startVertices[pass]) {
+                            this.captureLayer(capture, buildContext, block, layer, startVertices[pass]);
+                        }
                     }
 
                     if (inventory != null && buildContext.countMeshVertices() > before) {
@@ -587,7 +615,8 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
 
         Material layerMaterial = buildContext.getRenderBuffers().getRenderPassConfiguration()
                 .getMaterialForRenderType(layer);
-        capture.add(DeferredBlock.captureMaterial(block, layerMaterial), layer,
+        DeferredBlock layerOverride = block != null && (block.passMask() & (1 << layer.ordinal())) != 0 ? block : null;
+        capture.add(DeferredBlock.captureMaterial(layerOverride, layerMaterial), layer,
                 vanillaBytes(buffer, startVertex, vertexCount), quadContexts);
     }
 

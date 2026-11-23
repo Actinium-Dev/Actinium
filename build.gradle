@@ -838,6 +838,10 @@ def verifyDistributedJar = tasks.register('verifyDistributedJar') {
             'META-INF/MANIFEST.MF',
             'THIRD_PARTY_NOTICES.md',
             'LICENSE-REESES-SODIUM-OPTIONS.md',
+            'META-INF/actinium-continuity-LGPL-3.0.txt',
+            'META-INF/actinium-mcpatcher-notice.txt',
+            'actinium-builtin-packs/Actinium-Connected-Textures.zip',
+            'actinium-builtin-packs/Actinium-Glass-Pane-Culling-Fix.zip',
             'com/dhj/actinium/Actinium.class',
             'org/taumc/celeritas/core/CeleritasLoadingPlugin.class',
             'com/gtnewhorizons/angelica/glsm/GLStateManager.class',
@@ -863,6 +867,7 @@ def verifyDistributedJar = tasks.register('verifyDistributedJar') {
             'joml-1.10.5.jar',
             'mixins.actinium.iris.json',
             'mixins.actinium.vintage.json',
+            'mixins.actinium.resourcepacks.json',
             'META-INF/services/com.gtnewhorizons.angelica.glsm.backend.RenderBackend'
         ]
 
