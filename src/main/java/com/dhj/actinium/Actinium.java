@@ -20,7 +20,9 @@ import com.dhj.actinium.render.terrain.GpuCullingSettings;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.dhj.actinium.resourcepack.ResourcePackReload;
 import com.dhj.actinium.resourcepack.color.ResourcePackColors;
+import com.dhj.actinium.resourcepack.entity.ResourcePackEntities;
 import com.dhj.actinium.resourcepack.hd.ResourcePackHd;
+import com.dhj.actinium.resourcepack.item.ResourcePackItemFeatures;
 import com.dhj.actinium.resourcepack.sky.ResourcePackSky;
 import com.dhj.actinium.startup.SdlGpuBootstrap;
 import com.gtnewhorizons.angelica.proxy.ClientProxy;
@@ -86,7 +88,9 @@ public class Actinium {
 
     @EventHandler
     public void onConstruct(FMLConstructionEvent event) {
+        ResourcePackItemFeatures.register();
         ResourcePackColors.register();
+        ResourcePackEntities.register();
         ResourcePackSky.register();
         ResourcePackHd.register();
         ResourcePackReload.install();

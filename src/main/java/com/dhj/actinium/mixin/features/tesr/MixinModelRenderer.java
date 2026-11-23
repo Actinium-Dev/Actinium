@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.features.tesr;
 
+import com.dhj.actinium.resourcepack.entity.IndependentEmissiveDraw;
 import com.gtnewhorizons.angelica.glsm.GLSMDraws;
 import com.gtnewhorizons.angelica.rendering.tesr.BatchEligibility;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
@@ -28,10 +29,10 @@ public abstract class MixinModelRenderer {
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GlStateManager;callList(I)V")
     )
     private void actinium$batchPart(int list, float scale) {
-        if (!ModelPartBatcher.isBatchingActive()
+        if (IndependentEmissiveDraw.active() || !ModelPartBatcher.isBatchingActive()
             || !ModelPartBatcher.partDraw((ModelRenderer) (Object) this, scale, null)) {
             final long drawsBefore = GLSMDraws.drawCalls;
-            GLSMDraws.glCallList(list);
+            IndependentEmissiveDraw.callList(list);
             BatchEligibility.onPartFallback(drawsBefore, GLSMDraws.drawCalls);
         }
     }

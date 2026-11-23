@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.features.tesr;
 
+import com.dhj.actinium.resourcepack.item.ItemPackRendering;
 import com.gtnewhorizons.angelica.rendering.items.DroppedItemInstancer;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -17,6 +18,10 @@ public abstract class MixinRenderItemHeldInstancing {
         target = "Lnet/minecraft/client/renderer/RenderItem;renderItem(Lnet/minecraft/item/ItemStack;Lnet/minecraft/client/renderer/block/model/IBakedModel;)V"))
     private void actinium$instanceHeldItem(RenderItem renderer, ItemStack stack, IBakedModel model,
                                            Operation<Void> original, @Local(argsOnly = true) TransformType transform) {
+        if (ItemPackRendering.requiresImmediate(stack, model)) {
+            original.call(renderer, stack, model);
+            return;
+        }
         DroppedItemInstancer.renderHeldItem(renderer::renderQuads, renderer.itemColors, stack, model, transform,
             () -> original.call(renderer, stack, model));
     }
