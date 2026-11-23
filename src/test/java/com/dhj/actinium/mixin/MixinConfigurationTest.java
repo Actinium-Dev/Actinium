@@ -41,6 +41,7 @@ class MixinConfigurationTest {
     private static final String EXPECTED_REFMAP = "mixins.actinium-refmap.json";
     private static final List<String> MAIN_CONFIGS = List.of(
         "mixins.actinium.vintage.json",
+        "mixins.actinium.resourcepacks.json",
         "mixins.actinium.iris.json",
         "mixins.actinium.gibbed.json",
         "mixins.actinium.ichunutil.json",

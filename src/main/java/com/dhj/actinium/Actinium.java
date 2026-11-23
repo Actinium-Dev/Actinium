@@ -19,6 +19,9 @@ import com.dhj.actinium.render.terrain.ActiniumWorldRenderer;
 import com.dhj.actinium.render.terrain.GpuCullingSettings;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.dhj.actinium.resourcepack.ResourcePackReload;
+import com.dhj.actinium.resourcepack.color.ResourcePackColors;
+import com.dhj.actinium.resourcepack.hd.ResourcePackHd;
+import com.dhj.actinium.resourcepack.sky.ResourcePackSky;
 import com.dhj.actinium.startup.SdlGpuBootstrap;
 import com.gtnewhorizons.angelica.proxy.ClientProxy;
 import com.gtnewhorizons.angelica.config.AngelicaConfig;
@@ -83,6 +86,9 @@ public class Actinium {
 
     @EventHandler
     public void onConstruct(FMLConstructionEvent event) {
+        ResourcePackColors.register();
+        ResourcePackSky.register();
+        ResourcePackHd.register();
         ResourcePackReload.install();
         GLSMConfig.workerThreadCount = ActiniumConfig.workerThreadCount;
 
