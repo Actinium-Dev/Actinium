@@ -46,6 +46,20 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
     public final WindowSettings window = new WindowSettings();
     public final ReducerSettings reducer = new ReducerSettings();
     public final PerformanceIndicatorSettings performanceIndicator = new PerformanceIndicatorSettings();
+    public final ResourcePackSettings resourcePacks = new ResourcePackSettings();
+
+    public static final class ResourcePackSettings {
+        public boolean connectedTextures = true;
+        public boolean ctmModTextures = true;
+        public boolean ctmConnectInside;
+        public boolean emissive = true;
+        public boolean cit = true;
+        public boolean customColors = true;
+        public boolean randomEntities = true;
+        public boolean customSky = true;
+        public boolean extendedTextures = true;
+        public boolean continuityOptionsImported;
+    }
 
     private boolean readOnly;
 

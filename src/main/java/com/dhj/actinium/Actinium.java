@@ -18,6 +18,7 @@ import com.dhj.actinium.render.fps.FpsReducer;
 import com.dhj.actinium.render.terrain.ActiniumWorldRenderer;
 import com.dhj.actinium.render.terrain.GpuCullingSettings;
 import com.dhj.actinium.runtime.ActiniumRuntime;
+import com.dhj.actinium.resourcepack.ResourcePackReload;
 import com.dhj.actinium.startup.SdlGpuBootstrap;
 import com.gtnewhorizons.angelica.proxy.ClientProxy;
 import com.gtnewhorizons.angelica.config.AngelicaConfig;
@@ -59,7 +60,6 @@ import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.event.FMLConstructionEvent;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import dhj.embeddedt.embeddium.impl.common.util.MathUtil;
 import dhj.embeddedt.embeddium.impl.common.util.NativeBuffer;
@@ -83,6 +83,7 @@ public class Actinium {
 
     @EventHandler
     public void onConstruct(FMLConstructionEvent event) {
+        ResourcePackReload.install();
         GLSMConfig.workerThreadCount = ActiniumConfig.workerThreadCount;
 
         var container = Loader.instance().getIndexedModList().get(MODID);

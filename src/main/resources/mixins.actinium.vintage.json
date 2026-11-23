@@ -27,6 +27,7 @@
     "core.startup.MixinGameSettingsIrisInit",
     "core.startup.MixinMinecraftCoreProfileDisplay",
     "core.startup.MixinMinecraftIrisLoadingComplete",
+    "core.startup.MixinModelManagerResourcePacks",
     "core.startup.MixinOpenGlHelper",
     "core.startup.MixinResourceReloadCheckpoint",
     "core.startup.MixinSplashProgress",
