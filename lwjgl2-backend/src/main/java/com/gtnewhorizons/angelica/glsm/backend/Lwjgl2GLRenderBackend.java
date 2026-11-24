@@ -358,6 +358,11 @@ public final class Lwjgl2GLRenderBackend extends RenderBackend {
     }
 
     @Override
+    public boolean supportsInstancedDrawing() {
+        return GLContext.getCapabilities().OpenGL33;
+    }
+
+    @Override
     public void drawArraysInstanced(int mode, int first, int count, int primcount) {
         GL31.glDrawArraysInstanced(mode, first, count, primcount);
     }

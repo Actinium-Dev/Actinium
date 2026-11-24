@@ -176,6 +176,18 @@ public class ActiniumGameOptionPages {
                 .build();
     }
 
+    private static OptionImpl<SodiumGameOptions, Boolean> createInstancedWeatherOption() {
+        return OptionImpl.createBuilder(boolean.class, sodiumOpts)
+                .setId(OptionIdentifier.create("actinium", "use_instanced_weather", Boolean.class))
+                .setName(TextComponent.translatable("sodium.options.actinium.instanced_weather.name"))
+                .setTooltip(TextComponent.translatable("sodium.options.actinium.instanced_weather.tooltip"))
+                .setControl(TickBoxControl::new)
+                .setImpact(OptionImpact.MEDIUM)
+                .setBinding((opts, value) -> opts.advanced.useInstancedWeather = value, opts -> opts.advanced.useInstancedWeather)
+                .setDefaultValue(true)
+                .build();
+    }
+
     public static OptionPage general() {
         List<OptionGroup> groups = new ArrayList<>();
 
@@ -599,6 +611,7 @@ public class ActiniumGameOptionPages {
                 .add(createModelRendererDisplayListsOption(TextComponent.translatable("sodium.options.model_renderer_display_lists.tooltip")))
                 .add(createFastLitItemRenderingOption(TextComponent.translatable("sodium.options.fast_lit_item_rendering.tooltip")))
                 .add(createFastLitItemDisplayListsOption(TextComponent.translatable("sodium.options.fast_lit_item_display_lists.tooltip")))
+                .add(createInstancedWeatherOption())
                 .build());
 
         groups.add(OptionGroup.createBuilder()

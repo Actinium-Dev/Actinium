@@ -28,20 +28,18 @@ class AttributeTransformer {
 	}
 
 	private static void transformCore(Transformer transformer, AttributeParameters parameters) {
-		// Only the template and cube layouts have an instance head; the declaration helper rejects the
-		// remaining kinds, so every instanced vertex stage here reads the head.
 		final boolean instancedVertex = parameters.type == ShaderType.VERTEX && parameters.instancing != Instancing.NONE;
 		final boolean cubeVertex = instancedVertex && parameters.instancing == Instancing.CUBE;
 		final boolean particleVertex = instancedVertex && parameters.instancing == Instancing.PARTICLE;
+		final boolean weatherVertex = instancedVertex && parameters.instancing == Instancing.WEATHER;
 		CoreTransformHelper.injectMatrixUniforms(transformer, instancedVertex ? parameters.instancing : Instancing.NONE);
 
 		if (parameters.type == ShaderType.VERTEX) {
-			if (particleVertex) {
-				// The per-vertex values are assembled from the instance and the corner offset, so
-				// their attributes are declared by the shared helper instead. The quad mesh has no
-				// normal attribute, and location 4 would read the unset generic value, so the normal
-				// is the camera-facing axis the billboard is built in.
-				transformer.injectVariable("const vec3 iris_Normal = vec3(0.0, 0.0, 1.0);");
+			if (particleVertex || weatherVertex) {
+				// The quad layouts have no normal attribute.
+				transformer.injectVariable(weatherVertex
+					? "const vec3 iris_Normal = vec3(0.0, 1.0, 0.0);"
+					: "const vec3 iris_Normal = vec3(0.0, 0.0, 1.0);");
 				transformer.injectVariable("uniform vec4 iris_ColorModulator;");
 				transformer.replaceExpression("gl_Color", "(iris_Color * iris_ColorModulator)");
 			} else {
@@ -111,6 +109,10 @@ class AttributeTransformer {
 					init.append(" iris_MultiTexCoord0 = ").append(InstancedGlslHelpers.particleUv("iris_InstUv", "iris_ParticleCorner")).append(';');
 					init.append(" iris_MultiTexCoord1 = vec4(iris_InstLightmap, 0.0, 1.0);");
 					assignMidTexCoord(transformer, init, "vec4((iris_InstUv.x + iris_InstUv.z) * 0.5, (iris_InstUv.y + iris_InstUv.w) * 0.5, 0.0, 1.0)");
+				} else if (weatherVertex) {
+					init.append(InstancedGlslHelpers.weatherPrologue("iris_", "iris_", "iris_WeatherCorner",
+						"iris_Vertex", "iris_Color", "iris_MultiTexCoord0", "iris_MultiTexCoord1", " "));
+					assignMidTexCoord(transformer, init, "vec4(0.5, 0.5, 0.0, 1.0)");
 				} else {
 					init.append("iris_ModelViewMatrix = ").append(InstancedGlslHelpers.mat4FromRows("iris_InstRow0", "iris_InstRow1", "iris_InstRow2")).append(';');
 					init.append(" iris_NormalMatrix = ").append(InstancedGlslHelpers.mat3FromRows("iris_InstRow0", "iris_InstRow1", "iris_InstRow2")).append(';');

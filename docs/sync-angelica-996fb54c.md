@@ -5,6 +5,7 @@
 - 上游：`D:/Code/Angelica` 的 `upstream/master`。固定范围为 `8e099e952921a53ea5db88414e1071135f716ed4..996fb54cb05e256ea6039f4e2c8457a221a179b7`，共 18 个提交。表格按 Git 提交顺序排列，日期使用作者日期。
 - 对照基线：Actinium `3a333db7fd9f3faffd510bdd9000902c72933d02`（`main`）。覆盖 Minecraft 1.12.2 的 Cleanroom、Forge 和 Outlands 路径，以及本地 GLSM、Iris 和 SDL GPU 后端。
 - 前序：[Angelica 上游逐提交台账（02f0b0fc → 8e099e95）](sync-angelica-8e099e95.md)。
+- 后续：[Angelica 上游增量台账（996fb54c → fbfcafc7）](sync-angelica-fbfcafc7.md)。
 
 ## 逐提交结论
 
@@ -27,7 +28,7 @@
 | 15 | [`60d1a3de`，#2354](https://github.com/GTNewHorizons/Angelica/pull/2354) | 2026-11-09 | 已实现，待实测 | 沿用本地 Fluidlogged API 的存储流体绘制；`ChunkBuilderMeshingTask.prescanDeferred` 同时检查快照中的宿主与存储流体方块，任一个 ID 被配置为仅主线程渲染时，整格交给主线程。隐藏宿主跳过全部方块层，仍可捕获流体。自动化测试覆盖整格分流及无流体查询的路径；实机验证流体仅绘制一次和跨区段接面。 |
 | 16 | [`a12d2bb4`，#2360](https://github.com/GTNewHorizons/Angelica/pull/2360) | 2026-11-11 | 不直接移植 | 清除 1.7.10 Extra Utilities `RenderBlockConnectedTexturesEthereal` 的两个临时 renderer 持有的世界引用。本地 Extra Utilities 2 使用独立的 `MixinXUBlockStaticLazyQuads` 模型 quad 缓存和 `MixinGLStateAttributes` GUI 状态兼容。若 XU2 复现退出后仍持有 `WorldClient`，按堆引用链定位持有者。 |
 | 17 | [`d1e7838c`，#2356](https://github.com/GTNewHorizons/Angelica/pull/2356) | 2026-11-14 | 已有对应路径 | 上游给 GTNH LiquidLogged `0.2.0` 新增区段流体快照与邻接查询，并在绘制存储流体时配对调用 `beginStoredFluid` / `endStoredFluid`。本地针对不同依赖 JBredwards Fluidlogged API `3.0.6`，`ClonedChunkSection`、`FluidStateStorage` 与 `WorldSlice.getFluidState` 已快照并读取完整 `FluidState`。保持本地 API，结合第 15 项验证非默认流体状态、区段接面及移除流体后重建。 |
-| 18 | [`996fb54c`，#2364](https://github.com/GTNewHorizons/Angelica/pull/2364) | 2026-11-13 | 随前置移植 | 在已有原版雨雪实例化的基础上，新增 `WeatherColumnProvider` / `WeatherColumnSink`，支持 handler 决定是否保留原版降水，并按纹理层提交带颜色、淡出半径及 tick 的列。本地具备 `Instancing.WEATHER`、`WeatherQuadMesh`、`WeatherParams` 与 48 字节实例布局，但 Iris 的 `WEATHER` program 列表为空，`EntityRendererIrisMixin.actinium$renderWeather` 仍调宿主 `renderRainSnow`。先接前序 `f2c07dea` 的原版降水实例化，再迁移 80 字节布局、FFP/Iris 变换、额外 uniform 与世界切换清理。Flyby 采集脚本及 1.7.10 NotFine 的 Biomes O’ Plenty 树叶 Mixin 分开处理。 |
+| 18 | [`996fb54c`，#2364](https://github.com/GTNewHorizons/Angelica/pull/2364) | 2026-11-13 | 天气代码已适配，待实测 | `WeatherColumnProvider` / `WeatherColumnSink` 接入 1.12.2 Forge 天气 handler。80 字节实例布局、FFP/Iris 天气变体和世界切换清理见[后续台账](sync-angelica-fbfcafc7.md#天气实例化与模组-api)。Flyby 与 1.7.10 NotFine 树叶改动分开处理。 |
 
 ## 建议移植顺序与验证
 
@@ -35,4 +36,4 @@
 2. **批次 program 与流体线程安全（第 4、15 项）**：两项可独立推进。前者覆盖无光影和延迟管线，并比较批次绘制前后的 program 与 framebuffer；后者覆盖工作线程、主线程延迟捕获和跨区段接面。
 3. **GLES 和 clip distance（第 10、12 项）**：点大小查询可单独验证；原生 GLES 启动需要真实 ES 上下文。clip distance 从现有 `ClipPlaneInjectionTest` 扩展，另在 GL 集成验证启停、`push/pop`、列表回放和 Iris 普通、实例化、宽线变体切换，并在 SDL 检查能力报告与 uniform 上传。
 4. **先验证再决定范围（第 5、11、13 项）**：SDL 读回单独验证 fence、映射长度及 buffer 重分配；抽屉和桶先在 1.12.2 光影环境重现，兼顾普通、附魔物品与文字；捕获工具先验证 `GL_EXT_debug_tool` 探测和帧标记，Tracy 帧图等原生后端接入后再做。
-5. **天气（前序 `f2c07dea` → 第 18 项）**：先验证原版雨雪实例化，再验证多纹理层自定义降水、保留与替换原版降水、缺少实例变体时原 handler 只执行一次、切换世界和维度后刷新。保留本地 `RAIN_SNOW` 阶段、深度写入设置和嵌套渲染保护。
+5. **天气（前序 `f2c07dea` → 第 18 项）**：适配实现、与原版的差异和验证场景见[后续台账](sync-angelica-fbfcafc7.md#天气实例化与模组-api)。

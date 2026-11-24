@@ -163,3 +163,6 @@ gui.actinium.indicator.row.vram=Видеопамять
 gui.actinium.indicator.refresh=Интервал обновления: %s мс
 gui.actinium.indicator.save=Сохранить
 gui.actinium.indicator.cancel=Отмена
+
+sodium.options.actinium.instanced_weather.name=Инстансинг погоды
+sodium.options.actinium.instanced_weather.tooltip=Использует инстансинг для дождя, снега и погоды совместимых модов. После отключения используется исходный рендер погоды.

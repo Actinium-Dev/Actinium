@@ -163,3 +163,6 @@ gui.actinium.indicator.row.vram=显存
 gui.actinium.indicator.refresh=刷新间隔：%s 毫秒
 gui.actinium.indicator.save=保存
 gui.actinium.indicator.cancel=取消
+
+sodium.options.actinium.instanced_weather.name=天气实例化
+sodium.options.actinium.instanced_weather.tooltip=使用实例化绘制雨雪和兼容模组的天气。关闭后使用原有天气渲染器。

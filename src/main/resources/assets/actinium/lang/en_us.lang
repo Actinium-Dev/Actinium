@@ -163,3 +163,6 @@ gui.actinium.indicator.row.vram=VRAM
 gui.actinium.indicator.refresh=Refresh Interval: %s ms
 gui.actinium.indicator.save=Save
 gui.actinium.indicator.cancel=Cancel
+
+sodium.options.actinium.instanced_weather.name=Instanced Weather
+sodium.options.actinium.instanced_weather.tooltip=Draw rain, snow and compatible mod weather using instancing. Disable to use the original weather renderer.

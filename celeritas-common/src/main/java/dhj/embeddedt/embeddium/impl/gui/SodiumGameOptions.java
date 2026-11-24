@@ -145,6 +145,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         public boolean useModelRendererDisplayLists = true;
         public boolean useFastLitItemRendering = true;
         public boolean useFastLitItemDisplayLists = true;
+        public boolean useInstancedWeather = true;
 
         public int cpuRenderAheadLimit = 0;
         public MultiDrawMode multiDrawMode = MultiDrawMode.INDIRECT;

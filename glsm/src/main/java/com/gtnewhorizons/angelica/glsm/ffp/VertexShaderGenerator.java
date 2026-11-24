@@ -22,7 +22,12 @@ public final class VertexShaderGenerator {
 
         sb.append("void main() {\n");
         emitPositionTransform(sb, key);
-        if (key.lightingEnabled()) {
+        if (key.instancing() == Instancing.WEATHER) {
+            sb.append("  v_Color = weatherColor;\n");
+            if (key.separateSpecular()) {
+                sb.append("  v_SpecularColor = vec3(0.0);\n");
+            }
+        } else if (key.lightingEnabled()) {
             emitNormalTransform(sb, key);
             emitLighting(sb, key);
         } else {
@@ -45,8 +50,12 @@ public final class VertexShaderGenerator {
     private static void emitAttributes(StringBuilder sb, VertexKey key) {
         final Instancing kind = key.instancing();
         sb.append("// Vertex attributes\n");
-        sb.append("layout(location = ").append(VertexFormatElement.Usage.POSITION.getAttributeLocation()).append(") in vec3 a_Position;\n");
-        if (kind == Instancing.PARTICLE) {
+        if (kind != Instancing.WEATHER) {
+            sb.append("layout(location = ").append(VertexFormatElement.Usage.POSITION.getAttributeLocation()).append(") in vec3 a_Position;\n");
+        }
+        if (kind == Instancing.WEATHER) {
+            sb.append("layout(location = ").append(VertexFormatElement.Usage.PRIMARY_UV.getAttributeLocation()).append(") in vec2 a_WeatherCorner;\n");
+        } else if (kind == Instancing.PARTICLE) {
             // The particle mesh carries the corner offset and the corner's share of the texture
             // rectangle. Colour, lightmap and the quad centre come from the instance, so no
             // per-vertex colour, lightmap or normal attribute is declared: their locations belong to
@@ -103,6 +112,12 @@ public final class VertexShaderGenerator {
 
         if (key.lightingEnabled()) {
             sb.append("uniform mat3 u_NormalMatrix;\n");
+        }
+        if (key.instancing() == Instancing.WEATHER) {
+            sb.append("uniform vec4 u_WeatherParams0;\n");
+            sb.append("uniform vec4 u_WeatherParams1;\n");
+            sb.append("uniform vec4 u_WeatherParams2;\n");
+            sb.append("uniform vec4 u_WeatherParams3;\n");
         }
 
         if (key.unitTexMatEnabled(0)) {
@@ -257,15 +272,17 @@ public final class VertexShaderGenerator {
             sb.append("  v_Overlay = a_InstOverlay;\n\n");
             return;
         }
-        sb.append("  vec4 pos4 = ");
-        if (key.instancing() == Instancing.PARTICLE) {
+        if (key.instancing() == Instancing.WEATHER) {
+            sb.append("  vec4 pos4, weatherColor, weatherTex, weatherLight;\n  ");
+            sb.append(InstancedGlslHelpers.weatherPrologue("u_", "a_", "a_WeatherCorner",
+                "pos4", "weatherColor", "weatherTex", "weatherLight", "\n  ")).append('\n');
+        } else if (key.instancing() == Instancing.PARTICLE) {
             // The instance carries the quad centre and its half extent; the vertex carries the
             // corner offset in the billboard basis baked into ParticleQuadMesh.
-            sb.append(InstancedGlslHelpers.particlePos("a_InstCenterHalf", "a_Position"));
+            sb.append("  vec4 pos4 = ").append(InstancedGlslHelpers.particlePos("a_InstCenterHalf", "a_Position")).append(";\n");
         } else {
-            sb.append("vec4(a_Position, 1.0)");
+            sb.append("  vec4 pos4 = vec4(a_Position, 1.0);\n");
         }
-        sb.append(";\n");
         sb.append("  gl_Position = u_MVPMatrix * pos4;\n");
         if (key.lineQuads()) {
             emitLineQuadWidening(sb);
@@ -498,6 +515,8 @@ public final class VertexShaderGenerator {
             } else if (key.instancing() == Instancing.PARTICLE) {
                 // The instance holds the quad's texture rectangle, the vertex its corner share.
                 src = InstancedGlslHelpers.particleUv("a_InstUv", "a_TexCoord0");
+            } else if (key.instancing() == Instancing.WEATHER) {
+                src = "weatherTex";
             } else {
                 src = key.hasVertexTexCoord() ? "a_TexCoord0" : "u_CurrentTexCoord";
             }
@@ -513,6 +532,8 @@ public final class VertexShaderGenerator {
             } else if (key.instancing() == Instancing.PARTICLE) {
                 // Particles carry the lightmap per instance; the vertex format has no lightmap element.
                 sb.append("  v_TexCoord1 = u_LightmapTextureMatrix * vec4(a_InstLightmap, 0.0, 1.0);\n");
+            } else if (key.instancing() == Instancing.WEATHER) {
+                sb.append("  v_TexCoord1 = u_LightmapTextureMatrix * weatherLight;\n");
             } else if (key.instancing().hasInstanceHead()) {
                 sb.append("  v_TexCoord1 = u_LightmapTextureMatrix * vec4(a_InstLightmap, 0.0, 1.0);\n");
             } else if (key.hasVertexLightmap()) {
@@ -528,7 +549,7 @@ public final class VertexShaderGenerator {
             // the unit's own per-vertex attribute, then the per-draw constant fallback (issue #175).
             final String src;
             if (key.unit23UvFromUnit0()) {
-                src = "a_TexCoord0";
+                src = key.instancing() == Instancing.WEATHER ? "weatherTex" : "a_TexCoord0";
             } else if (key.hasUnitVertexTexCoord(i)) {
                 src = "a_TexCoord" + i;
             } else {
