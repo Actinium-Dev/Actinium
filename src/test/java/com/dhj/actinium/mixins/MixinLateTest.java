@@ -115,9 +115,22 @@ class MixinLateTest {
                 "mixins.actinium.mekanism.json",
                 "mixins.actinium.embers.json",
                 "mixins.actinium.mmce.json",
-                "mixins.actinium.librarianlib.json"
+                "mixins.actinium.librarianlib.json",
+                "mixins.actinium.evilcraft.json"
             ),
             Set.copyOf(MixinLate.configsFor(modId -> true, className -> true))
         );
+    }
+
+    @Test
+    void evilCraftConfigRequiresBothModsAndTheChaliceRenderer() {
+        var mods = Set.of("evilcraft", "cyclopscore");
+        String renderer = "org.cyclops.evilcraft.client.render.tileentity.RenderTileEntityEntangledChalice";
+
+        assertEquals(Set.of(), Set.copyOf(MixinLate.configsFor("evilcraft"::equals, renderer::equals)));
+        assertEquals(Set.of(), Set.copyOf(MixinLate.configsFor("cyclopscore"::equals, renderer::equals)));
+        assertEquals(Set.of(), Set.copyOf(MixinLate.configsFor(mods::contains, name -> false)));
+        assertEquals(Set.of("mixins.actinium.evilcraft.json"),
+            Set.copyOf(MixinLate.configsFor(mods::contains, renderer::equals)));
     }
 }
