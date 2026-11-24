@@ -1049,8 +1049,11 @@ public class GLStateManager {
         if (Float.isNaN(maxPointSize)) {
             final FloatBuffer range = ctx().queryScratch;
             range.clear();
-            RENDER_BACKEND.getFloat(GL11.GL_POINT_SIZE_RANGE, range);
-            final float smooth = range.get(1);
+            float smooth = 0.0f;
+            if (!RenderSystem.isGLES()) {
+                RENDER_BACKEND.getFloat(GL11.GL_POINT_SIZE_RANGE, range);
+                smooth = range.get(1);
+            }
             RENDER_BACKEND.getFloat(GL12.GL_ALIASED_POINT_SIZE_RANGE, range);
             maxPointSize = Math.max(smooth, range.get(1));
         }
