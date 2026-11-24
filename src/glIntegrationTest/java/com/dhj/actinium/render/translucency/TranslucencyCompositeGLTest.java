@@ -1,6 +1,7 @@
 package com.dhj.actinium.render.translucency;
 
 import com.dhj.actinium.render.RenderWorldRecursionGuard;
+import com.gtnewhorizons.angelica.glsm.DepthEcho;
 import com.gtnewhorizons.angelica.glsm.GLStateManagerIntegrationFixture;
 import com.gtnewhorizons.angelica.glsm.GLSMBlend;
 import com.gtnewhorizons.angelica.glsm.GLSMDepthStencilAlpha;
@@ -358,5 +359,35 @@ class TranslucencyCompositeGLTest extends GLStateManagerIntegrationFixture {
         final ByteBuffer color = readColor();
         assertColumn(color, 0, 159, 159, 191);
         assertColumn(color, 1, 64, 96, 159);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void glowDepthOrdersAdditiveTesrsAgainstOtherLayers(boolean replay) {
+        layers.beginFrame();
+        drawInto(TranslucentLayer.PARTICLES, 0, 0.5f, 0f, 1f, 0f, 0.5f);
+        layers.begin(TranslucentLayer.BLOCK_ENTITIES);
+        try {
+            if (replay) DepthEcho.beginTracking();
+            GLSMDepthStencilAlpha.glDepthMask(false);
+            drawBlended(quadProgram, 0, 0.3f, 0f, 0f, 0.4f, 0f, GL11.GL_ONE, GL11.GL_ONE);
+            if (replay) {
+                assertTrue(DepthEcho.endTracking());
+                assertTrue(layers.beginGlowReplay());
+                try {
+                    drawBlended(quadProgram, 0, 0.3f, 0f, 0f, 0.4f, 0f, GL11.GL_ONE, GL11.GL_ONE);
+                } finally {
+                    layers.endGlowReplay();
+                }
+            }
+            assertFalse(GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK));
+        } finally {
+            GLSMDepthStencilAlpha.glDepthMask(true);
+            layers.end();
+        }
+        layers.composite();
+        assertColumn(readColor(), 0, 127, 128, 102);
+        assertEquals(0.3f, readDepth().get(0), 1e-4f);
+        assertEquals(GL11.GL_NO_ERROR, GL11.glGetError());
     }
 }

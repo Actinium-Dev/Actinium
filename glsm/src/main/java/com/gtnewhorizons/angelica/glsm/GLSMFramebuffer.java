@@ -48,6 +48,7 @@ public final class GLSMFramebuffer {
                 return;
             }
         }
+        if (DepthEcho.replaying()) return;
         if (!isCachingEnabled() || ctx().drawBuffer.getValue() != mode) beforeUncapturedStateChange();
         if (isCachingEnabled()) mod(ctx().drawBuffer).setValue(mode);
         RENDER_BACKEND.drawBuffer(mode);
@@ -61,6 +62,10 @@ public final class GLSMFramebuffer {
             if (mode == RecordMode.COMPILE) {
                 return;
             }
+        }
+        if ((mask & GL11.GL_DEPTH_BUFFER_BIT) != 0 && DepthEcho.protectsDepth(getDrawFramebuffer())) {
+            mask &= ~GL11.GL_DEPTH_BUFFER_BIT;
+            if (mask == 0) return;
         }
         recordGpuCommand(GpuCommandType.CLEAR, GpuCommandPhase.BEGIN, mask, 0);
         if (firstClearPending && GLStateManager.isMainThread() && getDrawFramebuffer() == 0) {
@@ -307,6 +312,7 @@ public final class GLSMFramebuffer {
 
     public static void glFramebufferRenderbuffer(int target, int attachment, int renderbuffertarget, int renderbuffer) {
         rejectExitCapture();
+        if (DepthEcho.replaying()) return;
         // A renderbuffer replaces the texture in the slot, so the slot no longer keeps a texture alive.
         GLSMTextureLifetime.beginAttach(target, attachment, 0);
         RENDER_BACKEND.framebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer);
@@ -352,6 +358,10 @@ public final class GLSMFramebuffer {
 
     public static void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         rejectExitCapture();
+        if ((mask & GL11.GL_DEPTH_BUFFER_BIT) != 0 && DepthEcho.protectsDepth(getDrawFramebuffer())) {
+            mask &= ~GL11.GL_DEPTH_BUFFER_BIT;
+            if (mask == 0) return;
+        }
             final boolean cacheTrusted = isGpuDiagnosticCacheTrusted();
             final int diagnosticReadFramebuffer = GpuCommandDiagnostics.trustedValue(cacheTrusted, ctx().readFramebuffer);
             final int diagnosticDrawFramebuffer = GpuCommandDiagnostics.trustedValue(cacheTrusted, ctx().drawFramebuffer);

@@ -341,37 +341,37 @@ public final class Lwjgl3GLRenderBackend extends RenderBackend {
 
     @Override
     public void drawArrays(int mode, int first, int count) {
-        GL11C.glDrawArrays(mode, first, count);
+        submitOpenGLDraw(() -> GL11C.glDrawArrays(mode, first, count));
     }
 
     @Override
     public void drawElements(int mode, int count, int type, long indices) {
-        GL11C.glDrawElements(mode, count, type, indices);
+        submitOpenGLDraw(() -> GL11C.glDrawElements(mode, count, type, indices));
     }
 
     @Override
     public void drawElements(int mode, ByteBuffer indices) {
-        GL11C.glDrawElements(mode, indices);
+        submitOpenGLDraw(() -> GL11C.glDrawElements(mode, indices));
     }
 
     @Override
     public void drawElements(int mode, IntBuffer indices) {
-        GL11C.glDrawElements(mode, indices);
+        submitOpenGLDraw(() -> GL11C.glDrawElements(mode, indices));
     }
 
     @Override
     public void drawElements(int mode, ShortBuffer indices) {
-        GL11C.glDrawElements(mode, indices);
+        submitOpenGLDraw(() -> GL11C.glDrawElements(mode, indices));
     }
 
     @Override
     public void drawElements(int mode, int count, int type, ByteBuffer indices) {
-        GL11C.glDrawElements(mode, count, type, org.lwjgl.system.MemoryUtil.memAddress(indices));
+        submitOpenGLDraw(() -> GL11C.glDrawElements(mode, count, type, MemoryUtil.memAddress(indices)));
     }
 
     @Override
     public void drawElementsInstanced(int mode, int count, int type, long indices, int primcount) {
-        GL31C.glDrawElementsInstanced(mode, count, type, indices, primcount);
+        submitOpenGLDraw(() -> GL31C.glDrawElementsInstanced(mode, count, type, indices, primcount));
     }
 
     @Override
@@ -381,7 +381,7 @@ public final class Lwjgl3GLRenderBackend extends RenderBackend {
 
     @Override
     public void drawArraysInstanced(int mode, int first, int count, int primcount) {
-        GL31C.glDrawArraysInstanced(mode, first, count, primcount);
+        submitOpenGLDraw(() -> GL31C.glDrawArraysInstanced(mode, first, count, primcount));
     }
 
     @Override
@@ -391,12 +391,12 @@ public final class Lwjgl3GLRenderBackend extends RenderBackend {
 
     @Override
     public void multiDrawElementsIndirect(int mode, int type, long indirect, int drawcount, int stride) {
-        GL43C.glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
+        submitOpenGLDraw(() -> GL43C.glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride));
     }
 
     @Override
     public void multiDrawArraysIndirect(int mode, long indirect, int drawcount, int stride) {
-        GL43C.glMultiDrawArraysIndirect(mode, indirect, drawcount, stride);
+        submitOpenGLDraw(() -> GL43C.glMultiDrawArraysIndirect(mode, indirect, drawcount, stride));
     }
 
     @Override
@@ -406,22 +406,22 @@ public final class Lwjgl3GLRenderBackend extends RenderBackend {
 
     @Override
     public void drawElementsBaseVertex(int mode, int count, int type, long indices, int baseVertex) {
-        GL32C.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
+        submitOpenGLDraw(() -> GL32C.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex));
     }
 
     @Override
     public void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawcount, long pBaseVertex) {
-        GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawcount, pBaseVertex);
+        submitOpenGLDraw(() -> GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawcount, pBaseVertex));
     }
 
     @Override
     public void multiDrawArrays(int mode, IntBuffer firsts, IntBuffer counts) {
-        GL14C.glMultiDrawArrays(mode, firsts, counts);
+        submitOpenGLDraw(() -> GL14C.glMultiDrawArrays(mode, firsts, counts));
     }
 
     @Override
     public void multiDrawArrays(int mode, int[] firsts, int[] counts) {
-        GL14C.glMultiDrawArrays(mode, firsts, counts);
+        submitOpenGLDraw(() -> GL14C.glMultiDrawArrays(mode, firsts, counts));
     }
 
     @Override

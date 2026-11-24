@@ -2,6 +2,7 @@ package com.gtnewhorizons.angelica.glsm.ffp;
 
 import java.util.Arrays;
 
+import com.gtnewhorizons.angelica.glsm.DepthEcho;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.texture.TextureInfoCache;
 import com.gtnewhorizons.angelica.glsm.states.TexEnvState;
@@ -13,7 +14,7 @@ import org.lwjgl.opengl.GL13;
  * Packed-long fragment shader permutation key for FFP emulation.
  *
  * Layout:
- *   long[0]: global bits (14) + unit 0 (47 bits at offset 14)
+ *   long[0]: global bits (14), unit 0 (47 bits at offset 14), coverage discard (61)
  *   long[1..3]: unit 1..3 (47 bits each, low-aligned)
  * Only max(1, nrEnabledUnits) longs are significant.
  *
@@ -69,6 +70,7 @@ public final class FragmentKey {
     public static final int FOG_EXP2   = 3;
 
     private static final int GLOBAL_BITS = 14;
+    private static final int BIT_COVERAGE_DISCARD = 61;
     private static final int BIT_FOG_MODE          = 0;  // 2 bits
     private static final int BIT_ALPHA_TEST        = 2;  // 1 bit
     private static final int BIT_ALPHA_FUNC        = 3;  // 3 bits
@@ -110,6 +112,7 @@ public final class FragmentKey {
      */
     public static int packFromState(long[] out) {
         long global = 0;
+        if (DepthEcho.discardsCoverage()) global |= 1L << BIT_COVERAGE_DISCARD;
 
         // Fog
         if (GLStateManager.getFogMode().isEnabled()) {
@@ -258,6 +261,7 @@ public final class FragmentKey {
     public int textureSupersamplingSamples() { return 1 << (int) ((packed[0] >> BIT_TEXTURE_SUPERSAMPLING) & 0x7); }
     public boolean overlayEnabled()   { return ((packed[0] >> BIT_OVERLAY_ENABLED) & 1) != 0; }
     public boolean overlayInstanced() { return ((packed[0] >> BIT_OVERLAY_INSTANCED) & 1) != 0; }
+    public boolean coverageDiscard()  { return (packed[0] & (1L << BIT_COVERAGE_DISCARD)) != 0; }
 
     private long unitBits(int i) {
         return (i == 0) ? (packed[0] >>> GLOBAL_BITS) : packed[i];

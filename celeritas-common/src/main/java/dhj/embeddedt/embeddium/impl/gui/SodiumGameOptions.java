@@ -109,6 +109,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         public boolean enableEntityShadowReplay = false;
         /** Entity classes that re-run their renderer in the main view instead of replaying shadow pass draws. */
         public List<String> entityShadowReplayExcludedClasses = new ArrayList<>(defaultEntityShadowReplayExcludedClasses());
+        public List<String> glowDepthReplayExcludedClasses = new ArrayList<>();
 
         /**
          * {@return the exclusion list a fresh configuration starts with}. The load path restores the same list when the
@@ -447,6 +448,9 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         if (config.performance.entityShadowReplayExcludedClasses == null) {
             config.performance.entityShadowReplayExcludedClasses =
                     new ArrayList<>(PerformanceSettings.defaultEntityShadowReplayExcludedClasses());
+        }
+        if (config.performance.glowDepthReplayExcludedClasses == null) {
+            config.performance.glowDepthReplayExcludedClasses = new ArrayList<>();
         }
 
         if (config.performanceIndicator.rows == null) {

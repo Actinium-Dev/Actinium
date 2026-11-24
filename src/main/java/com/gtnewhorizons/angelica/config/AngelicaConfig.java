@@ -46,6 +46,11 @@ public final class AngelicaConfig {
         return performance().entityShadowReplayExcludedClasses;
     }
 
+    /** Fully qualified tile entity or renderer class names that use immediate glow depth capture. */
+    public static List<String> glowDepthReplayExcludedClasses() {
+        return performance().glowDepthReplayExcludedClasses;
+    }
+
     /** Upper bound for cached item meshes. */
     public static int itemRendererCacheSize() {
         return performance().itemRendererCacheSize;

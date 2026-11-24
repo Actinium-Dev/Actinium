@@ -8,6 +8,7 @@ import com.gtnewhorizons.angelica.rendering.tesr.AngelicaTesrMeshCache;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
 import com.gtnewhorizons.angelica.rendering.tesr.PendingTesrDraws;
 import com.gtnewhorizons.angelica.rendering.tesr.TesrBatchRenderer;
+import com.gtnewhorizons.angelica.rendering.tesr.TesrGlowReplay;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.coderbot.iris.Iris;
 import net.coderbot.iris.celeritas.WorldRendererCompat;
@@ -353,6 +354,7 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
             if(!tileEntity.shouldRenderInPass(pass))
                 continue;
 
+            PendingTesrDraws.beforeTileEntity(tileEntity);
             try {
                 TileEntityRendererDispatcher.instance.render(tileEntity, partialTicks, -1);
             } catch(RuntimeException e) {
@@ -409,7 +411,11 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
                 TranslucencyLayers.INSTANCE.begin(TranslucentLayer.BLOCK_ENTITIES);
             }
             try {
-                this.renderBlockEntitiesInPhase(context, 1, "block-entities-main-early");
+                if (layered) {
+                    TesrGlowReplay.renderLayer(() -> this.renderBlockEntitiesInPhase(context, 1, "block-entities-main-early"));
+                } else {
+                    this.renderBlockEntitiesInPhase(context, 1, "block-entities-main-early");
+                }
             } finally {
                 if (layered) {
                     TranslucencyLayers.INSTANCE.end();

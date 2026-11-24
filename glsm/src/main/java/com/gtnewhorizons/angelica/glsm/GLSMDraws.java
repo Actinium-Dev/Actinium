@@ -104,6 +104,7 @@ public final class GLSMDraws {
 
     public static void glDrawElements(int mode, ByteBuffer indices) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
         CommandRecorder savedRecorder = null;
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -142,6 +143,7 @@ public final class GLSMDraws {
 
     public static void glDrawElements(int mode, IntBuffer indices) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
         CommandRecorder savedRecorder = null;
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -184,6 +186,7 @@ public final class GLSMDraws {
 
     public static void glDrawElements(int mode, ShortBuffer indices) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
         CommandRecorder savedRecorder = null;
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -226,6 +229,7 @@ public final class GLSMDraws {
 
     public static void glDrawElements(int mode, int count, int type, ByteBuffer indices) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
         CommandRecorder savedRecorder = null;
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -272,6 +276,7 @@ public final class GLSMDraws {
 
     public static void glDrawElements(int mode, int indices_count, int type, long indices_buffer_offset) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
         CommandRecorder savedRecorder = null;
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -327,6 +332,7 @@ public final class GLSMDraws {
 
     public static void glDrawArrays(int mode, int first, int count) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
         CommandRecorder savedRecorder = null;
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -343,33 +349,35 @@ public final class GLSMDraws {
             FeedbackManager.processDrawArrays(mode, first, count);
             return;
         }
-        prepareWideLineEmulation(mode);
-        if (widensLineDraw(mode, count)) {
-            drawLinesAsQuads(ctx(), ImmediateModeRecorder.processDrawArraysFromAttribs(mode, first, count));
-            if (savedRecorder != null) DisplayListManager.resumeRecording(savedRecorder);
-            return;
-        }
-        final boolean ffpExt = FfpExtendedAttribs.maybeBind(ctx(), mode, first, count);
         try {
-            preDrawFFP();
-            prepareClientArrays(first, count);
-            if (DEBUG_DRAW_LOGS) {
-                GLSMDebug.logDrawArrays("draw-arrays", mode, first, count);
+            prepareWideLineEmulation(mode);
+            if (widensLineDraw(mode, count)) {
+                drawLinesAsQuads(ctx(), ImmediateModeRecorder.processDrawArraysFromAttribs(mode, first, count));
+                return;
             }
-            recordGpuCommand(GpuCommandType.DRAW_ARRAYS, mode, count);
-            if (mode == GL11.GL_QUADS) {
-                QuadConverter.drawQuadsAsTriangles(first, count);
-            } else if (mode == GL11.GL_QUAD_STRIP) {
-                RENDER_BACKEND.drawArrays(GL11.GL_TRIANGLE_STRIP, first, count & ~1);
-            } else if (mode == GL11.GL_POLYGON) {
-                RENDER_BACKEND.drawArrays(GL11.GL_TRIANGLE_FAN, first, count);
-            } else {
-                RENDER_BACKEND.drawArrays(mode, first, count);
+            final boolean ffpExt = FfpExtendedAttribs.maybeBind(ctx(), mode, first, count);
+            try {
+                preDrawFFP();
+                prepareClientArrays(first, count);
+                if (DEBUG_DRAW_LOGS) {
+                    GLSMDebug.logDrawArrays("draw-arrays", mode, first, count);
+                }
+                recordGpuCommand(GpuCommandType.DRAW_ARRAYS, mode, count);
+                if (mode == GL11.GL_QUADS) {
+                    QuadConverter.drawQuadsAsTriangles(first, count);
+                } else if (mode == GL11.GL_QUAD_STRIP) {
+                    RENDER_BACKEND.drawArrays(GL11.GL_TRIANGLE_STRIP, first, count & ~1);
+                } else if (mode == GL11.GL_POLYGON) {
+                    RENDER_BACKEND.drawArrays(GL11.GL_TRIANGLE_FAN, first, count);
+                } else {
+                    RENDER_BACKEND.drawArrays(mode, first, count);
+                }
+            } finally {
+                if (ffpExt) FfpExtendedAttribs.unbind();
             }
         } finally {
-            if (ffpExt) FfpExtendedAttribs.unbind();
+            if (savedRecorder != null) DisplayListManager.resumeRecording(savedRecorder);
         }
-        if (savedRecorder != null) DisplayListManager.resumeRecording(savedRecorder);
     }
 
     public static void glNewList(int list, int mode) {
@@ -487,6 +495,7 @@ public final class GLSMDraws {
 
     public static void glMultiDrawElementsIndirect(int mode, int type, long indirect, int drawcount, int stride) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls += drawcount;
             preDrawFFP();
             prepareClientArrays();
@@ -496,6 +505,7 @@ public final class GLSMDraws {
 
     public static void glMultiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawcount, long pBaseVertex) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls += drawcount;
             preDrawFFP();
             prepareClientArrays();
@@ -505,6 +515,7 @@ public final class GLSMDraws {
 
     public static void glDrawElementsBaseVertex(int mode, int count, int type, long indices, int basevertex) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
             preDrawFFP();
             prepareClientArrays();
@@ -514,6 +525,7 @@ public final class GLSMDraws {
 
     public static void glDrawElementsInstanced(int mode, int count, int type, long indices, int primcount) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
             warnIfInstancedWideLines(mode);
             preDrawFFP();
@@ -524,6 +536,7 @@ public final class GLSMDraws {
 
     public static void glDrawArraysInstanced(int mode, int first, int count, int primcount) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
         drawCalls++;
             prepareWideLineEmulation(mode);
             warnIfInstancedWideLines(mode);
@@ -543,6 +556,7 @@ public final class GLSMDraws {
 
     public static void glDrawRangeElements(int mode, int start, int end, int count, int type, long indices) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
             prepareWideLineEmulation(mode);
             if (widensLineDraw(mode, count)) {
                 drawLinesAsQuads(ctx(), lineElementsFromBuffer(mode, count, type, indices));
@@ -556,6 +570,7 @@ public final class GLSMDraws {
 
     public static void glDrawRangeElementsBaseVertex(int mode, int start, int end, int count, int type, long indices, int baseVertex) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
             preDrawFFP();
             prepareClientArrays();
             recordGpuCommand(GpuCommandType.DRAW_ELEMENTS, mode, count);
@@ -564,6 +579,7 @@ public final class GLSMDraws {
 
     public static void glMultiDrawArrays(int mode, IntBuffer firsts, IntBuffer counts) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
             prepareWideLineEmulation(mode);
             if (LineQuads.isLineMode(mode) && ffpWidensLineQuads()) {
                 // Each range is its own line primitive; widening them as one draw would join the ranges
@@ -581,6 +597,7 @@ public final class GLSMDraws {
         }
 
     public static void glMultiDrawArrays(int mode, int[] firsts, int[] counts) {
+        if (DepthEcho.skipsCall()) return;
             preDrawFFP();
             prepareClientArrays();
             recordGpuCommand(GpuCommandType.DRAW_ARRAYS, mode, counts.length);
@@ -617,6 +634,7 @@ public final class GLSMDraws {
 
     public static void glMultiDrawArraysIndirectCount(int mode, long indirect, long drawcount, int maxdrawcount, int stride) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
             preDrawFFP();
             prepareClientArrays();
             recordGpuCommand(GpuCommandType.DRAW_ARRAYS, mode, maxdrawcount);
@@ -625,6 +643,7 @@ public final class GLSMDraws {
 
     public static void glMultiDrawElementsIndirectCount(int mode, int type, long indirect, long drawcount, int maxdrawcount, int stride) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
             preDrawFFP();
             prepareClientArrays();
             recordGpuCommand(GpuCommandType.DRAW_ELEMENTS, mode, maxdrawcount);
@@ -659,6 +678,7 @@ public final class GLSMDraws {
 
     public static void nglMultiDrawElementsBaseVertex(int mode, long count, int type, long indices, int primcount, long basevertex) {
         rejectExitCapture();
+        if (DepthEcho.skipsCall()) return;
             RENDER_BACKEND.multiDrawElementsBaseVertex(mode, count, type, indices, primcount, basevertex);
         }
 

@@ -1,5 +1,6 @@
 package com.dhj.actinium.render.translucency;
 
+import com.gtnewhorizons.angelica.glsm.DepthEcho;
 import com.dhj.actinium.render.RenderWorldRecursionGuard;
 import com.gtnewhorizons.angelica.glsm.GLSMAttribStack;
 import com.gtnewhorizons.angelica.glsm.GLSMBlend;
@@ -69,6 +70,7 @@ public final class TranslucencyLayers {
     private final BooleanSupplier supportsPipeline;
     private final Target[] layers = new Target[LAYERS];
     private Target depthSnapshot;
+    private Target glowDepth;
     private int targetFramebuffer;
     private int targetDepthTexture;
     private int width;
@@ -90,9 +92,11 @@ public final class TranslucencyLayers {
     private final TextureBindings splitBinding = new TextureBindings(1);
     private final TextureBindings compositeBindings = new TextureBindings(TERRAIN_BEHIND_UNIT + 1);
     private boolean behindDrawn;
+    private boolean replayingGlows;
 
     private CompositeProgram program;
     private CompositeProgram behindProgram;
+    private GlProgram<Object> glowMergeProgram;
     private int vao;
     private StateSet prepareState;
 
@@ -154,9 +158,16 @@ public final class TranslucencyLayers {
             final Target target = layer(layer);
             final int bit = 1 << layer.ordinal();
             if ((drawnMask & bit) == 0) prepare(target);
+            if (layer == TranslucentLayer.BLOCK_ENTITIES) {
+                if (glowDepth == null) glowDepth = new Target(width, height, depthFormat, false);
+                prepareGlowDepth(target);
+            }
             target.framebuffer.bind();
             GLSMBlend.setLayerBlending(true);
             restoreAlphaMask(true);
+            if (layer == TranslucentLayer.BLOCK_ENTITIES) {
+                DepthEcho.arm(glowDepth.framebuffer.getId(), target.framebuffer.getId());
+            }
             drawnMask |= bit;
             open = layer;
         } finally {
@@ -168,6 +179,15 @@ public final class TranslucencyLayers {
         if (open == null) throw new IllegalStateException("No translucency layer is open");
         try {
             while (!terrainScopes.isEmpty()) endTerrainSplit();
+            if (open == TranslucentLayer.BLOCK_ENTITIES) {
+                try {
+                    if (replayingGlows) endGlowReplay();
+                    BatchStateGuard.beforeChange();
+                } finally {
+                    DepthEcho.disarm();
+                }
+                if (DepthEcho.takeEchoed()) mergeGlowDepth();
+            }
         } finally {
             try {
                 restoreCaptureState();
@@ -196,15 +216,42 @@ public final class TranslucencyLayers {
 
     public void bindOpenLayer() {
         if (!redirectsMainBind()) throw new IllegalStateException("No translucency layer is open for this view");
-        layers[open.ordinal()].framebuffer.bind();
+        (replayingGlows ? glowDepth : layers[open.ordinal()]).framebuffer.bind();
     }
 
     public boolean isOpenLayer(TranslucentLayer layer) {
         return redirectsMainBind() && open == layer;
     }
 
+    /** Redirects the recorded TESRs to the depth-only target for one replay. */
+    public boolean beginGlowReplay() {
+        if (!isOpenLayer(TranslucentLayer.BLOCK_ENTITIES) || !DepthEcho.armed()) return false;
+        if (replayingGlows) throw new IllegalStateException("TESR glow replay is already open");
+        BatchStateGuard.beforeChange();
+        glowDepth.framebuffer.bind();
+        DepthEcho.beginReplay();
+        replayingGlows = true;
+        return true;
+    }
+
+    /** Flushes replay geometry before returning to the regular block-entity target. */
+    public void endGlowReplay() {
+        if (!replayingGlows) throw new IllegalStateException("No TESR glow replay is open");
+        try {
+            BatchStateGuard.beforeChange();
+        } finally {
+            try {
+                DepthEcho.endReplay();
+            } finally {
+                replayingGlows = false;
+                layers[TranslucentLayer.BLOCK_ENTITIES.ordinal()].framebuffer.bind();
+            }
+        }
+    }
+
     /** Keeps recursive world renders outside the outer view's capture. */
     public void renderNested(Runnable draw) {
+        if (replayingGlows) return;
         if (open == null || captureSuspended) {
             draw.run();
             return;
@@ -319,6 +366,63 @@ public final class TranslucencyLayers {
     public void composite() {
         if (!active() || drawnMask == 0) return;
         if (open != null) throw new IllegalStateException("Cannot composite an open translucency layer");
+        try {
+            syncSize();
+            if (drawnMask != 0) drawFullscreen(this::prepareComposite);
+        } finally {
+            drawnMask = 0;
+            behindDrawn = false;
+        }
+    }
+
+    private void prepareComposite() {
+        final Target snapshot = depthSnapshot();
+        final CompositeProgram composite = compositeProgram(behindDrawn);
+        blit(targetFramebuffer, snapshot.framebuffer.getId(), GL11.GL_DEPTH_BUFFER_BIT);
+        GLSMFramebuffer.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, targetFramebuffer);
+        GLSMBlend.enableBlend();
+        GLSMBlend.glBlendEquation(GL14.GL_FUNC_ADD);
+        GLSMBlend.tryBlendFuncSeparate(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ZERO, GL11.GL_ONE);
+        GLSMBlend.glColorMask(true, true, true, false);
+        GLSMDepthStencilAlpha.glDepthFunc(GL11.GL_ALWAYS);
+        compositeBindings.save(0, 0);
+        bindTexture(0, snapshot.depth);
+        for (int i = 0; i < LAYERS; i++) {
+            if ((drawnMask & (1 << i)) == 0) continue;
+            final int colorUnit = FIRST_LAYER_UNIT + i;
+            final int depthUnit = colorUnit + LAYERS;
+            compositeBindings.save(colorUnit, colorUnit);
+            compositeBindings.save(depthUnit, depthUnit);
+            bindTexture(colorUnit, layers[i].color);
+            bindTexture(depthUnit, layers[i].depth);
+        }
+        if (behindDrawn) {
+            compositeBindings.save(TERRAIN_BEHIND_UNIT, TERRAIN_BEHIND_UNIT);
+            bindTexture(TERRAIN_BEHIND_UNIT, layers[TranslucentLayer.TERRAIN.ordinal()].behind);
+        }
+        GLSMPrograms.glUseProgram(composite.program.handle());
+        GLSMPrograms.glUniform1i(composite.maskUniform, drawnMask);
+    }
+
+    private void mergeGlowDepth() {
+        drawFullscreen(this::prepareGlowMerge);
+    }
+
+    private void prepareGlowMerge() {
+        if (glowMergeProgram == null) {
+            glowMergeProgram = loadFullscreenProgram("angelica:translucency_glow_depth", "angelica:translucency_glow_depth", ShaderConstants.EMPTY);
+        }
+        layers[TranslucentLayer.BLOCK_ENTITIES.ordinal()].framebuffer.bind();
+        GLSMBlend.disableBlend();
+        GLSMBlend.glColorMask(false, false, false, false);
+        GLSMDepthStencilAlpha.glDepthFunc(GL11.GL_LESS);
+        compositeBindings.save(0, 0);
+        bindTexture(0, glowDepth.depth);
+        GLSMPrograms.glUseProgram(glowMergeProgram.handle());
+        setUniform(glowMergeProgram.handle(), "u_GlowDepth", 0);
+    }
+
+    private void drawFullscreen(Runnable prepareDraw) {
         BatchStateGuard.beforeChange();
         final int draw = GLSMFramebuffer.getDrawFramebuffer();
         final int read = GLSMFramebuffer.getReadFramebuffer();
@@ -327,19 +431,10 @@ public final class TranslucencyLayers {
         final boolean layerBlending = GLSMBlend.isLayerBlending();
         final int state = GLSMAttribStack.pushState(StateSet.forMask(GL11.GL_ALL_ATTRIB_BITS));
         try {
-            syncSize();
-            if (drawnMask == 0) return;
-            final Target snapshot = depthSnapshot();
-            final CompositeProgram composite = compositeProgram(behindDrawn);
+            if (vao == 0) vao = GLSMVertexInput.glGenVertexArrays();
             GLSMRasterizer.disableScissorTest();
-            blit(targetFramebuffer, snapshot.framebuffer.getId(), GL11.GL_DEPTH_BUFFER_BIT);
-            GLSMFramebuffer.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, targetFramebuffer);
             GLSMRasterizer.glViewport(0, 0, width, height);
             GLSMBlend.setLayerBlending(false);
-            GLSMBlend.enableBlend();
-            GLSMBlend.glBlendEquation(GL14.GL_FUNC_ADD);
-            GLSMBlend.tryBlendFuncSeparate(GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ZERO, GL11.GL_ONE);
-            GLSMBlend.glColorMask(true, true, true, false);
             GLSMRasterizer.disableCull();
             GLSMRasterizer.glPolygonMode(GL11.GL_FRONT_AND_BACK, GL11.GL_FILL);
             GLSMEnable.glDisable(GL11.GL_POLYGON_OFFSET_FILL);
@@ -347,25 +442,8 @@ public final class TranslucencyLayers {
             GLSMEnable.glDisable(GL11.GL_STENCIL_TEST);
             GLSMDepthStencilAlpha.disableAlphaTest();
             GLSMDepthStencilAlpha.enableDepthTest();
-            GLSMDepthStencilAlpha.glDepthFunc(GL11.GL_ALWAYS);
             GLSMDepthStencilAlpha.glDepthMask(true);
-            compositeBindings.save(0, 0);
-            bindTexture(0, snapshot.depth);
-            for (int i = 0; i < LAYERS; i++) {
-                if ((drawnMask & (1 << i)) == 0) continue;
-                final int colorUnit = FIRST_LAYER_UNIT + i;
-                final int depthUnit = colorUnit + LAYERS;
-                compositeBindings.save(colorUnit, colorUnit);
-                compositeBindings.save(depthUnit, depthUnit);
-                bindTexture(colorUnit, layers[i].color);
-                bindTexture(depthUnit, layers[i].depth);
-            }
-            if (behindDrawn) {
-                compositeBindings.save(TERRAIN_BEHIND_UNIT, TERRAIN_BEHIND_UNIT);
-                bindTexture(TERRAIN_BEHIND_UNIT, layers[TranslucentLayer.TERRAIN.ordinal()].behind);
-            }
-            GLSMPrograms.glUseProgram(composite.program.handle());
-            GLSMPrograms.glUniform1i(composite.maskUniform, drawnMask);
+            prepareDraw.run();
             GLSMVertexInput.glBindVertexArray(vao);
             GLSMDraws.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
         } finally {
@@ -375,8 +453,6 @@ public final class TranslucencyLayers {
             bindFramebuffers(draw, read);
             GLSMBlend.setLayerBlending(layerBlending);
             GLSMAttribStack.popStateTo(state);
-            drawnMask = 0;
-            behindDrawn = false;
         }
     }
 
@@ -385,14 +461,15 @@ public final class TranslucencyLayers {
         destroyTargets();
         if (program != null) program.program.delete();
         if (behindProgram != null) behindProgram.program.delete();
+        if (glowMergeProgram != null) glowMergeProgram.delete();
         if (vao != 0) GLSMVertexInput.glDeleteVertexArrays(vao);
         program = null;
         behindProgram = null;
+        glowMergeProgram = null;
         vao = 0;
     }
 
     private CompositeProgram compositeProgram(boolean behind) {
-        if (vao == 0) vao = GLSMVertexInput.glGenVertexArrays();
         if (behind) {
             if (behindProgram == null) {
                 behindProgram = new CompositeProgram("angelica:translucency_composite_behind",
@@ -412,6 +489,20 @@ public final class TranslucencyLayers {
             clear(target);
             final int mask = GL11.GL_DEPTH_BUFFER_BIT | (depthFormat.isCombinedStencil() ? GL11.GL_STENCIL_BUFFER_BIT : 0);
             blit(targetFramebuffer, target.framebuffer.getId(), mask);
+        } finally {
+            bindFramebuffers(draw, read);
+            GLSMAttribStack.popStateTo(state);
+        }
+    }
+
+    private void prepareGlowDepth(Target blockEntities) {
+        final int draw = GLSMFramebuffer.getDrawFramebuffer();
+        final int read = GLSMFramebuffer.getReadFramebuffer();
+        final int state = pushClearState();
+        try {
+            GLSMRasterizer.disableScissorTest();
+            final int mask = GL11.GL_DEPTH_BUFFER_BIT | (depthFormat.isCombinedStencil() ? GL11.GL_STENCIL_BUFFER_BIT : 0);
+            blit(blockEntities.framebuffer.getId(), glowDepth.framebuffer.getId(), mask);
         } finally {
             bindFramebuffers(draw, read);
             GLSMAttribStack.popStateTo(state);
@@ -496,12 +587,28 @@ public final class TranslucencyLayers {
         }
         if (depthSnapshot != null) depthSnapshot.destroy();
         depthSnapshot = null;
+        if (glowDepth != null) glowDepth.destroy();
+        glowDepth = null;
         drawnMask = 0;
         behindDrawn = false;
     }
 
     private static void setUniform(int program, String name, int value) {
         GLSMPrograms.glUniform1i(GLSMPrograms.glGetUniformLocation(program, name), value);
+    }
+
+    private static GlProgram<Object> loadFullscreenProgram(String programName, String fragmentName, ShaderConstants constants) {
+        final GlShader vertex = ShaderLoader.loadShader(ShaderType.VERTEX, "angelica:panorama_blur.vert", ShaderConstants.EMPTY);
+        try {
+            final GlShader fragment = ShaderLoader.loadShader(ShaderType.FRAGMENT, fragmentName + ".frag", constants);
+            try {
+                return GlProgram.builder(programName).attachShader(vertex).attachShader(fragment).link(context -> context);
+            } finally {
+                fragment.delete();
+            }
+        } finally {
+            vertex.delete();
+        }
     }
 
     private static final class TextureBindings {
@@ -556,17 +663,7 @@ public final class TranslucencyLayers {
         final int maskUniform;
 
         CompositeProgram(String name, ShaderConstants constants) {
-            final GlShader vertex = ShaderLoader.loadShader(ShaderType.VERTEX, "angelica:panorama_blur.vert", ShaderConstants.EMPTY);
-            try {
-                final GlShader fragment = ShaderLoader.loadShader(ShaderType.FRAGMENT, "angelica:translucency_composite.frag", constants);
-                try {
-                    program = GlProgram.builder(name).attachShader(vertex).attachShader(fragment).link(context -> context);
-                } finally {
-                    fragment.delete();
-                }
-            } finally {
-                vertex.delete();
-            }
+            program = loadFullscreenProgram(name, "angelica:translucency_composite", constants);
             GLSMPrograms.glUseProgram(program.handle());
             setUniform(program.handle(), "u_Depth", 0);
             for (int i = 0; i < LAYERS; i++) {

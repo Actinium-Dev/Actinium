@@ -1,5 +1,6 @@
 package com.gtnewhorizons.angelica.rendering.tesr;
 
+import com.gtnewhorizons.angelica.glsm.DepthEcho;
 import com.gtnewhorizons.angelica.rendering.RenderFailures;
 import com.gtnewhorizon.gtnhlib.client.renderer.MatrixHelper;
 import com.gtnewhorizon.gtnhlib.client.renderer.vertex.VertexFormat;
@@ -200,10 +201,12 @@ public final class TesrBatchRenderer {
     }
 
     public void queue(TemplateBuffer template, ResourceLocation texture, TesrMaterial material) {
+        final boolean replaying = DepthEcho.replaying();
+        if (replaying && !canReplay(material)) return;
         modelView.set(GLSMMatrices.getModelViewMatrix());
         final int packedLight = currentPackedLight(material);
         final int colorABGR = resolveColor(material);
-        if (activePass >= 0) {
+        if (activePass >= 0 && !replaying) {
             final boolean offset = GLSMEnable.glIsEnabled(GL11.GL_POLYGON_OFFSET_FILL);
             final PolygonState polygon = GLSMRasterizer.getPolygonState();
             final PassOverride pass = PassOverride.capture();
@@ -220,6 +223,13 @@ public final class TesrBatchRenderer {
         } else {
             drawImmediate(template, texture, material, packedLight, colorABGR);
         }
+    }
+
+    static boolean canReplay(TesrMaterial material) {
+        if (material == TesrMaterial.CURRENT_STATE) return true;
+        return material.transparency() != TesrMaterial.Transparency.OPAQUE
+            && material.transparency() != TesrMaterial.Transparency.GLINT && !material.special().isGlint()
+            && !material.isDepthEqual() && !material.isDepthOnly();
     }
 
     private static Matrix4f captureTextureMatrix() {
