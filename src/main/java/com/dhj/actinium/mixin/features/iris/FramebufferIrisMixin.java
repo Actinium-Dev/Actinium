@@ -1,10 +1,13 @@
 package com.dhj.actinium.mixin.features.iris;
 
+import com.dhj.actinium.render.translucency.TranslucencyLayers;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
+import com.gtnewhorizons.angelica.glsm.GLSMRasterizer;
 import net.coderbot.iris.apiimpl.IrisApiV0Impl;
 import net.coderbot.iris.debug.IrisGlDebug;
 import net.coderbot.iris.gl.framebuffer.MinecraftFramebufferHelper;
 import net.coderbot.iris.rendertarget.IRenderTargetExt;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.shader.Framebuffer;
 import org.lwjgl.opengl.GL11;
@@ -81,6 +84,21 @@ public class FramebufferIrisMixin implements IRenderTargetExt {
     private void actinium$onDestroyBuffers(CallbackInfo ci) {
         this.actinium$depthBufferVersion++;
         this.actinium$colorBufferVersion++;
+        if ((Object) this == Minecraft.getMinecraft().getFramebuffer()) {
+            TranslucencyLayers.INSTANCE.destroy();
+        }
+    }
+
+    @Inject(method = "bindFramebuffer(Z)V", at = @At("HEAD"), cancellable = true)
+    private void actinium$bindOpenTranslucencyLayer(boolean setViewport, CallbackInfo ci) {
+        if (TranslucencyLayers.INSTANCE.redirectsMainBind()
+                && (Object) this == Minecraft.getMinecraft().getFramebuffer()) {
+            TranslucencyLayers.INSTANCE.bindOpenLayer();
+            if (setViewport) {
+                GLSMRasterizer.glViewport(0, 0, this.framebufferWidth, this.framebufferHeight);
+            }
+            ci.cancel();
+        }
     }
 
     @Inject(method = "bindFramebuffer(Z)V", at = @At("RETURN"))

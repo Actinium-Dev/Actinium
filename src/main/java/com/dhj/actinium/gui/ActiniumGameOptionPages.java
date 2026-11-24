@@ -17,6 +17,7 @@ import dhj.embeddedt.embeddium.api.options.control.ExternalButtonControl;
 import dhj.embeddedt.embeddium.api.options.control.SliderControl;
 import dhj.embeddedt.embeddium.api.options.control.TickBoxControl;
 import dhj.embeddedt.embeddium.impl.gui.SodiumGameOptions;
+import dhj.embeddedt.embeddium.impl.gui.TranslucencyMode;
 import dhj.embeddedt.embeddium.impl.gui.framework.TextComponent;
 import com.dhj.actinium.render.frame.FramePacer;
 import com.dhj.actinium.render.fps.FpsReducer;
@@ -520,15 +521,16 @@ public class ActiniumGameOptionPages {
 
         groups.add(OptionGroup.createBuilder()
                 .setId(StandardOptions.Group.SORTING)
-                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
+                .add(OptionImpl.createBuilder(TranslucencyMode.class, sodiumOpts)
                         .setId(StandardOptions.Option.TRANSLUCENT_FACE_SORTING.cast())
-                        .setName(TextComponent.translatable("sodium.options.translucent_face_sorting.name"))
-                        .setTooltip(TextComponent.translatable("sodium.options.translucent_face_sorting.tooltip"))
-                        .setControl(TickBoxControl::new)
+                        .setName(TextComponent.translatable("sodium.options.translucency_mode.name"))
+                        .setTooltip(TextComponent.translatable("sodium.options.translucency_mode.tooltip"))
+                        .setControl(option -> new CyclingControl<>(option, TranslucencyMode.class))
                         .setImpact(OptionImpact.VARIES)
-                        .setBinding((opts, value) -> opts.performance.useTranslucentFaceSorting = value, opts -> opts.performance.useTranslucentFaceSorting)
+                        .setBinding((opts, value) -> opts.performance.translucencyMode = value,
+                                opts -> opts.performance.translucencyMode)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setDefaultValue(true)
+                        .setDefaultValue(TranslucencyMode.FAST)
                         .build())
                 .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
                         .setId(OptionIdentifier.create("celeritas", "block_entities_before_translucent_terrain", boolean.class))

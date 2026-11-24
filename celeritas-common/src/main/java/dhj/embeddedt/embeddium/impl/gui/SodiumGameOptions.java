@@ -3,6 +3,8 @@ package dhj.embeddedt.embeddium.impl.gui;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.JsonSyntaxException;
 import com.gtnewhorizons.angelica.glsm.streaming.StreamingUploader;
@@ -15,8 +17,8 @@ import dhj.embeddedt.embeddium.impl.render.chunk.MultiDrawMode;
 import dhj.embeddedt.embeddium.impl.render.chunk.occlusion.AsyncOcclusionMode;
 import dhj.embeddedt.embeddium.impl.render.culling.GpuCullingMode;
 
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,8 +87,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         public boolean useFogOcclusion = true;
         public boolean useBlockFaceCulling = true;
         public boolean useCompactVertexFormat = true;
-        @SerializedName("use_translucent_face_sorting_v2")
-        public boolean useTranslucentFaceSorting = true;
+        public TranslucencyMode translucencyMode = TranslucencyMode.FAST;
         public boolean blockEntitiesBeforeTranslucentTerrain = true;
         public boolean useRenderPassOptimization = true;
         public boolean useRenderPassConsolidation = true;
@@ -384,6 +385,28 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
             .excludeFieldsWithModifiers(Modifier.PRIVATE)
             .create();
 
+    private static SodiumGameOptions read(Reader reader) {
+        JsonObject json = GSON.fromJson(reader, JsonObject.class);
+        if (json == null) {
+            throw new JsonSyntaxException("Expected a configuration object");
+        }
+
+        SodiumGameOptions config = GSON.fromJson(json, SodiumGameOptions.class);
+        if (json.get("performance") instanceof JsonObject performance && !performance.has("translucency_mode")) {
+            // Prefer the versioned key written by Actinium when both legacy keys are present.
+            var legacy = performance.has("use_translucent_face_sorting_v2")
+                    ? performance.get("use_translucent_face_sorting_v2")
+                    : performance.get("use_translucent_face_sorting");
+            if (legacy instanceof JsonPrimitive value && value.isBoolean()) {
+                config.performance.translucencyMode = value.getAsBoolean() ? TranslucencyMode.FAST : TranslucencyMode.OFF;
+            }
+        }
+        if (config.performance.translucencyMode == null) {
+            config.performance.translucencyMode = TranslucencyMode.FAST;
+        }
+        return config;
+    }
+
     public static SodiumGameOptions load() {
         return load(DEFAULT_FILE_NAME);
     }
@@ -395,8 +418,8 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         boolean resaveConfig = true;
 
         if (Files.exists(readPath)) {
-            try (FileReader reader = new FileReader(readPath.toFile())) {
-                config = GSON.fromJson(reader, SodiumGameOptions.class);
+            try (Reader reader = Files.newBufferedReader(readPath)) {
+                config = read(reader);
             } catch (IOException e) {
                 throw new RuntimeException("Could not parse config", e);
             } catch (JsonSyntaxException e) {

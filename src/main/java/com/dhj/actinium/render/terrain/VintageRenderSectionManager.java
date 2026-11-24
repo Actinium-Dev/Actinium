@@ -32,6 +32,9 @@ import dhj.embeddedt.embeddium.impl.render.chunk.shader.ChunkShaderTextureSlot;
 import dhj.embeddedt.embeddium.impl.render.chunk.shader.ChunkFogMode;
 import dhj.embeddedt.embeddium.impl.render.chunk.sprite.GenericSectionSpriteTicker;
 import dhj.embeddedt.embeddium.impl.render.chunk.terrain.TerrainRenderPass;
+import com.dhj.actinium.render.translucency.TranslucencyLayers;
+import com.dhj.actinium.render.translucency.TranslucentLayer;
+import com.gtnewhorizons.angelica.glsm.GLSMDepthStencilAlpha;
 import dhj.embeddedt.embeddium.impl.render.chunk.vertex.format.ChunkVertexType;
 import dhj.embeddedt.embeddium.impl.render.viewport.CameraTransform;
 import dhj.embeddedt.embeddium.impl.render.viewport.Viewport;
@@ -347,6 +350,7 @@ public class VintageRenderSectionManager extends RenderSectionManager {
         private GlProgram<? extends ChunkShaderInterface> actiniumProgram;
         private boolean usingActiniumProgram;
         private boolean terrainProgramAvailable;
+        private boolean layeredTerrainPass;
         private final GpuTerrainCuller culler = createCuller();
         private final ReusableCachedBatch gpuBatch = new ReusableCachedBatch();
         private final ShadowVoxelizer shadowVoxelizer = ShadowVoxelizer.create();
@@ -460,6 +464,23 @@ public class VintageRenderSectionManager extends RenderSectionManager {
             this.actiniumProgram = null;
             super.begin(pass);
             this.terrainProgramAvailable = this.activeProgram != null;
+            this.layeredTerrainPass = this.terrainProgramAvailable
+                && pass.extraDefines().containsKey("TRANSLUCENCY_SPLIT")
+                && TranslucencyLayers.INSTANCE.isOpenLayer(TranslucentLayer.TERRAIN);
+            if (this.layeredTerrainPass) {
+                try {
+                    GLSMDepthStencilAlpha.glDepthMask(true);
+                    TranslucencyLayers.INSTANCE.beginTerrainSplit(this.activeProgram.handle());
+                } catch (RuntimeException | Error failure) {
+                    this.layeredTerrainPass = false;
+                    try {
+                        super.end(pass);
+                    } catch (RuntimeException | Error cleanupFailure) {
+                        failure.addSuppressed(cleanupFailure);
+                    }
+                    throw failure;
+                }
+            }
         }
 
         @Override
@@ -475,7 +496,14 @@ public class VintageRenderSectionManager extends RenderSectionManager {
                 return;
             }
 
-            super.end(pass);
+            try {
+                if (this.layeredTerrainPass) {
+                    TranslucencyLayers.INSTANCE.endTerrainSplit();
+                }
+            } finally {
+                this.layeredTerrainPass = false;
+                super.end(pass);
+            }
         }
 
         @Override
@@ -516,4 +544,3 @@ public class VintageRenderSectionManager extends RenderSectionManager {
         }
     }
 }
-

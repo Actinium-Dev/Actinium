@@ -130,7 +130,15 @@ public abstract class DefaultChunkRenderer extends ShaderChunkRenderer {
         }
 
         this.begin(renderPass);
+        try {
+            this.drawPass(matrices, commandList, renderLists, renderPass, occlusionCamera, camera);
+        } finally {
+            this.end(renderPass);
+        }
+    }
 
+    private void drawPass(ChunkRenderMatrices matrices, CommandList commandList, ChunkRenderListIterable renderLists,
+                          TerrainRenderPass renderPass, CameraTransform occlusionCamera, CameraTransform camera) {
         // If there is no active program, shader compilation probably failed, and we can't render anything.
         if (this.activeProgram != null) {
             boolean checkDrawErrors = RenderDebugHooksHolder.shouldCaptureGlState();
@@ -290,7 +298,6 @@ public abstract class DefaultChunkRenderer extends ShaderChunkRenderer {
             }
         }
 
-        this.end(renderPass);
     }
 
     /**
@@ -475,4 +482,3 @@ public abstract class DefaultChunkRenderer extends ShaderChunkRenderer {
         this.batch.delete();
     }
 }
-
