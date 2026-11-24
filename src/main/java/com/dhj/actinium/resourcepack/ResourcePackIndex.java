@@ -65,7 +65,11 @@ public final class ResourcePackIndex {
                 continue;
             }
             int priority = i;
-            Path path = filePack.getResourcePackFile().toPath().toAbsolutePath().normalize();
+            var file = filePack.getResourcePackFile();
+            if (file == null) {
+                continue;
+            }
+            Path path = file.toPath().toAbsolutePath().normalize();
             paths.add(path);
             scanPack(source, path).forEach(id -> {
                 if (source.resourceExists(id)) {
