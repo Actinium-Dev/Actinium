@@ -1,12 +1,14 @@
 package com.dhj.actinium.render.terrain;
 
 import com.dhj.actinium.debug.WorldRenderInventory;
+import com.dhj.actinium.render.RenderWorldRecursionGuard;
 import com.gtnewhorizons.angelica.glsm.GLSMMatrices;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.rendering.tesr.AngelicaTesrMeshCache;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
 import com.gtnewhorizons.angelica.rendering.tesr.PendingTesrDraws;
 import com.gtnewhorizons.angelica.rendering.tesr.TesrBatchRenderer;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.coderbot.iris.celeritas.WorldRendererCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
@@ -53,6 +55,8 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
     private ChunkRenderMatrices portalMatrices;
     private Viewport shadowPassPlayerViewport;
     private @Nullable WorldRenderInventory worldRenderInventory;
+    private final TileEntityDepthOrder tileEntityDepthOrder = new TileEntityDepthOrder();
+    private final ObjectArrayList<TileEntity> sortedTileEntities = new ObjectArrayList<>();
 
     /** Returns this renderer's diagnostic session when its terrain meshes carry inventory counts. */
     public @Nullable WorldRenderInventory worldRenderInventory() {
@@ -341,15 +345,24 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
         }
     }
 
+    private int renderSortedBlockEntities(TileEntityRenderContext context) {
+        try {
+            this.forEachVisibleBlockEntity(this.sortedTileEntities::add);
+            this.tileEntityDepthOrder.sortBackToFront(this.sortedTileEntities,
+                    TileEntityRendererDispatcher.staticPlayerX, TileEntityRendererDispatcher.staticPlayerY,
+                    TileEntityRendererDispatcher.staticPlayerZ);
+            this.renderBlockEntityList(this.sortedTileEntities, context);
+            return this.sortedTileEntities.size();
+        } finally {
+            this.sortedTileEntities.clear();
+        }
+    }
+
     @Override
     public int renderBlockEntities(TileEntityRenderContext tileEntityRenderContext) {
         int pass = MinecraftForgeClient.getRenderPass();
-        // TESRs (e.g. HBM-CE machines) are not disciplined about GL state; guard the batch so
-        // leaked depth/blend/texture state cannot reach the translucent pass or the HUD.
+        // TESRs such as HBM-CE machines can leak GL state into translucent terrain and the HUD.
         TileEntityGlStateGuard.push();
-        // The batch brackets own the retained geometry of this pass; the model part batcher records
-        // the parts the block entity renderers draw into it.
-        // -1 means no Forge pass is active; it belongs to the first pass rather than the second.
         TesrBatchRenderer.INSTANCE.beginPass(pass <= 0 ? TesrBatchRenderer.PASS_MAIN_0 : TesrBatchRenderer.PASS_MAIN_1,
             GLSMMatrices.getModelViewMatrix(), TileEntityRendererDispatcher.staticPlayerX,
             TileEntityRendererDispatcher.staticPlayerY, TileEntityRendererDispatcher.staticPlayerZ);
@@ -359,9 +372,12 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
             TileEntityRendererDispatcher.instance.preDrawBatch();
             try {
                 AngelicaTesrMeshCache.INSTANCE.tick();
+                if (ActiniumRuntime.options().performance.useTranslucentFaceSorting
+                        && !RenderWorldRecursionGuard.isNested() && !ShaderProviderHolder.isShadowPass()) {
+                    return this.renderSortedBlockEntities(tileEntityRenderContext);
+                }
                 return super.renderBlockEntities(tileEntityRenderContext);
             } finally {
-                // Flush the FastTESR batch with the clean entry state (see TileEntityGlStateGuard.restoreForBatch).
                 TileEntityGlStateGuard.restoreForBatch();
                 TileEntityRendererDispatcher.instance.drawBatch(pass);
             }
