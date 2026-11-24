@@ -9,10 +9,14 @@ import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
 import com.gtnewhorizons.angelica.rendering.tesr.PendingTesrDraws;
 import com.gtnewhorizons.angelica.rendering.tesr.TesrBatchRenderer;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.coderbot.iris.Iris;
 import net.coderbot.iris.celeritas.WorldRendererCompat;
+import net.coderbot.iris.layer.GbufferPrograms;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.DestroyBlockProgress;
+import net.minecraft.client.renderer.OpenGlHelper;
+import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.tileentity.TileEntityRendererDispatcher;
 import net.minecraft.entity.Entity;
 import net.minecraft.tileentity.TileEntity;
@@ -57,6 +61,8 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
     private @Nullable WorldRenderInventory worldRenderInventory;
     private final TileEntityDepthOrder tileEntityDepthOrder = new TileEntityDepthOrder();
     private final ObjectArrayList<TileEntity> sortedTileEntities = new ObjectArrayList<>();
+    private final BlockEntityPassOrder blockEntityPassOrder = new BlockEntityPassOrder();
+    private final EarlyBlockEntityRendering earlyBlockEntityRendering = new EarlyBlockEntityRendering();
 
     /** Returns this renderer's diagnostic session when its terrain meshes carry inventory counts. */
     public @Nullable WorldRenderInventory worldRenderInventory() {
@@ -355,6 +361,46 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
             return this.sortedTileEntities.size();
         } finally {
             this.sortedTileEntities.clear();
+        }
+    }
+
+    public void renderBlockEntitiesInWorldPass(TileEntityRenderContext context, boolean shadow) {
+        int pass = MinecraftForgeClient.getRenderPass();
+        long view = shadow ? 0 : RenderWorldRecursionGuard.outerPassId();
+        if (pass == 1 && !this.blockEntityPassOrder.shouldDrawLate(view)) {
+            return;
+        }
+
+        this.renderBlockEntitiesInPhase(context, pass, "block-entities-main");
+        if (pass == 0 && view != 0) {
+            this.blockEntityPassOrder.prepare(view);
+        }
+    }
+
+    public void renderBlockEntitiesBeforeTranslucent(Minecraft mc, TileEntityRenderContext context) {
+        if (ActiniumRuntime.options().performance.blockEntitiesBeforeTranslucentTerrain
+                && this.blockEntityPassOrder.claimEarlyDraw(RenderWorldRecursionGuard.outerPassId())) {
+            this.earlyBlockEntityRendering.render(OpenGlHelper.lightmapTexUnit, () -> {
+                        RenderHelper.enableStandardItemLighting();
+                        mc.entityRenderer.enableLightmap();
+                    },
+                    () -> this.renderBlockEntitiesInPhase(context, 1, "block-entities-main-early"));
+        }
+    }
+
+    private void renderBlockEntitiesInPhase(TileEntityRenderContext context, int pass, String timingStage) {
+        long startNanos = RenderDebugHooksHolder.beginRenderGlobalStageTiming();
+        boolean iris = Iris.enabled;
+        if (iris) {
+            GbufferPrograms.beginBlockEntities();
+        }
+        try {
+            this.renderBlockEntities(context);
+        } finally {
+            if (iris) {
+                GbufferPrograms.endBlockEntities();
+            }
+            RenderDebugHooksHolder.recordRenderGlobalStageTiming(timingStage, pass, startNanos);
         }
     }
 

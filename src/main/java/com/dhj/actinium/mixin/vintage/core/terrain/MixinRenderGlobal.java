@@ -167,23 +167,20 @@ public abstract class MixinRenderGlobal implements SimpleWorldRenderer.Provider<
      */
     @Overwrite
     public int renderBlockLayer(BlockRenderLayer blockLayerIn, double partialTicks, int pass, Entity entityIn) {
-        WorldRenderingPipeline pipeline = null;
-        if (Iris.enabled) {
-            pipeline = Iris.getPipelineManager().getPipelineNullable();
-            if (pipeline != null) {
-                if (blockLayerIn == BlockRenderLayer.SOLID) {
-                    pipeline.setPhase(WorldRenderingPhase.TERRAIN_SOLID);
-                } else if (blockLayerIn == BlockRenderLayer.CUTOUT_MIPPED) {
-                    pipeline.setPhase(WorldRenderingPhase.TERRAIN_CUTOUT_MIPPED);
-                } else if (blockLayerIn == BlockRenderLayer.CUTOUT) {
-                    pipeline.setPhase(WorldRenderingPhase.TERRAIN_CUTOUT);
-                } else if (blockLayerIn == BlockRenderLayer.TRANSLUCENT) {
-                    if (!ShadowRenderingState.areShadowsCurrentlyBeingRendered()
-                            && IrisApiV0Impl.INSTANCE.isShaderPackInUse()) {
-                        this.actinium$beginIrisTranslucents(pipeline, (float) partialTicks);
-                    }
-                    pipeline.setPhase(WorldRenderingPhase.TERRAIN_TRANSLUCENT);
-                }
+        WorldRenderingPipeline pipeline = Iris.enabled ? Iris.getPipelineManager().getPipelineNullable() : null;
+        if (blockLayerIn == BlockRenderLayer.TRANSLUCENT && !ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            if (pipeline != null && IrisApiV0Impl.INSTANCE.isShaderPackInUse()) {
+                this.actinium$beginIrisTranslucents(pipeline, (float) partialTicks);
+            }
+            this.renderer.renderBlockEntitiesBeforeTranslucent(this.mc,
+                    new ActiniumWorldRenderer.TileEntityRenderContext(damagedBlocks, (float) partialTicks));
+        }
+        if (pipeline != null) {
+            switch (blockLayerIn) {
+                case SOLID -> pipeline.setPhase(WorldRenderingPhase.TERRAIN_SOLID);
+                case CUTOUT_MIPPED -> pipeline.setPhase(WorldRenderingPhase.TERRAIN_CUTOUT_MIPPED);
+                case CUTOUT -> pipeline.setPhase(WorldRenderingPhase.TERRAIN_CUTOUT);
+                case TRANSLUCENT -> pipeline.setPhase(WorldRenderingPhase.TERRAIN_TRANSLUCENT);
             }
         }
         ManagedCodeBoundary.enter();
@@ -315,24 +312,16 @@ public abstract class MixinRenderGlobal implements SimpleWorldRenderer.Provider<
     @Inject(method = "renderEntities", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/RenderHelper;enableStandardItemLighting()V", shift = At.Shift.AFTER, ordinal = 1), cancellable = true)
     public void sodium$renderTileEntities(Entity entity, ICamera camera, float partialTicks, CallbackInfo ci) {
         int pass = MinecraftForgeClient.getRenderPass();
-        boolean renderShadowBlockEntities = !ShadowRenderingState.areShadowsCurrentlyBeingRendered()
-                || InternalShadowRenderingState.shouldRenderShadowBlockEntities();
+        boolean shadow = ShadowRenderingState.areShadowsCurrentlyBeingRendered();
+        boolean renderBlockEntities = !shadow || InternalShadowRenderingState.shouldRenderShadowBlockEntities();
 
         // The deferred overlay auras are captured during the entity loop above and replayed here, after
         // every entity and before the block entities, so they composite over all opaque geometry.
         DeferredEntityOverlay.renderAll();
 
-        if (renderShadowBlockEntities) {
-            long blockEntityStartNanos = RenderDebugHooksHolder.beginRenderGlobalStageTiming();
-            if (Iris.enabled) {
-                GbufferPrograms.beginBlockEntities();
-                GbufferPrograms.setBlockEntityDefaults();
-            }
-            this.renderer.renderBlockEntities(new ActiniumWorldRenderer.TileEntityRenderContext(damagedBlocks, partialTicks));
-            if (Iris.enabled) {
-                GbufferPrograms.endBlockEntities();
-            }
-            RenderDebugHooksHolder.recordRenderGlobalStageTiming("block-entities-main", pass, blockEntityStartNanos);
+        if (renderBlockEntities) {
+            this.renderer.renderBlockEntitiesInWorldPass(
+                    new ActiniumWorldRenderer.TileEntityRenderContext(damagedBlocks, partialTicks), shadow);
         }
 
         /*
@@ -340,7 +329,7 @@ public abstract class MixinRenderGlobal implements SimpleWorldRenderer.Provider<
          * inject a custom renderer into the set. So we render any TE we find in it.
          * https://github.com/pau101/Fairy-Lights/blob/8a92f770d69be6fa164d24d7a023d828249423bb/src/main/java/com/pau101/fairylights/client/ClientProxy.java#L203
          */
-        if (renderShadowBlockEntities) {
+        if (renderBlockEntities) {
             synchronized(this.setTileEntities) {
                 if (!this.setTileEntities.isEmpty()) {
                     long setBlockEntityStartNanos = RenderDebugHooksHolder.beginRenderGlobalStageTiming();
