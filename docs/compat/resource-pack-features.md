@@ -4,6 +4,8 @@ Actinium 内置 Continuity 和 MCPatcher 资源包功能。资源格式以 Conti
 
 升级时先卸载独立 `continuity`。Actinium 从 `config/continuity.json` 导入开关，不改写原配置文件或已选资源包列表。资源包选择菜单中可单独启用默认连接纹理和玻璃板修复。CTM Mod 存在时由它处理 `.png.mcmeta` 等 CTM 元数据；CleanSkyboxes 存在时由它处理天空层。OptiFine 本体不属于此验证组合。
 
+`Actinium-Connected-Textures.zip` 使用 Angelica 的默认连接贴图，覆盖普通玻璃、16 色染色玻璃及其玻璃板、书架和普通砂岩。从旧版默认包升级时，先删除 `resourcepacks/Actinium-Connected-Textures.zip`，再启动新版 Actinium 安装同名资源包。已选资源包顺序继续生效。
+
 已启用的包提供规则时，Actinium 自动应用对应功能。视频设置的「资源包」页可按功能关闭，保存设置后重载资源。
 
 旧玻璃板规则为匹配的原版玻璃板生成 MCPatcher 网格。透明玻璃板使用薄面，染色玻璃板保留 1/8 厚度和端面，兼容内置的玻璃板修复包。资源包提供自定义玻璃板模型时保留其几何。

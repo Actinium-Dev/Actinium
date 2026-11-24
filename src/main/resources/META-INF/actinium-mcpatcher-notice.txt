@@ -1,8 +1,8 @@
 MCPatcherForge attribution from Angelica commit 996fb54cb05e256ea6039f4e2c8457a221a179b7.
 Original MCPatcher source is licensed under the MIT license below. Mist475's changes
 are licensed under the GNU Lesser General Public License, version 3, included as
-actinium-continuity-LGPL-3.0.txt in the same distribution. Angelica's MCPatcher
-resource assets are not included.
+actinium-continuity-LGPL-3.0.txt in the same distribution. See NOTICE.txt inside
+Actinium-Connected-Textures.zip for the default CTM asset license and credits.
 
 Copyright (c) 2013
 
