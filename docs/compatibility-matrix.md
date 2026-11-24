@@ -349,6 +349,12 @@ Windows 10、NVIDIA GeForce RTX 5070 Laptop GPU（驱动 610.74）。
 | Derivative Main                  | d24.4.14      | 部分    | 开启、景深（DoF）开关与重复 Apply、维度切换、重载；手持动态光照；普通草、单格花、双格高草与 Farmer's Future Delight 1.5.1 蓝色矢车菊摆动（2026-11-07 用户实机确认） | 地形/实体/水/天空等完整场景清单与 Distant Horizons 组合未验证 | `fix/derivative-plant-materials` |
 | SEUS PTGI HRR                      | Test 2.1      | 无法启用 | -                                                              | 光影包不能成功开启 | `f261611`   |
 
+### 雨天云层与降水
+
+MakeUp Ultra Fast 9.4c 的雨雪与体积云都写入 `colortex1`。Minecraft 1.12.2 原本在半透明地形之前绘制雨雪，随后光影包的 `deferred` 根据 `depthtex0` 识别天空，在合成体积云时也会覆盖此前写入的雨色。
+
+启用光影包时，主视图在晚期云层之后、最终合成之前绘制雨雪，继续遵循光影包的 `rain.depth` 与天气开关。实例化和原版绘制共用这一阶段。2026 年 11 月 24 日，用户在 Forge 1.12.2 实例中确认雨滴遮挡修复通过。BSL 与 Complementary 的画面回归待单独记录。
+
 ### 天空前的染色玻璃
 
 Derivative Main d24.4.14 和 Revelation dev 在合成时用 `depthtex0` 判断像素是否属于天空。

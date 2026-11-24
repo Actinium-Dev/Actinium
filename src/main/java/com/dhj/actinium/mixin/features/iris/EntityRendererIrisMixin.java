@@ -5,6 +5,7 @@ import com.dhj.actinium.render.CloudRenderSettings;
 import com.dhj.actinium.render.GuiGlStateBoundary;
 import com.dhj.actinium.render.RenderWorldRecursionGuard;
 import com.dhj.actinium.render.RevoScreenEffectsGradient;
+import com.dhj.actinium.render.iris.IrisWeatherPass;
 import com.dhj.actinium.render.terrain.ActiniumWorldRenderer;
 import com.gtnewhorizons.angelica.compat.mojang.Camera;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
@@ -71,6 +72,10 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
 
     @Shadow
     protected abstract void renderRainSnow(float partialTicks);
+
+    @Shadow
+    private void setupFog(int startCoords, float partialTicks) {
+    }
 
     @Shadow
     private void addRainParticles() {
@@ -557,8 +562,10 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/EntityRenderer;renderRainSnow(F)V", shift = At.Shift.AFTER)
     )
     private void actinium$checkAfterWeather(int pass, float partialTicks, long finishTimeNano, CallbackInfo ci) {
-        IrisGlDebug.markStage("render-world-pass:" + pass + ":after-weather");
-        IrisGlDebug.recordWorldPassStage("weather-to-terrain-translucent");
+        if (!actinium$deferWeather()) {
+            IrisGlDebug.markStage("render-world-pass:" + pass + ":after-weather");
+            IrisGlDebug.recordWorldPassStage("weather-to-terrain-translucent");
+        }
     }
 
     // GTCEu's GregTechTransformer rewrites renderWorldPass via ASM and replaces the 4th
@@ -616,6 +623,9 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
         WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
         if (pipeline != null) {
             actinium$renderLateClouds(partialTicks, pass, pipeline);
+            IrisWeatherPass.render(pipeline, () -> this.setupFog(0, partialTicks), () -> this.renderRainSnow(partialTicks));
+            IrisGlDebug.markStage("render-world-pass:" + pass + ":after-weather");
+            IrisGlDebug.recordWorldPassStage("weather-to-finalize");
         }
 
         MinecraftFramebufferHelper.restoreMinecraftFramebufferBuffers();
@@ -765,29 +775,14 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/EntityRenderer;renderRainSnow(F)V")
     )
     private void actinium$renderWeather(EntityRenderer renderer, float partialTicks) {
-        if (RenderWorldRecursionGuard.isNested()) {
+        if (!actinium$deferWeather()) {
             this.renderRainSnow(partialTicks);
-            return;
         }
-        if (!Iris.enabled) {
-            this.renderRainSnow(partialTicks);
-            return;
-        }
+    }
 
-        WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
-        if (pipeline == null) {
-            this.renderRainSnow(partialTicks);
-            return;
-        }
-
-        pipeline.setPhase(WorldRenderingPhase.RAIN_SNOW);
-        if (pipeline.shouldWriteRainAndSnowToDepthBuffer()) {
-            GLSMDepthStencilAlpha.glDepthMask(true);
-        }
-        if (pipeline.shouldRenderWeather()) {
-            this.renderRainSnow(partialTicks);
-        }
-        pipeline.setPhase(WorldRenderingPhase.NONE);
+    @Unique
+    private static boolean actinium$deferWeather() {
+        return !RenderWorldRecursionGuard.isNested() && Iris.enabled && IrisApiV0Impl.INSTANCE.isShaderPackInUse();
     }
 
     @Redirect(
