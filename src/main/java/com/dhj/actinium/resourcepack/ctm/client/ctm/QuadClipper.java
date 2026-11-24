@@ -136,7 +136,7 @@ public final class QuadClipper {
 			data[posIndex + 1] = Float.floatToIntBits(newPos[i][1]);
 			data[posIndex + 2] = Float.floatToIntBits(newPos[i][2]);
 		}
-		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, true, format);
+		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, quad.shouldApplyDiffuseLighting(), format);
 	}
 
 	/** World position of the vertex whose UV equals the given (u, v) within the quad. */
@@ -206,7 +206,7 @@ public final class QuadClipper {
 			data[uvIndex + 1] = Float.floatToIntBits(srcMinV + v01 * srcH);
 		}
 
-		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, true, format);
+		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, quad.shouldApplyDiffuseLighting(), format);
 	}
 
 	/**
@@ -333,7 +333,7 @@ public final class QuadClipper {
 			data[posIndex + 2] = Float.floatToIntBits(newPos[i][2]);
 		}
 
-		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, true, format);
+		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, quad.shouldApplyDiffuseLighting(), format);
 	}
 
 	/**
@@ -372,7 +372,7 @@ public final class QuadClipper {
 			data[uvIndex + 1] = Float.floatToIntBits(lerp(dstMinV, dstMaxV, vFrac));
 		}
 
-		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), toSprite, true, format);
+		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), toSprite, quad.shouldApplyDiffuseLighting(), format);
 	}
 
 	/** Assigns the whole output submap to the clipped quad, matching CTM Vintage's {@code setUVs}. */
@@ -405,7 +405,7 @@ public final class QuadClipper {
 			data[uvIndex + 1] = Float.floatToIntBits(lerp(targetMinV, targetMaxV, vFraction));
 		}
 
-		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), toSprite, true, format);
+		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), toSprite, quad.shouldApplyDiffuseLighting(), format);
 	}
 
 	/**
@@ -450,7 +450,7 @@ public final class QuadClipper {
 			data[uvIndex + 1] = Float.floatToIntBits(srcMinV + nv * srcH);
 		}
 
-		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, true, format);
+		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, quad.shouldApplyDiffuseLighting(), format);
 	}
 
 	/** Applies a small UV offset only to the interior vertices of a subdivided quad. */
@@ -481,7 +481,7 @@ public final class QuadClipper {
 			}
 		}
 
-		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, true, format);
+		return new BakedQuad(data, quad.getTintIndex(), quad.getFace(), sprite, quad.shouldApplyDiffuseLighting(), format);
 	}
 
 	static float getU(BakedQuad quad, int vertex) {

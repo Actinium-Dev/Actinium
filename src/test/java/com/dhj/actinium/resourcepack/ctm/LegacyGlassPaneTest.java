@@ -2,17 +2,29 @@ package com.dhj.actinium.resourcepack.ctm;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 
+import com.dhj.actinium.resourcepack.ctm.client.processor.ProcessingDataKeys;
+import com.dhj.actinium.resourcepack.ctm.client.processor.simple.CompactQuadProcessor;
+import com.dhj.actinium.resourcepack.ctm.client.properties.OrientedConnectingCtmProperties;
 import com.dhj.actinium.resourcepack.ctm.client.util.QuadUtil;
+import com.dhj.actinium.resourcepack.ctm.impl.client.ProcessingContextImpl;
 import net.minecraft.block.BlockStainedGlassPane;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.init.Blocks;
 import net.minecraft.init.Bootstrap;
 import net.minecraft.item.EnumDyeColor;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.IBlockAccess;
+import net.minecraft.world.WorldType;
+import net.minecraft.world.biome.Biome;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -121,6 +133,41 @@ class LegacyGlassPaneTest {
         assertFalse(LegacyGlassPane.separatesDyes(red, Blocks.GLASS_PANE.getDefaultState()));
     }
 
+    @Test
+    void compactCtmKeepsTheSameDiffuseLightingAcrossPaneWallRows() {
+        ProcessingDataKeys.init();
+        var values = new Properties();
+        values.setProperty("matchBlocks", "glass_pane");
+        values.setProperty("connect", "sides");
+        values.setProperty("tiles", "0-4");
+        var properties = new OrientedConnectingCtmProperties(values,
+                new ResourceLocation("mcpatcher/ctm/glass/glasspane.properties"), "Test pack", 0, null, "compact");
+        properties.init();
+        var tiles = new TextureAtlasSprite[5];
+        for (int tile = 0; tile < tiles.length; tile++) {
+            tiles[tile] = new Sprite("test:tile_" + tile);
+        }
+        var processor = new CompactQuadProcessor.Factory().createProcessor(properties, tiles);
+        var model = new LegacyGlassPane.Model(new LegacyGlassPane.Connections(false, false, true, true),
+                false, DefaultVertexFormats.BLOCK, GLASS, RIM);
+        var walls = new ArrayList<BakedQuad>();
+        model.addWall(walls, EnumFacing.NORTH);
+        var input = walls.getFirst();
+        var world = new PaneWall();
+
+        for (int y : new int[]{0, 1, -1}) {
+            var pos = new BlockPos(0, y, 0);
+            var state = world.getBlockState(pos);
+            var context = new ProcessingContextImpl();
+            processor.processQuad(input, GLASS, world, pos, state, state, 0, 0, context);
+            assertFalse(context.getExtraQuads().isEmpty(), "No connected texture in row " + y);
+            for (var output : context.getExtraQuads()) {
+                assertEquals(input.shouldApplyDiffuseLighting(), output.shouldApplyDiffuseLighting(),
+                        "CTM changed directional shading in row " + y);
+            }
+        }
+    }
+
     private static long covering(List<BakedQuad> quads, float x, float z) {
         return quads.stream().filter(quad -> spans(quad, x, 0) && spans(quad, z, 2)).count();
     }
@@ -166,6 +213,9 @@ class LegacyGlassPaneTest {
     private static final class Sprite extends TextureAtlasSprite {
         private Sprite(String name) {
             super(name);
+            setIconWidth(16);
+            setIconHeight(16);
+            initSprite(16, 16, 0, 0, false);
         }
 
         @Override
@@ -177,5 +227,21 @@ class LegacyGlassPaneTest {
         public float getInterpolatedV(double v) {
             return (float) v / 16;
         }
+    }
+
+    private static final class PaneWall implements IBlockAccess {
+        @Override
+        public IBlockState getBlockState(BlockPos pos) {
+            return pos.getZ() == 0 && Math.abs(pos.getX()) <= 1 && Math.abs(pos.getY()) <= 1
+                    ? Blocks.GLASS_PANE.getDefaultState() : Blocks.AIR.getDefaultState();
+        }
+
+        @Override public boolean isAirBlock(BlockPos pos) { return getBlockState(pos).getBlock() == Blocks.AIR; }
+        @Override public TileEntity getTileEntity(BlockPos pos) { throw new UnsupportedOperationException(); }
+        @Override public int getCombinedLight(BlockPos pos, int lightValue) { throw new UnsupportedOperationException(); }
+        @Override public Biome getBiome(BlockPos pos) { throw new UnsupportedOperationException(); }
+        @Override public int getStrongPower(BlockPos pos, EnumFacing direction) { throw new UnsupportedOperationException(); }
+        @Override public WorldType getWorldType() { throw new UnsupportedOperationException(); }
+        @Override public boolean isSideSolid(BlockPos pos, EnumFacing side, boolean defaultValue) { return false; }
     }
 }
