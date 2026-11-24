@@ -37,36 +37,41 @@ public final class TesrBrackets {
      */
     public static void renderTileEntity(TileEntitySpecialRenderer<?> renderer, TileEntity te, double x, double y,
                                         double z, float partialTicks, int destroyStage, float alpha, Runnable render) {
+        if (TesrGlowReplay.renderNested(renderer, te, x, y, z, render)) return;
         TesrBatchRenderer.INSTANCE.beginScope();
         final int blendDepth = GLSMAttribStack.pushState(StateSet.BLEND);
         final Class<?> previousRenderable = TesrAttribution.currentRenderable;
         TesrAttribution.currentRenderable = te == null ? null : te.getClass();
         try {
             PassRebindGate.rebindIfDirty();
-            if (TesrProviderDispatch.tryRender(renderer, te, x, y, z)) {
-                return;
-            }
-            if (!AngelicaConfig.enableEntityBatching()) {
-                render.run();
-                return;
-            }
-
-            final IBatchEligibility holder = (IBatchEligibility) renderer;
-            final byte state = holder.angelica$batchState();
-            BatchEligibility.begin(state, GLSMDraws.drawCalls);
-            try {
-                render.run();
-            } finally {
-                final byte next = BatchEligibility.end(state, GLSMDraws.drawCalls);
-                if (next != state) {
-                    holder.angelica$setBatchState(next);
-                    BatchEligibility.onStateChange(renderer, te, next);
-                }
-            }
+            TesrGlowReplay.track(renderer, te, x, y, z, partialTicks, destroyStage, alpha,
+                () -> renderTileEntityBatched(renderer, te, x, y, z, render));
         } finally {
             TesrAttribution.currentRenderable = previousRenderable;
             GLSMAttribStack.popStateTo(blendDepth);
             TesrBatchRenderer.INSTANCE.endScope();
+        }
+    }
+
+    private static void renderTileEntityBatched(TileEntitySpecialRenderer<?> renderer, TileEntity te,
+                                                double x, double y, double z, Runnable render) {
+        if (TesrProviderDispatch.tryRender(renderer, te, x, y, z)) return;
+        if (!AngelicaConfig.enableEntityBatching()) {
+            render.run();
+            return;
+        }
+
+        final IBatchEligibility holder = (IBatchEligibility) renderer;
+        final byte state = holder.angelica$batchState();
+        BatchEligibility.begin(state, GLSMDraws.drawCalls);
+        try {
+            render.run();
+        } finally {
+            final byte next = BatchEligibility.end(state, GLSMDraws.drawCalls);
+            if (next != state) {
+                holder.angelica$setBatchState(next);
+                BatchEligibility.onStateChange(renderer, te, next);
+            }
         }
     }
 

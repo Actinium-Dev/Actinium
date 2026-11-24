@@ -324,37 +324,37 @@ public final class Lwjgl2GLRenderBackend extends RenderBackend {
 
     @Override
     public void drawArrays(int mode, int first, int count) {
-        GL11.glDrawArrays(mode, first, count);
+        submitOpenGLDraw(() -> GL11.glDrawArrays(mode, first, count));
     }
 
     @Override
     public void drawElements(int mode, int count, int type, long indices) {
-        GL11.glDrawElements(mode, count, type, indices);
+        submitOpenGLDraw(() -> GL11.glDrawElements(mode, count, type, indices));
     }
 
     @Override
     public void drawElements(int mode, ByteBuffer indices) {
-        GL11.glDrawElements(mode, indices);
+        submitOpenGLDraw(() -> GL11.glDrawElements(mode, indices));
     }
 
     @Override
     public void drawElements(int mode, IntBuffer indices) {
-        GL11.glDrawElements(mode, indices);
+        submitOpenGLDraw(() -> GL11.glDrawElements(mode, indices));
     }
 
     @Override
     public void drawElements(int mode, ShortBuffer indices) {
-        GL11.glDrawElements(mode, indices);
+        submitOpenGLDraw(() -> GL11.glDrawElements(mode, indices));
     }
 
     @Override
     public void drawElements(int mode, int count, int type, ByteBuffer indices) {
-        GL11.glDrawElements(mode, count, type, indices);
+        submitOpenGLDraw(() -> GL11.glDrawElements(mode, count, type, indices));
     }
 
     @Override
     public void drawElementsInstanced(int mode, int count, int type, long indices, int primcount) {
-        GL31.glDrawElementsInstanced(mode, count, type, indices, primcount);
+        submitOpenGLDraw(() -> GL31.glDrawElementsInstanced(mode, count, type, indices, primcount));
     }
 
     @Override
@@ -364,7 +364,7 @@ public final class Lwjgl2GLRenderBackend extends RenderBackend {
 
     @Override
     public void drawArraysInstanced(int mode, int first, int count, int primcount) {
-        GL31.glDrawArraysInstanced(mode, first, count, primcount);
+        submitOpenGLDraw(() -> GL31.glDrawArraysInstanced(mode, first, count, primcount));
     }
 
     @Override
@@ -374,7 +374,7 @@ public final class Lwjgl2GLRenderBackend extends RenderBackend {
 
     @Override
     public void multiDrawElementsIndirect(int mode, int type, long indirect, int drawcount, int stride) {
-        GL43.glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
+        submitOpenGLDraw(() -> GL43.glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride));
     }
 
     @Override
@@ -384,14 +384,16 @@ public final class Lwjgl2GLRenderBackend extends RenderBackend {
 
     @Override
     public void drawElementsBaseVertex(int mode, int count, int type, long indices, int baseVertex) {
-        GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
+        submitOpenGLDraw(() -> GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex));
     }
 
     @Override
     public void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawcount, long pBaseVertex) {
-        for (int i = 0; i < drawcount; i++) {
-            GL32.glDrawElementsBaseVertex(mode, memGetInt(pCount + 4L * i), type, memGetAddress(pIndices + (long) i * POINTER_SIZE), memGetInt(pBaseVertex + 4L * i));
-        }
+        submitOpenGLDraw(() -> {
+            for (int i = 0; i < drawcount; i++) {
+                GL32.glDrawElementsBaseVertex(mode, memGetInt(pCount + 4L * i), type, memGetAddress(pIndices + (long) i * POINTER_SIZE), memGetInt(pBaseVertex + 4L * i));
+            }
+        });
     }
 
     @Override
@@ -1744,7 +1746,7 @@ public final class Lwjgl2GLRenderBackend extends RenderBackend {
 
     @Override
     public void multiDrawArrays(int mode, IntBuffer firsts, IntBuffer counts) {
-        GL14.glMultiDrawArrays(mode, firsts, counts);
+        submitOpenGLDraw(() -> GL14.glMultiDrawArrays(mode, firsts, counts));
     }
 
     @Override
@@ -1809,7 +1811,7 @@ public final class Lwjgl2GLRenderBackend extends RenderBackend {
 
     @Override
     public void multiDrawArraysIndirect(int mode, long indirect, int drawcount, int stride) {
-        GL43.glMultiDrawArraysIndirect(mode, indirect, drawcount, stride);
+        submitOpenGLDraw(() -> GL43.glMultiDrawArraysIndirect(mode, indirect, drawcount, stride));
     }
 
     @Override

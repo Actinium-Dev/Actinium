@@ -99,6 +99,8 @@ Outlands 管理窗口和输入，并提供与 lwjgl3ify 对应的创建、销毁
 
 「半透明渲染模式」设为「精细」时，无光影 OpenGL 外层视图按地形、区块 pass 1 TESR、粒子、雨雪和晚绘制云层分别采集颜色与深度。每个分层目标在首次使用时复制主 framebuffer 的深度，GLSM 在分层目标内累积预乘 alpha。地形 shader 按 TESR 深度把后方片元写入第二个颜色附件。合成在 Forge `RenderWorldLastEvent` 和手部绘制前按像素深度混合各层，并写回最近的有效深度。采集与合成结束时恢复 framebuffer、program、纹理绑定、视口和所用的混合与深度状态。
 
+区块 pass 1 TESR 中开启混合和深度测试、关闭深度写入的发光绘制，由 GLSM 把深度采集到独立 framebuffer。普通 TESR 仅在检测到这类绘制后重放，延迟批次和排除重放的 TESR 在提交几何时直接采集。重放期间暂停粒子和声音提交。TESR 层关闭前将发光深度与原深度逐像素取较近值，供地形拆分和分层合成使用。
+
 TESR 实例化批次不新增 pass：`DeferredWorldRenderingPipeline` 为 `Instancing.TEMPLATE` 与
 `Instancing.CUBE` 从 `Block`、`BlockTrans`、`Entities`、`EntitiesTrans`、`Shadow`、
 `ShadowWater`、`ArmorGlint`、`SpiderEyes` 的程序源码另做一份属性变换，首次查询时链接为

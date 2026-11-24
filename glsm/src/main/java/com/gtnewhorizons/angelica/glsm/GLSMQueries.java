@@ -619,9 +619,15 @@ public final class GLSMQueries {
             glGetBooleani_v(pname, index, params);
         }
 
-    public static void glBeginQuery(int target, int id) { rejectExitCapture(); RENDER_BACKEND.beginQuery(target, id); }
+    public static void glBeginQuery(int target, int id) {
+        rejectExitCapture();
+        if (!DepthEcho.replaying()) RENDER_BACKEND.beginQuery(target, id);
+    }
 
-    public static void glEndQuery(int target) { rejectExitCapture(); RENDER_BACKEND.endQuery(target); }
+    public static void glEndQuery(int target) {
+        rejectExitCapture();
+        if (!DepthEcho.replaying()) RENDER_BACKEND.endQuery(target);
+    }
 
     public static void glDeleteQueries(int id) { rejectExitCapture(); RENDER_BACKEND.deleteQueries(id); }
 

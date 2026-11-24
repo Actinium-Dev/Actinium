@@ -1,6 +1,7 @@
 package com.gtnewhorizons.angelica.glsm.backend;
 
 import com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities;
+import com.gtnewhorizons.angelica.glsm.DepthEcho;
 import com.gtnewhorizons.angelica.glsm.GLESFormatRemap;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
@@ -428,6 +429,11 @@ public abstract class RenderBackend {
     public abstract void pointSize(float size);
     public abstract void logicOp(int opcode);
     public abstract void hint(int target, int mode);
+
+    /** Submits a native OpenGL draw through the active depth capture scope. */
+    protected final void submitOpenGLDraw(Runnable draw) {
+        DepthEcho.submit(draw);
+    }
 
     public abstract void drawArrays(int mode, int first, int count);
     public abstract void drawElements(int mode, int count, int type, long indices);

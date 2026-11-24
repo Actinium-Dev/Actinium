@@ -110,12 +110,25 @@ public class Program {
     public int locSecondaryColor = -1;
     public int locFogParams = -1;
     public int locFogColor = -1;
+    private final int locCoverMode;
+    private int coverMode = -1;
 
     Program(int programId, VertexKey vertexKey, FragmentKey fragmentKey) {
         this.programId = programId;
         this.vertexKey = vertexKey;
         this.fragmentKey = fragmentKey;
         resolveLocations();
+        locCoverMode = fragmentKey.coverageDiscard() ? loc("u_CoverMode") : -1;
+    }
+
+    boolean hasCoverMode() {
+        return locCoverMode != -1;
+    }
+
+    void syncCoverMode(int mode) {
+        if (locCoverMode == -1 || coverMode == mode) return;
+        RENDER_BACKEND.uniform1i(locCoverMode, mode);
+        coverMode = mode;
     }
 
     private void resolveLocations() {

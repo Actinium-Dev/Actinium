@@ -69,6 +69,8 @@
     "features.tesr.MixinTileEntityEnderChestRenderer",
     "features.tesr.MixinTileEntityRendererDispatcherTesr",
     "features.tesr.MixinTileEntityRendererDispatcherTesrLight",
+    "features.tesr.MixinParticleManagerGlowReplay",
+    "features.tesr.MixinSoundHandlerGlowReplay",
     "features.tesr.MixinTileEntitySignRenderer",
     "features.tesr.MixinTileEntitySkullRenderer",
     "features.tesr.MixinTileEntitySpecialRendererBatchEligibility"

@@ -2,6 +2,7 @@ package com.dhj.actinium.mixin.features.tesr;
 
 import com.dhj.actinium.debug.WorldRenderInventory;
 import com.gtnewhorizons.angelica.rendering.tesr.TesrBrackets;
+import com.gtnewhorizons.angelica.rendering.tesr.TesrGlowReplay;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -38,6 +39,6 @@ public abstract class MixinTileEntityRendererDispatcherTesr {
                                         double x, double y, double z, float partialTicks, int destroyStage,
                                         float alpha, BufferBuilder buffer, Operation<Void> original) {
         WorldRenderInventory.recordBlockEntity(te, renderer);
-        original.call(renderer, te, x, y, z, partialTicks, destroyStage, alpha, buffer);
+        TesrGlowReplay.drawImmediate(() -> original.call(renderer, te, x, y, z, partialTicks, destroyStage, alpha, buffer));
     }
 }

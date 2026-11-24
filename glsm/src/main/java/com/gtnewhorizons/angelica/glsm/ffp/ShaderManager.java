@@ -3,6 +3,8 @@ package com.gtnewhorizons.angelica.glsm.ffp;
 import com.gtnewhorizon.gtnhlib.client.renderer.vertex.VertexFlags;
 import com.gtnewhorizon.gtnhlib.client.renderer.vertex.VertexFormat;
 import com.gtnewhorizons.angelica.glsm.CompatUniformManager;
+import com.gtnewhorizons.angelica.glsm.CoverageDiscard;
+import com.gtnewhorizons.angelica.glsm.DepthEcho;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.QuadConverter;
 import com.gtnewhorizons.angelica.glsm.debug.GLSMDebug;
@@ -17,6 +19,7 @@ import com.gtnewhorizons.angelica.glsm.streaming.TessellatorStreamingDrawer;
 import lombok.Getter;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.lwjgl.opengl.GL20;
 
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -237,7 +240,27 @@ public final class ShaderManager {
         final boolean perfDebugEnabled = GLSMPerfDebug.isEnabled();
         final long perfStart = perfDebugEnabled ? GLSMPerfDebug.begin(GLSMPerfDebug.Stage.FFP_UNIFORMS) : 0L;
         uniforms.upload(currentProgram);
+        if (currentProgram.hasCoverMode()) {
+            currentProgram.syncCoverMode(DepthEcho.replaying() ? CoverageDiscard.mode() : CoverageDiscard.OFF);
+        }
         if (perfDebugEnabled) GLSMPerfDebug.end(GLSMPerfDebug.Stage.FFP_UNIFORMS, perfStart);
+    }
+
+    /** Applies coverage discard to an immediate depth echo. The native draw must preserve the bound program. */
+    public void withDepthEchoCoverage(Runnable draw) {
+        final Program program = currentProgram;
+        if (!active || program == null || !program.hasCoverMode() || RENDER_BACKEND.isSDLGPU()
+            || RENDER_BACKEND.getInteger(GL20.GL_CURRENT_PROGRAM) != program.getProgramId()) {
+            draw.run();
+            return;
+        }
+
+        try {
+            program.syncCoverMode(CoverageDiscard.mode());
+            draw.run();
+        } finally {
+            program.syncCoverMode(CoverageDiscard.OFF);
+        }
     }
 
     public static Vector3f getCurrentNormal() {
