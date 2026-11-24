@@ -63,6 +63,11 @@ public final class GLSMQueries {
 
     private GLSMQueries() {}
 
+    private static boolean isEmulatedClipQuery(int pname) {
+        return (pname == GL11.GL_MAX_CLIP_PLANES || ClipPlaneBooleanState.isClipPlane(pname))
+            && RenderSystem.isClipDistanceEmulated();
+    }
+
     /** Reads a full-width indexed offset or length from the active rendering backend. */
     public static long glGetInteger64i(int pname, int index) {
         rejectExitCapture();
@@ -71,10 +76,10 @@ public final class GLSMQueries {
 
     public static boolean glGetBoolean(int pname) {
         rejectExitCapture();
-        if (shouldBypassCache()) {
+        if (shouldBypassCache() && !isEmulatedClipQuery(pname)) {
             return RENDER_BACKEND.getBoolean(pname);
         }
-        if (pname >= GL11.GL_CLIP_PLANE0 && pname < GL11.GL_CLIP_PLANE0 + MAX_CLIP_PLANES) {
+        if (ClipPlaneBooleanState.isClipPlane(pname)) {
             return ctx().clipPlaneStates[pname - GL11.GL_CLIP_PLANE0].isEnabled();
         }
 
@@ -87,6 +92,7 @@ public final class GLSMQueries {
             case GL14.GL_COLOR_SUM -> ctx().colorSumState.isEnabled();
             case GL11.GL_CULL_FACE -> ctx().cullState.isEnabled();
             case GL11.GL_DEPTH_TEST -> ctx().depthTest.isEnabled();
+            case GL11.GL_MAX_CLIP_PLANES -> true;
             case GL11.GL_DEPTH_WRITEMASK -> ctx().depthState.isMaskEnabled();
             case GL11.GL_DITHER -> ctx().ditherState.isEnabled();
             case GL11.GL_FOG -> ctx().fogMode.isEnabled();
@@ -158,7 +164,7 @@ public final class GLSMQueries {
 
     public static void glGetBoolean(int pname, ByteBuffer params) {
         rejectExitCapture();
-        if (shouldBypassCache()) {
+        if (shouldBypassCache() && !isEmulatedClipQuery(pname)) {
             RENDER_BACKEND.getBoolean(pname, params);
             return;
         }
@@ -183,7 +189,7 @@ public final class GLSMQueries {
 
     public static int glGetInteger(int pname) {
         rejectExitCapture();
-        if (shouldBypassCache()) {
+        if (shouldBypassCache() && !isEmulatedClipQuery(pname)) {
             return RENDER_BACKEND.getInteger(pname);
         }
 
@@ -301,7 +307,7 @@ public final class GLSMQueries {
 
     public static void glGetInteger(int pname, IntBuffer params) {
         rejectExitCapture();
-        if (shouldBypassCache()) {
+        if (shouldBypassCache() && !isEmulatedClipQuery(pname)) {
             RENDER_BACKEND.getInteger(pname, params);
             return;
         }
@@ -336,7 +342,7 @@ public final class GLSMQueries {
     public static void glGetInteger(int pname, int[] params) {
         rejectExitCapture();
         if (params.length == 0) return;
-        if (shouldBypassCache()) {
+        if (shouldBypassCache() && !isEmulatedClipQuery(pname)) {
             queryDriverVector(pname, params);
             return;
         }
@@ -358,7 +364,7 @@ public final class GLSMQueries {
 
     public static void glGetFloat(int pname, FloatBuffer params) {
         rejectExitCapture();
-        if (shouldBypassCache()) {
+        if (shouldBypassCache() && !isEmulatedClipQuery(pname)) {
             RENDER_BACKEND.getFloat(pname, params);
             return;
         }
@@ -469,7 +475,7 @@ public final class GLSMQueries {
     public static void glGetDouble(int pname, DoubleBuffer params) {
         rejectExitCapture();
         final GLContextState glCtx = ctx();
-        if (!isCachingEnabled()) {
+        if (!isCachingEnabled() && !isEmulatedClipQuery(pname)) {
             RENDER_BACKEND.getDouble(pname, params);
             return;
         }
@@ -512,7 +518,7 @@ public final class GLSMQueries {
 
     public static float glGetFloat(int pname) {
         rejectExitCapture();
-        if (shouldBypassCache()) {
+        if (shouldBypassCache() && !isEmulatedClipQuery(pname)) {
             return RENDER_BACKEND.getFloat(pname);
         }
         if (isEnableCap(pname)) {
@@ -526,6 +532,7 @@ public final class GLSMQueries {
             case GL11.GL_FOG_END -> ctx().fogState.getEnd();
             case GL11.GL_DEPTH_CLEAR_VALUE -> (float) ctx().depthState.getClearValue();
             case GL11.GL_LINE_WIDTH -> ctx().lineState.getWidth();
+            case GL11.GL_MAX_CLIP_PLANES -> MAX_CLIP_PLANES;
             case GL11.GL_POINT_SIZE -> ctx().pointState.getSize();
             case GL14.GL_POINT_SIZE_MIN -> ctx().pointState.getMinSize();
             case GL14.GL_POINT_SIZE_MAX -> {

@@ -1,7 +1,7 @@
 # MobileGlues / Mali：`GL_EXT_clip_cull_distance` 与裁剪面着色器注入
 
 > 对应 issue：[#214](https://github.com/Q-Engineering-Source/Actinium/issues/214)。
-> 当前状态：修复已实现并通过自动化测试，实机验证待确认。
+> 当前状态：#2348 自动化测试通过，游戏内未实测。
 
 ## 症状
 
@@ -30,55 +30,24 @@
    （`MobileGlues-cpp/3rdparty/SPIRV-Cross/spirv_glsl.cpp`），而 ANGLE/Mali 后端不支持该扩展，
    于是所有含注入代码的程序编译失败。
 
-## 修复：双侧契约
+## 裁剪能力与模拟路径
 
-### Actinium 侧（本仓库）
+`RenderSystem.initRenderer` 通过版本字符串中的 `MobileGlues` 或扩展表中的 `GL_MG_mobileglues` 识别 MobileGlues。对 GLES 和识别出的 MobileGlues，先确认 `GL_EXT_clip_cull_distance` 存在，再查询 `GL_MAX_CLIP_DISTANCES`。桌面 GL 直接查询上限。驱动支持至少八个平面时使用原生裁剪，其余情况使用片元模拟。[Angelica #2348](https://github.com/GTNewHorizons/Angelica/pull/2348)
 
-- `RenderSystem.initRenderer` 新增 MobileGlues 探测（`GL_VERSION` 含 `"MobileGlues"`，或扩展表含
-  `GL_MG_mobileglues`），能力判定改为
-  `resolveClipCullDistanceSupport(frontendHasExtension, isGLES, isMobileGlues)`
-  = `frontendHasExtension || (!isGLES && !isMobileGlues)`。
-  即：MobileGlues 环境下只看扩展表是否声明 `GL_EXT_clip_cull_distance`，不再被桌面版本号误判。
-- `CommonTransformer` 的裁剪面注入改为仅在 `RenderSystem.hasClipCullDistance()` 为真时执行。
-- `VertexKey` 的 `BIT_CLIP_PLANES` 置位同样加 `hasClipCullDistance()` 门控，保证 FFP
-  着色器 key 与注入行为自洽（同时修复真实 GLES 无扩展时的同构隐患）。
+模拟时，GLSM 记录八个平面的启用状态和眼空间方程。固定管线在顶点阶段计算到各平面的有符号距离并插值，片元着色器丢弃任一有效距离为负的片元。禁用的平面使用零方程。`GL_ENABLE_BIT` 恢复启用状态，`GL_TRANSFORM_BIT` 同时恢复方程。
 
-### MobileGlues 侧（`D:\Code\MobileGlues`，分支 `feat/declare-clip-cull-distance`）
+Iris 对仅含顶点和片元阶段的 `Patch.ATTRIBUTES` 程序提供裁剪变体。启用第一个平面或关闭最后一个平面时，下一次绘制会选择对应变体。含几何或细分阶段的程序沿用原变体。SDL Vulkan 创建设备时请求原生裁剪能力，请求失败后可使用模拟路径。SDL 的 uniform 数组支持整组上传和按下标更新。
 
-`MobileGlues-cpp/gles/loader.cpp` 的 `InitGLESCapabilities()` 中，当真实 ES 后端支持
-`GL_EXT_clip_cull_distance` 时把它 AppendExtension 进伪装桌面扩展表：
+MobileGlues 侧的 `InitGLESCapabilities()` 根据真实 ES 后端能力公布扩展。其 `hideMGEnvLevel ≥ 1` 设置会隐藏版本标记和扩展 `GL_MG_mobileglues`，影响 Actinium 对伪装桌面上下文的识别。此前对 MobileGlues 的验证为使用 NDK 27.3.13750724 对 `gles/loader.cpp` 执行 C++ 语法检查。
 
-```cpp
-if (g_gles_caps.GL_EXT_clip_cull_distance) {
-    AppendExtension("GL_EXT_clip_cull_distance");
-}
-```
+## 验证状态
 
-这样 Actinium 的 `hasExtension("GL_EXT_clip_cull_distance")` 在后端真支持时直接命中，
-裁剪面注入恢复启用。**无条件声明没有意义**：后端不支持时，SPIRV-Cross 输出的
-`#extension ... : require` 仍会被 ANGLE 拒绝。
+**#2348 已通过自动化测试，尚未在 Minecraft 客户端实测。** HBM 防爆门、实际光影包及 POCO X7 Pro 上的 MobileGlues 画面均待确认。
 
-## 降级行为
+`check` 和 `build` 通过。23 项定向 OpenGL 测试和 3 项 SDL GPU 测试全部通过。像素读回覆盖第八个平面（下标 7）的左右半面裁剪、显示列表重放、属性栈恢复、固定管线宽线和 Iris 眼空间裁剪。SDL 离屏测试依次向数组下标 7 上传正向、反向和零方程，分别读回右半、左半和完整画面。
 
-后端不支持 `GL_EXT_clip_cull_distance` 时（issue #214 的 Mali-G720 + ANGLE 环境）：
+## 游戏内验证方法
 
-- 着色器不再包含 `gl_ClipDistance` 写入，全部程序正常编译，实体渲染与崩溃消失。
-- 固定管线裁剪面（`glClipPlane` 语义）不可用。vanilla 1.12.2 不调用 `glClipPlane`
-  （MCP 反编译检索 0 结果），该特性只服务极少数 mod，降级影响可忽略。
-- glsm 侧 `CompatUniformManager.uploadClipPlanes` 对 location == -1 已容错，
-  着色器不声明 uniform 时上传是自然空操作，无需额外改动。
-
-## 已知限制
-
-- MobileGlues 的 `hideMGEnvLevel ≥ 1` 会同时隐藏 `GL_VERSION` 中的 `"MobileGlues"` 标记和
-  `GL_MG_mobileglues` 扩展。此时 Actinium 无法识别 MobileGlues，会按桌面 GL 判定并恢复注入——
-  该组合属于 MobileGlues 的文档化限制，不在本修复覆盖范围内。
-
-## 验证记录
-
-- Actinium：`ClipCullDistanceSupportTest`（能力判定三用例矩阵：桌面 / GLES / MobileGlues）、
-  `ClipPlaneInjectionTest`（`TransformPatcher.patchAttributes` 双向验证注入有无）；
-  `./gradlew check --no-daemon` 通过。
-- MobileGlues：NDK 27.3.13750724 clang++ `--target=aarch64-linux-android21 -fsyntax-only`
-  编译 `gles/loader.cpp` 通过。
-- 桌面回归与实机（POCO X7 Pro）验证待用户确认。
+1. 在 Minecraft 1.12.2 安装 Actinium 和 HBM Nuclear Tech Mod Community Edition，放置滑动防爆门。`RenderSlidingBlastDoor.render` 绘制左右门扇时会启用两个裁剪平面。
+2. 在桌面 OpenGL 下关闭光影，从正面和斜侧面各观察一次完整开关门动画。门扇滑入门框时应在边缘截断。重复开关后，邻近实体和方块实体应保持完整。
+3. 在缺少八个原生裁剪平面的 MobileGlues 或 SDL Vulkan 设备上打开同一场景。先在 `latest.log` 搜索 `Emulating clip distances` 确认使用模拟路径，再分别关闭光影、启用使用顶点和片元两阶段方块实体程序的光影包。门板边界应与桌面对照一致，切换光影后实体应继续显示。记录设备、后端、光影包版本及相同视角的画面。

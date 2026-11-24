@@ -3,6 +3,7 @@ package com.gtnewhorizons.angelica.glsm.hooks;
 import com.gtnewhorizons.angelica.glsm.DisplayListManager;
 import com.gtnewhorizons.angelica.glsm.hooks.events.AlphaStateChangeEvent;
 import com.gtnewhorizons.angelica.glsm.hooks.events.BlendFuncChangeEvent;
+import com.gtnewhorizons.angelica.glsm.hooks.events.ClipPlanesInUseEvent;
 import com.gtnewhorizons.angelica.glsm.hooks.events.FogStateChangeEvent;
 import com.gtnewhorizons.angelica.glsm.hooks.events.ForeignDrawEndEvent;
 import com.gtnewhorizons.angelica.glsm.hooks.events.LightmapCoordsEvent;
@@ -42,7 +43,7 @@ public final class GLSMHooks {
     /** Resolves a program selection deferred while a batch or a display list owned the program. */
     public static void resolvePendingProgram() {
         final PendingProgramSelection pending = pendingProgramSelection;
-        if (pending != null && !DisplayListManager.isRecording()) pending.resolvePendingProgram();
+        if (pending != null && DisplayListManager.getRecordMode() != DisplayListManager.RecordMode.COMPILE) pending.resolvePendingProgram();
     }
 
     /**
@@ -100,6 +101,7 @@ public final class GLSMHooks {
     public static final EventBus<ForeignDrawEndEvent> FOREIGN_DRAW_END = EventBus.create(ForeignDrawEndEvent.class);
     public static final EventBus<VanillaBlendChangeEvent> VANILLA_BLEND_CHANGE = EventBus.create(VanillaBlendChangeEvent.class);
     public static final EventBus<BlendFuncChangeEvent> BLEND_FUNC_CHANGE = EventBus.create(BlendFuncChangeEvent.class);
+    public static final EventBus<ClipPlanesInUseEvent> CLIP_PLANES_IN_USE = EventBus.create(ClipPlanesInUseEvent.class);
     public static final EventBus<FogStateChangeEvent> FOG_STATE_CHANGE = EventBus.create(FogStateChangeEvent.class);
     public static final EventBus<LightmapCoordsEvent> LIGHTMAP_COORDS = EventBus.create(LightmapCoordsEvent.class);
     public static final EventBus<LoadingCheckpointEvent> LOADING_CHECKPOINT = EventBus.create(LoadingCheckpointEvent.class);
@@ -114,6 +116,7 @@ public final class GLSMHooks {
     public static final ForeignDrawEndEvent foreignDrawEndEvent = new ForeignDrawEndEvent();
     public static final VanillaBlendChangeEvent vanillaBlendChangeEvent = new VanillaBlendChangeEvent();
     public static final BlendFuncChangeEvent blendFuncChangeEvent = new BlendFuncChangeEvent();
+    public static final ClipPlanesInUseEvent clipPlanesInUseEvent = new ClipPlanesInUseEvent();
     public static final FogStateChangeEvent fogStateChangeEvent = new FogStateChangeEvent();
     public static final LightmapCoordsEvent lightmapCoordsEvent = new LightmapCoordsEvent();
     public static final LoadingCheckpointEvent loadingCheckpointEvent = new LoadingCheckpointEvent();

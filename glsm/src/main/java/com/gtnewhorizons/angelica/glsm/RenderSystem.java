@@ -134,9 +134,11 @@ public class RenderSystem {
         // stays authoritative; without the MobileGlues check it would be overruled by !isGLES.
         final String glVersion = RENDER_BACKEND.getString(GL11.GL_VERSION);
         isMobileGlues = (glVersion != null && glVersion.contains("MobileGlues")) || hasExtension("GL_MG_mobileglues");
-        hasClipCullDistance = resolveClipCullDistanceSupport(hasExtension("GL_EXT_clip_cull_distance"), isGLES, isMobileGlues);
-        if (isMobileGlues) {
-            GLStateManager.LOGGER.info("MobileGlues detected, clip distance support: {}", hasClipCullDistance);
+        final boolean clipDistanceAvailable = resolveClipCullDistanceSupport(hasExtension("GL_EXT_clip_cull_distance"), isGLES, isMobileGlues);
+        final int maxClipDistances = clipDistanceAvailable ? RENDER_BACKEND.getInteger(GL30.GL_MAX_CLIP_DISTANCES) : 0;
+        hasClipCullDistance = maxClipDistances >= GLStateManager.MAX_CLIP_PLANES;
+        if (!hasClipCullDistance) {
+            GLStateManager.LOGGER.info("Emulating clip distances (native clip distances: {}, required: {})", maxClipDistances, GLStateManager.MAX_CLIP_PLANES);
         }
 
         if (supportsImageLoadStore) {
@@ -420,6 +422,10 @@ public class RenderSystem {
 
     public static boolean supportsImageLoadStore() {
         return supportsImageLoadStore;
+    }
+
+    public static boolean isClipDistanceEmulated() {
+        return !hasClipCullDistance;
     }
 
     public static boolean hasClipCullDistance() {

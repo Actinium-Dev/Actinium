@@ -305,6 +305,12 @@ public final class IrisGLSMBridge {
             refreshBlendCondition();
         });
 
+        GLSMHooks.CLIP_PLANES_IN_USE.addListener(event -> {
+            if (Iris.enabled && Iris.getPipelineManager().getPipelineNullable() instanceof DeferredWorldRenderingPipeline pipeline) {
+                pipeline.onClipPlanesInUseChanged();
+            }
+        });
+
         GLSMHooks.FOREIGN_DRAW_END.addListener(event -> {
             if (!Iris.enabled) {
                 return;

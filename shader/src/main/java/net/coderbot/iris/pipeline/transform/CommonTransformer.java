@@ -2,7 +2,10 @@ package net.coderbot.iris.pipeline.transform;
 
 import com.gtnewhorizons.angelica.glsm.GlslTransformUtils;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
+import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
+import com.gtnewhorizons.angelica.glsm.ffp.ClipDistanceGlsl;
 import net.coderbot.iris.gl.shader.ShaderType;
+import net.coderbot.iris.pipeline.transform.parameter.AttributeParameters;
 import net.coderbot.iris.pipeline.transform.parameter.Parameters;
 import org.taumc.glsl.Transformer;
 
@@ -85,24 +88,50 @@ public class CommonTransformer {
 		root.renameAndWrapShadow("shadow2DLod", "textureLod");
 		AdaptiveShadowBoundsTransformer.transform(root, parameters.type);
 
-		// FFP clip planes are realized through gl_ClipDistance writes. Only inject when the driver
-		// can compile them: ES and desktop-masquerading translation layers (MobileGlues) need
-		// GL_EXT_clip_cull_distance, otherwise every gbuffers/shadow vertex shader fails (issue #214).
-		if (parameters.patch == Patch.ATTRIBUTES && parameters.type == ShaderType.VERTEX
-				&& RenderSystem.hasClipCullDistance()) {
-			root.injectVariable("uniform bool actinium_ClipPlanesEnabled;");
+		if (parameters instanceof AttributeParameters attributes) {
+			injectClipDistances(root, attributes);
+		}
+	}
+
+	private static final String EMULATED_VERTEX_CLIP;
+	private static final String NATIVE_VERTEX_CLIP;
+	static {
+		String eyePosition = "vec4 _cp_ep = iris_ModelViewMatrix * iris_Vertex; ";
+		StringBuilder nativeClip = new StringBuilder("{ ").append(eyePosition);
+		String[] distances = new String[8];
+		for (int i = 0; i < distances.length; i++) {
+			distances[i] = "dot(actinium_ClipPlane[" + i + "], _cp_ep)";
+			nativeClip.append("gl_ClipDistance[").append(i).append("] = ").append(distances[i]).append("; ");
+		}
+		NATIVE_VERTEX_CLIP = nativeClip.append('}').toString();
+		StringBuilder emulatedClip = new StringBuilder("{ ").append(eyePosition);
+		ClipDistanceGlsl.appendVsAssign(emulatedClip, distances);
+		EMULATED_VERTEX_CLIP = emulatedClip.append('}').toString();
+	}
+
+	private static void injectClipDistances(Transformer root, AttributeParameters parameters) {
+		if (RenderSystem.isClipDistanceEmulated()) {
+			if (!parameters.clipDiscard || parameters.hasGeometry || parameters.hasTesselation) return;
+			if (parameters.type == ShaderType.VERTEX) {
+				root.injectVariable("uniform vec4 actinium_ClipPlane[8];");
+				root.injectVariable(ClipDistanceGlsl.VS_OUT_DIST0);
+				root.injectVariable(ClipDistanceGlsl.VS_OUT_DIST1);
+				root.prependMain(EMULATED_VERTEX_CLIP);
+			} else if (parameters.type == ShaderType.FRAGMENT) {
+				root.injectVariable(ClipDistanceGlsl.FS_IN_DIST0);
+				root.injectVariable(ClipDistanceGlsl.FS_IN_DIST1);
+				root.prependMain(ClipDistanceGlsl.FS_DISCARD);
+			}
+		} else if (parameters.type == ShaderType.VERTEX) {
 			root.injectVariable("uniform vec4 actinium_ClipPlane[8];");
-			root.appendMain(
-				"{ if (actinium_ClipPlanesEnabled) { vec4 _cp_ep = iris_ModelViewMatrix * iris_Vertex; "
-				+ "gl_ClipDistance[0] = dot(actinium_ClipPlane[0], _cp_ep); "
-				+ "gl_ClipDistance[1] = dot(actinium_ClipPlane[1], _cp_ep); "
-				+ "gl_ClipDistance[2] = dot(actinium_ClipPlane[2], _cp_ep); "
-				+ "gl_ClipDistance[3] = dot(actinium_ClipPlane[3], _cp_ep); "
-				+ "gl_ClipDistance[4] = dot(actinium_ClipPlane[4], _cp_ep); "
-				+ "gl_ClipDistance[5] = dot(actinium_ClipPlane[5], _cp_ep); "
-				+ "gl_ClipDistance[6] = dot(actinium_ClipPlane[6], _cp_ep); "
-				+ "gl_ClipDistance[7] = dot(actinium_ClipPlane[7], _cp_ep); } }"
-			);
+			if (BackendManager.RENDER_BACKEND.isSDLGPU()) {
+				// Vulkan consumes every declared distance. Disabled planes have zero equations;
+				// a pack can override the resulting defaults before returning from main.
+				root.prependMain(NATIVE_VERTEX_CLIP);
+			} else {
+				root.injectVariable("uniform bool actinium_ClipPlanesEnabled;");
+				root.appendMain("if (actinium_ClipPlanesEnabled) " + NATIVE_VERTEX_CLIP);
+			}
 		}
 	}
 }

@@ -465,6 +465,61 @@ class IrisInstancingGLTest extends GLStateManagerIntegrationFixture {
         GLSMPrograms.glDeleteProgram(linkProgram(name, result));
     }
 
+    @ParameterizedTest
+    @EnumSource(Instancing.class)
+    void emulatedClipPlanesAreLiveOnlyInTheClippedProgram(Instancing kind) {
+        boolean previous = RenderSystem.hasClipCullDistance();
+        RenderSystem.initializeClipCullDistanceSupportForTesting(false);
+        try {
+            for (boolean clipped : new boolean[] {false, true, false}) {
+                Map<PatchShaderType, String> stages = TransformPatcher.patchAttributesInstanced(
+                    TEMPLATE_VERTEX, null, null, null, TEMPLATE_FRAGMENT, TEX_LM, kind, clipped);
+                int program = linkProgram("clipDistance", stages);
+                try {
+                    assertEquals(clipped, GL20.glGetUniformLocation(program, "actinium_ClipPlane[7]") >= 0);
+                } finally {
+                    GLSMPrograms.glDeleteProgram(program);
+                }
+            }
+        } finally {
+            RenderSystem.initializeClipCullDistanceSupportForTesting(previous);
+        }
+    }
+
+    @Test
+    void emulatedPlaneClipsThePackDrawInEyeSpace() {
+        boolean previous = RenderSystem.hasClipCullDistance();
+        RenderSystem.initializeClipCullDistanceSupportForTesting(false);
+        try {
+            Map<PatchShaderType, String> stages = TransformPatcher.patchAttributesInstanced(
+                "#version 120\nvoid main() { gl_Position = gl_Vertex; }", null, null, null,
+                "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }",
+                TEX_LM, Instancing.NONE, true);
+            int program = linkProgram("clipEyeSpace", stages);
+            try {
+                GLSMPrograms.glUseProgram(program);
+                GL20.glUniformMatrix4fv(GL20.glGetUniformLocation(program, "iris_ModelViewMatrix"), false,
+                    new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.5f, 0, 0, 1});
+                GL20.glUniform4f(GL20.glGetUniformLocation(program, "actinium_ClipPlane[7]"), 1, 0, 0, 0);
+                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, new float[] {-1, -1, 3, -1, -1, 3}, GL15.GL_STATIC_DRAW);
+                GL20.glEnableVertexAttribArray(0);
+                GL20.glVertexAttribPointer(0, 2, GL11.GL_FLOAT, false, 0, 0L);
+                clear();
+                GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
+                ByteBuffer row = BufferUtils.createByteBuffer(SIZE * 4);
+                GL11.glReadPixels(0, SIZE / 2, SIZE, 1, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, row);
+                for (int x = 0; x < SIZE; x++) {
+                    assertEquals(x >= SIZE / 4, row.get(x * 4) != 0, "x = " + x);
+                }
+            } finally {
+                GLSMPrograms.glUseProgram(0);
+                GLSMPrograms.glDeleteProgram(program);
+            }
+        } finally {
+            RenderSystem.initializeClipCullDistanceSupportForTesting(previous);
+        }
+    }
+
     private static int linkProgram(String name, Map<PatchShaderType, String> result) {
         final String vertex = result.get(PatchShaderType.VERTEX);
         final String geometry = result.get(PatchShaderType.GEOMETRY);

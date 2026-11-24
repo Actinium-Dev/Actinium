@@ -441,9 +441,7 @@ public class CompatUniformManager {
             final ClipPlaneState cps = GLStateManager.getClipPlaneState();
             FloatBuffer clipPlaneBuf = UPLOAD_BUFFERS.get().clipPlaneBuf;
             clipPlaneBuf.clear();
-            for (int i = 0; i < GLStateManager.MAX_CLIP_PLANES; i++) {
-                cps.putEyePlane(i, clipPlaneBuf);
-            }
+            cps.putEffectivePlanes(GLStateManager.ctx().clipPlaneEnabledMask, clipPlaneBuf);
             clipPlaneBuf.flip();
             RENDER_BACKEND.uniform4(locs[LOC_CLIP_PLANES], clipPlaneBuf);
         }
