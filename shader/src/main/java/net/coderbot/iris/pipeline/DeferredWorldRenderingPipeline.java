@@ -1716,6 +1716,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		// Particle quad instancing only needs the fixed particle layout, so it is always attempted;
 		// a pack whose particle program cannot be transformed or linked clears this again.
 		out[Instancing.PARTICLE.ordinal()] = true;
+		out[Instancing.WEATHER.ordinal()] = true;
 		return out;
 	}
 
@@ -2591,14 +2592,14 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 	/**
 	 * The programs a layout can produce a variant for. The entity batch draws entities, block
 	 * entities, glint and shadows, the particle batch draws the two particle programs, and the weather
-	 * layout has no transform of its own yet, so it returns no ids and reports itself unsupported.
+	 * batch draws the weather program.
 	 */
 	static ProgramId[] attributeProgramIds(Instancing kind) {
 		return switch (kind) {
 			case NONE -> ProgramId.values();
 			case TEMPLATE, CUBE -> INSTANCED_PROGRAM_IDS;
 			case PARTICLE -> PARTICLE_PROGRAM_IDS;
-			case WEATHER -> new ProgramId[0];
+			case WEATHER -> new ProgramId[] { ProgramId.Weather };
 		};
 	}
 

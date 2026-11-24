@@ -19,7 +19,7 @@ public final class WeatherQuadMesh {
     public static final int VERTEX_FLAGS = VertexFlags.TEXTURE_BIT;
     public static final int VERTEX_COUNT = 4;
 
-    private static final float[] CORNERS = { 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f };
+    private static final float[] CORNERS = { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f };
 
     private static int vao;
     private static int vbo;

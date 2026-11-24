@@ -74,7 +74,8 @@ DEBUG 页原先与高级/性能页重复的 5 项（模型渲染器批处理、�
 
 | 选项 | 字段 | 实现落点 |
 | --- | --- | --- |
-| 天气质量 | `quality.weatherQuality` | `mixin.vintage.features.options.MixinEntityRenderer`（`renderRainSnow` 与 `addRainParticles` 重定向 `fancyGraphics`） |
+| 天气质量 | `quality.weatherQuality` | `WeatherRenderer` 决定实例化雨雪范围。原版雨雪和粒子使用 `mixin.vintage.features.options.MixinEntityRenderer` 对 `fancyGraphics` 的重定向 |
+| 天气实例化 | `advanced.useInstancedWeather`，默认 `true` | `WeatherRenderer` 控制原版雨雪和模组降水列的实例化。关闭后执行原有 `renderRainSnow` |
 | 树叶质量 | `quality.leavesQuality` | `render/terrain/LeafRenderQuality`（由 `MixinRenderGlobal.onReload` 在 `loadRenderers` 返回后套用） |
 | 生物群系颜色噪声 | `quality.useBiomeColorNoise` 等 | 生物群系染色计算 |
 | 暗角 | `quality.enableVignette` | `mixin.vintage.features.options.MixinGuiIngameForge` |

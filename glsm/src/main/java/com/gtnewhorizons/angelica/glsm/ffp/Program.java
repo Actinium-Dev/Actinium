@@ -39,6 +39,10 @@ public class Program {
 
     // Current state defaults
     public int locCurrentNormal = -1;
+    int locWeatherParams0 = -1;
+    int locWeatherParams1 = -1;
+    int locWeatherParams2 = -1;
+    int locWeatherParams3 = -1;
     public int locCurrentColor = -1;
     public int locCurrentTexCoord = -1;
     public int locCurrentTexCoord2 = -1;
@@ -124,6 +128,10 @@ public class Program {
         locTextureMatrix3 = loc("u_TextureMatrix3");
 
         locCurrentNormal = loc("u_CurrentNormal");
+        locWeatherParams0 = loc("u_WeatherParams0");
+        locWeatherParams1 = loc("u_WeatherParams1");
+        locWeatherParams2 = loc("u_WeatherParams2");
+        locWeatherParams3 = loc("u_WeatherParams3");
         locCurrentColor = loc("u_CurrentColor");
         locCurrentTexCoord = loc("u_CurrentTexCoord");
         locCurrentTexCoord2 = loc("u_CurrentTexCoord2");

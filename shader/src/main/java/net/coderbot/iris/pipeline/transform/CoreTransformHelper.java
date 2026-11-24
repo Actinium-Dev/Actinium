@@ -35,6 +35,8 @@ class CoreTransformHelper {
         }
         if (instancing == Instancing.PARTICLE) {
             injectParticleInputs(transformer);
+        } else if (instancing == Instancing.WEATHER) {
+            injectWeatherInputs(transformer);
         }
         final boolean perInstanceMatrices = instancing.hasInstanceHead();
 
@@ -78,6 +80,18 @@ class CoreTransformHelper {
     private static void injectParticleInputs(Transformer transformer) {
         transformer.injectVariable("layout(location = " + VertexFormatElement.Usage.POSITION.getAttributeLocation() + ") in vec3 iris_ParticleOffset;");
         transformer.injectVariable("layout(location = " + VertexFormatElement.Usage.PRIMARY_UV.getAttributeLocation() + ") in vec2 iris_ParticleCorner;");
+        transformer.injectVariable("vec4 iris_Vertex;");
+        transformer.injectVariable("vec4 iris_Color;");
+        transformer.injectVariable("vec4 iris_MultiTexCoord0;");
+        transformer.injectVariable("vec4 iris_MultiTexCoord1;");
+    }
+
+    private static void injectWeatherInputs(Transformer transformer) {
+        transformer.injectVariable("layout(location = " + VertexFormatElement.Usage.PRIMARY_UV.getAttributeLocation() + ") in vec2 iris_WeatherCorner;");
+        transformer.injectVariable("uniform vec4 iris_WeatherParams0;");
+        transformer.injectVariable("uniform vec4 iris_WeatherParams1;");
+        transformer.injectVariable("uniform vec4 iris_WeatherParams2;");
+        transformer.injectVariable("uniform vec4 iris_WeatherParams3;");
         transformer.injectVariable("vec4 iris_Vertex;");
         transformer.injectVariable("vec4 iris_Color;");
         transformer.injectVariable("vec4 iris_MultiTexCoord0;");

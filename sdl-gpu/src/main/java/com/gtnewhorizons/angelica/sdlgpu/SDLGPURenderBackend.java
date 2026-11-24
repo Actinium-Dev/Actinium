@@ -5017,6 +5017,11 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
 
     @Override
+    public boolean supportsInstancedDrawing() {
+        return true;
+    }
+
+    @Override
     public void drawArraysInstanced(int mode, int first, int count, int primcount) {
         if (count <= 0 || primcount <= 0) return;
         final ContextState st = s();

@@ -678,6 +678,12 @@ Mixin 组织约定：
   dev 验证无法覆盖；2026-08-12 生产崩溃实例：`MixinGlStateTracker$Saved`）。
   辅助实现一律放 mixin 包外。
 
+## 天气渲染
+
+`MixinEntityRendererWeather` 在 1.12.2 `renderRainSnow` 入口调用 `WeatherRenderer`。实例化路径按纹理提交原版雨雪和模组降水列。模组将实现 `WeatherColumnProvider` 的 Forge `IRenderHandler` 注册到维度，由 provider 决定是否保留原版雨雪。自定义列按 provider、revision、维度和相机方块坐标缓存。客户端切换世界时释放天气缓冲和 VAO。
+
+天气沿用调用方的 framebuffer、viewport 与深度写入规则。无光影时使用 GLSM 固定管线天气变体。有光影时在 Iris `RAIN_SNOW` 阶段绑定当前 pass 的天气变体。绘制结束后恢复 pass、纹理、混合及顶点输入。关闭天气实例化、后端不支持实例化或光影缺少天气变体时，由原有入口处理降水和 Forge handler。
+
 ## 兼容层总览
 
 - Distant Horizons：API event、framebuffer、depth texture、LOD shader 和条件 Mixin。

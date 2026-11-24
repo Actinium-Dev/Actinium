@@ -56,6 +56,7 @@
     "features.mipmaps.MixinTextureUtil",
     "features.options.MixinEntityRenderer",
     "features.options.MixinEntityRendererDynamicFov",
+    "features.weather.MixinEntityRendererWeather",
     "features.options.MixinGuiIngameForge",
     "features.options.MixinGuiOptions",
     "features.render.tileentity.piston.MixinTileEntityPistonRenderer",

@@ -69,20 +69,22 @@ public class ProgramUniforms {
 
 		if (once != null) {
 			updateStage(once);
-			updateStage(perTick);
+			if (!perTick.isEmpty()) {
+				updateStage(perTick);
+				lastTick = getCurrentTick();
+			}
 			updateStage(perFrame);
-			lastTick = getCurrentTick();
 
 			once = null;
 			return;
 		}
 
-		long currentTick = getCurrentTick();
-
-		if (lastTick != currentTick) {
-			lastTick = currentTick;
-
-			updateStage(perTick);
+		if (!perTick.isEmpty()) {
+			final long currentTick = getCurrentTick();
+			if (lastTick != currentTick) {
+				lastTick = currentTick;
+				updateStage(perTick);
+			}
 		}
 
 		// TODO: Move the frame counter to a different place?

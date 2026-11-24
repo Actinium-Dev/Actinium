@@ -68,6 +68,10 @@ public class Uniforms {
 
     public void upload(Program program) {
         final ProgramUniformState uploaded = program.getUniformState();
+        if (program.getVertexKey().instancing() == Instancing.WEATHER && uploaded.needsWeatherParamsUpload(WeatherParams.generation)) {
+            uploadWeatherParams(program);
+            uploaded.markWeatherParamsUploaded(WeatherParams.generation);
+        }
         uploadAtlasGutter(program);
 
         final int mvGen = GLStateManager.getMvGeneration();
@@ -157,6 +161,16 @@ public class Uniforms {
         if (program.getVertexKey().lineQuads() || program.getVertexKey().lineStipple()) {
             uploadLineUniforms(program, uploaded);
         }
+    }
+
+    private void uploadWeatherParams(Program program) {
+        RENDER_BACKEND.uniform4f(program.locWeatherParams0, WeatherParams.translateX, WeatherParams.translateY,
+            WeatherParams.translateZ, WeatherParams.invRadius);
+        RENDER_BACKEND.uniform4f(program.locWeatherParams1, WeatherParams.cameraFracX, WeatherParams.cameraFracZ,
+            WeatherParams.partialTicks, WeatherParams.age);
+        RENDER_BACKEND.uniform4f(program.locWeatherParams2, WeatherParams.vanillaTick, WeatherParams.providerTick,
+            WeatherParams.rainStrength, WeatherParams.providerAge);
+        RENDER_BACKEND.uniform4f(program.locWeatherParams3, WeatherParams.providerInvRadius, 0.0F, 0.0F, 0.0F);
     }
 
     private void uploadMatrices(Program program, boolean mvChanged, boolean projChanged, boolean texMatChanged) {

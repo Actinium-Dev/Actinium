@@ -9,6 +9,7 @@ import com.dhj.actinium.compat.mmce.MmceControllerRenderCompat;
 import com.dhj.actinium.debug.GlStateDiffProbe;
 import com.dhj.actinium.render.BoundingBoxOutline;
 import com.dhj.actinium.render.ManagedCodeBoundary;
+import com.dhj.actinium.render.WeatherRenderer;
 import net.coderbot.iris.compat.rfp2.Rfp2Compat;
 import com.gtnewhorizons.angelica.glsm.shadow.InternalShadowRenderingState;
 import com.dhj.actinium.shadows.ShadowRenderingState;
@@ -126,6 +127,7 @@ public abstract class MixinRenderGlobal implements SimpleWorldRenderer.Provider<
         ManagedCodeBoundary.enter();
 
         try {
+            WeatherRenderer.clear();
             this.renderer.setWorld(world);
         } finally {
             ManagedCodeBoundary.exit();
