@@ -59,7 +59,7 @@
     "features.options.MixinGuiIngameForge",
     "features.options.MixinGuiOptions",
     "features.render.tileentity.piston.MixinTileEntityPistonRenderer",
-    "features.textures.MixinRenderItem",
+    "features.textures.MixinLightUtil",
     "features.textures.MixinTextureAtlas",
     "features.textures.MixinTextureAtlasSprite",
     "fontrenderer.MixinFontRenderer",
