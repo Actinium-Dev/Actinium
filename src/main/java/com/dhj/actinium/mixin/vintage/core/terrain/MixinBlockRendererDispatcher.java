@@ -3,6 +3,9 @@ package com.dhj.actinium.mixin.vintage.core.terrain;
 import com.dhj.actinium.compat.librarianlib.LibrarianLibGlowCompat;
 import com.dhj.actinium.render.terrain.compile.ChunkBlockRendererRouter;
 import com.dhj.actinium.render.terrain.compile.ChunkBufferBuilder;
+import com.dhj.actinium.render.terrain.compile.pipeline.TerrainPackGeometry;
+import com.dhj.actinium.render.terrain.compile.pipeline.VanillaPackModel;
+import com.dhj.actinium.resourcepack.color.ResourcePackColors;
 import com.dhj.actinium.world.cloned.ActiniumBlockAccess;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -57,8 +60,16 @@ public class MixinBlockRendererDispatcher {
             }
             return rendered;
         }
-        boolean rendered = original.call(renderer, world, model, state, pos, buffer, checkSides);
-        if (LibrarianLibGlowCompat.IS_LOADED && buffer instanceof ChunkBufferBuilder chunkBuffer) {
+        if (!(buffer instanceof ChunkBufferBuilder chunkBuffer)) {
+            return original.call(renderer, world, model, state, pos, buffer, checkSides);
+        }
+        var packRules = TerrainPackGeometry.capture();
+        boolean tintUntinted = ResourcePackColors.hasBlockColorRule(state);
+        boolean rendered = packRules == null && !tintUntinted
+                ? original.call(renderer, world, model, state, pos, chunkBuffer, checkSides)
+                : VanillaPackModel.render(packRules, tintUntinted, model, state, world, pos, chunkBuffer,
+                        (layerModel, layerBuffer) -> original.call(renderer, world, layerModel, state, pos, layerBuffer, checkSides));
+        if (LibrarianLibGlowCompat.IS_LOADED) {
             chunkBuffer.setFastModelRender(false);
         }
         return rendered;

@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.features.iris;
 
+import com.dhj.actinium.resourcepack.entity.IndependentEmissiveDraw;
 import com.dhj.actinium.config.ActiniumRuntimeOptions;
 import com.dhj.actinium.compat.gibbed.ActiniumModelRenderer;
 import com.dhj.actinium.mixinterface.features.iris.ModelRenderState;
@@ -210,7 +211,7 @@ public abstract class ModelRendererIrisMixin implements IModelRenderer, Actinium
 
         // The batch places the part with the current modelview, exactly where the display list would
         // have drawn it; when it declines, the display list or the immediate path below draws it.
-        if (ModelPartBatcher.isBatchingActive()
+        if (!IndependentEmissiveDraw.active() && ModelPartBatcher.isBatchingActive()
             && ModelPartBatcher.partDraw((ModelRenderer) (Object) this, scale, null)) {
             return;
         }
@@ -241,7 +242,7 @@ public abstract class ModelRendererIrisMixin implements IModelRenderer, Actinium
                     this.actinium$compileDisplayList(scale, scaleBits);
                 }
 
-                GLSMDraws.glCallList(this.actinium$displayList);
+                IndependentEmissiveDraw.callList(this.actinium$displayList);
                 return;
             } else if (allowDisplayLists) {
                 this.actinium$resetDisplayList();

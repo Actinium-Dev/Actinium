@@ -1,6 +1,7 @@
 package com.dhj.actinium.render.terrain;
 
 import com.dhj.actinium.debug.WorldRenderInventory;
+import com.dhj.actinium.render.ManagedCodeBoundary;
 import com.gtnewhorizons.angelica.glsm.GLSMMatrices;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.rendering.tesr.AngelicaTesrMeshCache;
@@ -83,6 +84,32 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
         if (inventory != null) {
             this.worldRenderInventory = null;
             inventory.close();
+        }
+    }
+
+    /** Joins all builders before any model or atlas data is replaced. */
+    public boolean suspendForResourceReload() {
+        if (this.renderSectionManager == null) {
+            return false;
+        }
+        ManagedCodeBoundary.enter();
+        try {
+            this.closeRenderInventory();
+            this.renderSectionManager.destroy();
+            this.renderSectionManager = null;
+            return true;
+        } finally {
+            ManagedCodeBoundary.exit();
+        }
+    }
+
+    /** Restarts section builds using the models and sprites installed by the resource reload. */
+    public void resumeAfterResourceReload() {
+        ManagedCodeBoundary.enter();
+        try {
+            this.reload();
+        } finally {
+            ManagedCodeBoundary.exit();
         }
     }
 

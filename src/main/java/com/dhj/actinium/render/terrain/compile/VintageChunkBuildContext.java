@@ -184,6 +184,11 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
         return count;
     }
 
+    /** Returns the count for a vanilla buffer without creating one for an unused layer. */
+    public int getExistingVertexCount(BlockRenderLayer layer) {
+        return this.usedWorldRenderers[layer.ordinal()] ? this.worldRenderers[layer.ordinal()].getVertexCount() : 0;
+    }
+
     public void convertVanillaDataToCeleritasData(ChunkBuildBuffers buffers) {
         var renderers = this.worldRenderers;
         var used = this.usedWorldRenderers;
@@ -481,4 +486,3 @@ public class VintageChunkBuildContext extends ChunkBuildContext {
         return BlockRenderingSettings.INSTANCE.resolveBlockNbtId(state.getBlock(), metadata, tileEntity);
     }
 }
-

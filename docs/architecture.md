@@ -678,6 +678,12 @@ Mixin 组织约定：
   dev 验证无法覆盖；2026-08-12 生产崩溃实例：`MixinGlStateTracker$Saved`）。
   辅助实现一律放 mixin 包外。
 
+## 资源包功能
+
+`ResourcePackReload` 使用资源管理器收到的实际包列表，在 Minecraft 重载监听器运行前解析规则。方块图集拼接及模型烘焙完成后统一发布规则；更新图集前停止区块任务，发布后重新启动区块构建。各渲染入口只读取已发布结果；同步加载字体时可读取本次准备数据。
+
+连接纹理、叠加面和发光先处理实际烘焙四边形，再按目标层提交。旧玻璃板在处理各朝向前比对整个烘焙模型，使用同一份网格替换各朝向和通用面。地形快速路径和 Forge 模型路径都使用同样的规则；延迟区块构建捕获普通面和跨层追加面。配置与验证场景见 `docs/compat/resource-pack-features.md`。
+
 ## 兼容层总览
 
 - Distant Horizons：API event、framebuffer、depth texture、LOD shader 和条件 Mixin。

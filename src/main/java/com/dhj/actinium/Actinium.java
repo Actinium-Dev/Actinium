@@ -18,6 +18,14 @@ import com.dhj.actinium.render.fps.FpsReducer;
 import com.dhj.actinium.render.terrain.ActiniumWorldRenderer;
 import com.dhj.actinium.render.terrain.GpuCullingSettings;
 import com.dhj.actinium.runtime.ActiniumRuntime;
+import com.dhj.actinium.resourcepack.ResourcePackOptions;
+import com.dhj.actinium.resourcepack.ResourcePackReload;
+import com.dhj.actinium.resourcepack.color.ResourcePackColors;
+import com.dhj.actinium.resourcepack.ctm.TerrainPackRules;
+import com.dhj.actinium.resourcepack.entity.ResourcePackEntities;
+import com.dhj.actinium.resourcepack.hd.ResourcePackHd;
+import com.dhj.actinium.resourcepack.item.ResourcePackItemFeatures;
+import com.dhj.actinium.resourcepack.sky.ResourcePackSky;
 import com.dhj.actinium.startup.SdlGpuBootstrap;
 import com.gtnewhorizons.angelica.proxy.ClientProxy;
 import com.gtnewhorizons.angelica.config.AngelicaConfig;
@@ -59,7 +67,6 @@ import net.minecraftforge.fml.common.Mod.EventHandler;
 import net.minecraftforge.fml.common.event.FMLConstructionEvent;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import dhj.embeddedt.embeddium.impl.common.util.MathUtil;
 import dhj.embeddedt.embeddium.impl.common.util.NativeBuffer;
@@ -83,6 +90,17 @@ public class Actinium {
 
     @EventHandler
     public void onConstruct(FMLConstructionEvent event) {
+        if (Loader.isModLoaded("continuity")) {
+            throw new IllegalStateException("Actinium includes Continuity. Remove the standalone Continuity mod from the mods directory.");
+        }
+        ResourcePackOptions.importContinuityOptions(Loader.instance().getConfigDir().toPath());
+        TerrainPackRules.register();
+        ResourcePackItemFeatures.register();
+        ResourcePackColors.register();
+        ResourcePackEntities.register();
+        ResourcePackSky.register();
+        ResourcePackHd.register();
+        ResourcePackReload.install();
         GLSMConfig.workerThreadCount = ActiniumConfig.workerThreadCount;
 
         var container = Loader.instance().getIndexedModList().get(MODID);

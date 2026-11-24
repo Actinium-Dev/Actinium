@@ -1,5 +1,6 @@
 package com.dhj.actinium.render;
 
+import com.dhj.actinium.resourcepack.entity.IndependentEmissiveDraw;
 import com.gtnewhorizon.gtnhlib.client.renderer.TessellatorManager;
 import com.gtnewhorizons.angelica.client.rendering.DeferredDrawBatcher;
 import com.gtnewhorizons.angelica.glsm.ITessellatorData;
@@ -28,6 +29,9 @@ public final class TessellatorDrawRouter {
     public static boolean draw(BufferBuilder buffer, ITessellatorData view) {
         if (VanillaBufferBuilderRenderer.shouldUseVanillaPositionDraw(buffer)) {
             return false;
+        }
+        if (IndependentEmissiveDraw.drawBuffer(buffer)) {
+            return true;
         }
         if (DeferredDrawBatcher.capture(buffer)) {
             return true;

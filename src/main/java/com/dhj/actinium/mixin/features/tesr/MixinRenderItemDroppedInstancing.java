@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.features.tesr;
 
+import com.dhj.actinium.resourcepack.item.ItemPackRendering;
 import com.gtnewhorizons.angelica.rendering.items.DroppedItemInstancer;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
 import net.minecraft.client.renderer.RenderItem;
@@ -32,6 +33,7 @@ public abstract class MixinRenderItemDroppedInstancing {
         cancellable = true
     )
     private void actinium$instanceDroppedItem(ItemStack stack, IBakedModel model, CallbackInfo ci) {
+        if (ItemPackRendering.requiresImmediate(stack, model)) return;
         final RenderItem renderItem = (RenderItem) (Object) this;
         if (DroppedItemInstancer.renderItemPart(renderItem::renderQuads, renderItem.itemColors, stack, model)
             == DroppedItemInstancer.SKIP) {

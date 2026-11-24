@@ -2,6 +2,7 @@ package com.dhj.actinium.compat.sodium;
 
 import com.dhj.actinium.gui.ActiniumGameOptionPages;
 import com.dhj.actinium.gui.GraphicsOptionPage;
+import com.dhj.actinium.gui.ResourcePackOptionPage;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import net.irisshaders.iris.compat.sodium.IrisConfigEntryPoint;
 import dhj.embeddedt.embeddium.impl.gui.SodiumGameOptions;
@@ -33,6 +34,7 @@ public final class ActiniumOptionPages {
                 CommonOptionPages.performance(options),
                 ActiniumGameOptionPages.advanced()));
         appendGraphicsAndDebug(pages, options);
+        pages.add(ResourcePackOptionPage.create(options));
         pages.addAll(new IrisConfigEntryPoint().createPages());
         return List.copyOf(pages);
     }

@@ -1,5 +1,7 @@
 package com.dhj.actinium.mixin.features.tesr;
 
+import com.dhj.actinium.resourcepack.item.ItemPackRendering;
+
 import com.dhj.actinium.render.ArmorGlintBatching;
 import com.gtnewhorizons.angelica.rendering.GlintClock;
 import com.gtnewhorizons.angelica.rendering.tesr.GlintCapture;
@@ -31,7 +33,7 @@ public abstract class MixinLayerArmorBaseGlint {
     private void actinium$captureArmorBase(ModelBase model, Entity entity, float swing, float amount, float age,
                                            float yaw, float pitch, float scale, Operation<Void> original,
                                            @Local ItemStack stack, @Share("armorBase") LocalRef<ArmorGlintBatching> base) {
-        if (skipRenderGlint || !stack.isItemEnchanted()) {
+        if (skipRenderGlint || !stack.isItemEnchanted() || ItemPackRendering.overridesEquipmentGlint(stack)) {
             original.call(model, entity, swing, amount, age, yaw, pitch, scale);
             return;
         }
