@@ -318,4 +318,7 @@ dependencies {
     modCompileOnly 'curse.maven:storage-drawers-223852:2952606'
     modRuntimeOnly 'curse.maven:chameleon-230497:2450900'
     modRuntimeOnly 'curse.maven:storage-drawers-223852:2952606'
+
+    modCompileOnly 'curse.maven:evilcraft-74610:2811267'
+    modCompileOnly 'curse.maven:cyclops-core-232758:3159497'
 }
