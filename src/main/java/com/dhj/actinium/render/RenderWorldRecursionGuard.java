@@ -12,6 +12,7 @@ package com.dhj.actinium.render;
  */
 public final class RenderWorldRecursionGuard {
     private static int depth;
+    private static long worldPassId;
 
     private RenderWorldRecursionGuard() {
     }
@@ -21,6 +22,9 @@ public final class RenderWorldRecursionGuard {
      * even when the pass throws.
      */
     public static void enter() {
+        if (depth == 0) {
+            worldPassId++;
+        }
         depth++;
     }
 
@@ -42,5 +46,10 @@ public final class RenderWorldRecursionGuard {
      */
     public static boolean isNested() {
         return depth > 1;
+    }
+
+    /** Identifies the active outer view, or returns zero outside it and during nested views. */
+    public static long outerPassId() {
+        return depth == 1 ? worldPassId : 0;
     }
 }

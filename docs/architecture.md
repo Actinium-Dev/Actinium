@@ -93,6 +93,10 @@ Outlands 管理窗口和输入，并提供与 lwjgl3ify 对应的创建、销毁
    early return；仅当 GLSM 性能调试开启且 SSBO/GLSL 4.30 可用时，
    `DeferredWorldRenderingPipeline` 才分配独立 SSBO 并注入运行期 `atomicAdd` 统计。
 
+启用「在半透明地形前绘制方块实体」时，`MixinRenderGlobal.renderBlockLayer` 在 Iris deferred 和原有延迟批次提交之后、半透明地形之前调度区块的 Forge pass 1 TESR。准备和去重状态按外层 `renderWorldPass` 记录，只有同一视图完成 pass 0 的区块 TESR 绘制后才能提前绘制。原位置继续处理普通实体、模组加入 `setTileEntities` 的方块实体以及兼容回调。
+
+提前绘制使用当前世界 framebuffer 与视口。Iris 在 `BLOCK_ENTITIES` 阶段选择 program 和目标；`EarlyBlockEntityRendering` 在返回前恢复读写 framebuffer、program、视口、纹理单元、光照贴图矩阵与亮度坐标，以及深度和混合状态。半透明地形随后按自己的阶段配置绘制状态。
+
 TESR 实例化批次不新增 pass：`DeferredWorldRenderingPipeline` 为 `Instancing.TEMPLATE` 与
 `Instancing.CUBE` 从 `Block`、`BlockTrans`、`Entities`、`EntitiesTrans`、`Shadow`、
 `ShadowWater`、`ArmorGlint`、`SpiderEyes` 的程序源码另做一份属性变换，首次查询时链接为
