@@ -7,12 +7,16 @@ import com.dhj.actinium.render.RenderWorldRecursionGuard;
 import com.dhj.actinium.render.RevoScreenEffectsGradient;
 import com.dhj.actinium.render.iris.IrisWeatherPass;
 import com.dhj.actinium.render.terrain.ActiniumWorldRenderer;
+import com.dhj.actinium.render.LayeredWorldRendering;
+import com.dhj.actinium.render.translucency.TranslucencyLayers;
+import com.dhj.actinium.render.translucency.TranslucentLayer;
 import com.gtnewhorizons.angelica.compat.mojang.Camera;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.rendering.RenderingState;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import dhj.embeddedt.embeddium.impl.render.viewport.ViewportProvider;
 import net.coderbot.iris.Iris;
@@ -33,6 +37,7 @@ import net.coderbot.iris.uniforms.CapturedRenderingState;
 import net.coderbot.iris.uniforms.SystemTimeUniforms;
 import net.irisshaders.iris.api.v0.IrisApi;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.particle.ParticleManager;
 import net.minecraft.client.renderer.EntityRenderer;
 import net.minecraft.client.renderer.ItemRenderer;
 import net.minecraft.client.renderer.RenderGlobal;
@@ -45,6 +50,7 @@ import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.BlockRenderLayer;
+import net.minecraft.util.math.MathHelper;
 import org.joml.Vector3d;
 import org.lwjgl.opengl.GL11;
 import org.objectweb.asm.Opcodes;
@@ -53,6 +59,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import com.gtnewhorizons.angelica.glsm.GLSMCurrentAttribs;
@@ -65,6 +72,9 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
 
     @Shadow
     public Minecraft mc;
+
+    @Shadow
+    private float farPlaneDistance;
 
     @Shadow
     private void renderCloudsCheck(RenderGlobal renderGlobalIn, float partialTicks, int pass, double x, double y, double z) {
@@ -88,15 +98,29 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
     private void actinium$guardRenderWorldPassRecursion(int pass, float partialTicks, long finishTimeNano, Operation<Void> original) {
         RenderWorldRecursionGuard.enter();
         boolean outerPass = !RenderWorldRecursionGuard.isNested();
+        boolean layerFrame = outerPass && !this.mc.gameSettings.anaglyph;
         try {
+            if (layerFrame) {
+                TranslucencyLayers.INSTANCE.beginFrame();
+            }
             if (outerPass) {
                 WorldRenderInventory.beginWorldPass(this.mc);
             }
-            original.call(pass, partialTicks, finishTimeNano);
+            if (outerPass) {
+                original.call(pass, partialTicks, finishTimeNano);
+            } else {
+                TranslucencyLayers.INSTANCE.renderNested(() -> original.call(pass, partialTicks, finishTimeNano));
+            }
         } finally {
             try {
-                if (outerPass) {
-                    WorldRenderInventory.endWorldPass();
+                try {
+                    if (layerFrame) {
+                        TranslucencyLayers.INSTANCE.endFrame();
+                    }
+                } finally {
+                    if (outerPass) {
+                        WorldRenderInventory.endWorldPass();
+                    }
                 }
             } finally {
                 RenderWorldRecursionGuard.exit();
@@ -562,7 +586,7 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/EntityRenderer;renderRainSnow(F)V", shift = At.Shift.AFTER)
     )
     private void actinium$checkAfterWeather(int pass, float partialTicks, long finishTimeNano, CallbackInfo ci) {
-        if (!actinium$deferWeather()) {
+        if (!actinium$deferShaderWeatherAndClouds()) {
             IrisGlDebug.markStage("render-world-pass:" + pass + ":after-weather");
             IrisGlDebug.recordWorldPassStage("weather-to-terrain-translucent");
         }
@@ -616,6 +640,7 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
         if (RenderWorldRecursionGuard.isNested()) {
             return;
         }
+        TranslucencyLayers.INSTANCE.composite();
         if (!Iris.enabled || !IrisApiV0Impl.INSTANCE.isShaderPackInUse()) {
             return;
         }
@@ -740,15 +765,51 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
 
     @Redirect(
         method = "renderWorldPass(IFJ)V",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/EntityRenderer;renderCloudsCheck(Lnet/minecraft/client/renderer/RenderGlobal;FIDDD)V")
+        at = @At(value = "INVOKE", ordinal = 0, target = "Lnet/minecraft/client/renderer/EntityRenderer;renderCloudsCheck(Lnet/minecraft/client/renderer/RenderGlobal;FIDDD)V")
     )
-    private void actinium$renderClouds(EntityRenderer renderer, RenderGlobal renderGlobal, float partialTicks, int pass, double x, double y, double z) {
-        if (RenderWorldRecursionGuard.isNested()) {
+    private void actinium$renderEarlyVanillaClouds(EntityRenderer renderer, RenderGlobal renderGlobal, float partialTicks, int pass, double x, double y, double z) {
+        if (!actinium$deferShaderWeatherAndClouds()) {
             this.renderCloudsCheck(renderGlobal, partialTicks, pass, x, y, z);
-            return;
         }
-        if (!Iris.enabled || !IrisApiV0Impl.INSTANCE.isShaderPackInUse()) {
-            this.renderCloudsCheck(renderGlobal, partialTicks, pass, x, y, z);
+    }
+
+    @Redirect(
+        method = "renderWorldPass(IFJ)V",
+        at = @At(value = "INVOKE", ordinal = 1, target = "Lnet/minecraft/client/renderer/EntityRenderer;renderCloudsCheck(Lnet/minecraft/client/renderer/RenderGlobal;FIDDD)V")
+    )
+    private void actinium$renderLateVanillaClouds(EntityRenderer renderer, RenderGlobal renderGlobal, float partialTicks, int pass, double x, double y, double z) {
+        if (!actinium$deferShaderWeatherAndClouds()) {
+            if (CloudRenderSettings.cloudsVisible(this.mc.gameSettings.clouds) && TranslucencyLayers.INSTANCE.active()) {
+                LayeredWorldRendering.draw(TranslucentLayer.CLOUDS, false,
+                    () -> this.renderCloudsCheck(renderGlobal, partialTicks, pass, x, y, z));
+            } else {
+                this.renderCloudsCheck(renderGlobal, partialTicks, pass, x, y, z);
+            }
+        }
+    }
+
+    @WrapOperation(
+        method = "renderWorldPass(IFJ)V",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/particle/ParticleManager;renderLitParticles(Lnet/minecraft/entity/Entity;F)V")
+    )
+    private void actinium$renderLayeredLitParticles(ParticleManager manager, Entity entity, float partialTicks, Operation<Void> original) {
+        this.actinium$renderLayeredParticles(manager, entity, partialTicks, original);
+    }
+
+    @WrapOperation(
+        method = "renderWorldPass(IFJ)V",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/particle/ParticleManager;renderParticles(Lnet/minecraft/entity/Entity;F)V")
+    )
+    private void actinium$renderLayeredUnlitParticles(ParticleManager manager, Entity entity, float partialTicks, Operation<Void> original) {
+        this.actinium$renderLayeredParticles(manager, entity, partialTicks, original);
+    }
+
+    @Unique
+    private void actinium$renderLayeredParticles(ParticleManager manager, Entity entity, float partialTicks, Operation<Void> original) {
+        if (TranslucencyLayers.INSTANCE.active()) {
+            LayeredWorldRendering.draw(TranslucentLayer.PARTICLES, false, () -> original.call(manager, entity, partialTicks));
+        } else {
+            original.call(manager, entity, partialTicks);
         }
     }
 
@@ -758,6 +819,16 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
     )
     private int actinium$useConfiguredCloudMode(GameSettings settings) {
         return CloudRenderSettings.effectiveCloudMode(settings.clouds);
+    }
+
+    @ModifyArg(
+        method = "renderCloudsCheck",
+        at = @At(value = "INVOKE", ordinal = 0, target = "Lorg/lwjgl/util/glu/Project;gluPerspective(FFFF)V"),
+        index = 3
+    )
+    private float actinium$useWorldDepthForLayeredClouds(float farPlane) {
+        return TranslucencyLayers.INSTANCE.isOpenLayer(TranslucentLayer.CLOUDS)
+            ? this.farPlaneDistance * MathHelper.SQRT_2 : farPlane;
     }
 
     @Inject(
@@ -775,13 +846,19 @@ public abstract class EntityRendererIrisMixin implements IResourceManagerReloadL
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/EntityRenderer;renderRainSnow(F)V")
     )
     private void actinium$renderWeather(EntityRenderer renderer, float partialTicks) {
-        if (!actinium$deferWeather()) {
+        if (actinium$deferShaderWeatherAndClouds()) {
+            return;
+        }
+        if (TranslucencyLayers.INSTANCE.active()
+                && (this.mc.world.getRainStrength(partialTicks) > 0.0F || this.mc.world.provider.getWeatherRenderer() != null)) {
+            LayeredWorldRendering.draw(TranslucentLayer.WEATHER, true, () -> this.renderRainSnow(partialTicks));
+        } else {
             this.renderRainSnow(partialTicks);
         }
     }
 
     @Unique
-    private static boolean actinium$deferWeather() {
+    private static boolean actinium$deferShaderWeatherAndClouds() {
         return !RenderWorldRecursionGuard.isNested() && Iris.enabled && IrisApiV0Impl.INSTANCE.isShaderPackInUse();
     }
 

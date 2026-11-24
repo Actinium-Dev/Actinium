@@ -12,7 +12,7 @@
 | --- | --- | --- | --- |
 | [`eff66975`，#2330](https://github.com/GTNewHorizons/Angelica/commit/eff6697583b59f579bf23ca50b2b9504865fa240) | 2026-11-22 | 已适配并实机验证 | 启用「半透明面排序」时，`ActiniumWorldRenderer` 汇集可见区块的裁剪列表和全局方块实体列表，根据 TESR 分派时的观察位置从远到近排序，再按 Forge pass 过滤并调用渲染器。关闭选项、嵌套视图与阴影绘制沿用原遍历顺序。 |
 | [`ef8648cd`，#2331](https://github.com/GTNewHorizons/Angelica/commit/ef8648cdc06a85c793cad1874d6cbdacf3e09778) | 2026-11-22 | 已适配并实机验证 | 区块的 Forge pass 1 TESR 在 Iris deferred 之后、半透明地形之前绘制。同一外层视图的原 pass 1 跳过这批区块方块实体。普通实体、`setTileEntities` 额外注册项、阴影和嵌套视图沿用原时机。 |
-| [`586cce1c`，#2332](https://github.com/GTNewHorizons/Angelica/commit/586cce1c40541deb3b4de0158f105eae61ae8c37) | 2026-11-22 | 待移植，接续 #2331 | 上游引入 `Off/Fast/Fancy`、预乘 alpha 混合、分层 framebuffer 和按深度合成，接入地形、TESR、粒子、天气与云。`Fancy` 进一步拆分位于方块实体后方的地形。本地 `VintageTranslucentMaterials` 和 Iris 半透明深度路径可供对照。实现前按本地架构明确 OpenGL、SDL GPU、Iris 与 LWJGL2 路径的 framebuffer、program、纹理单元、视口及混合和深度状态归属。 |
+| [`586cce1c`，#2332](https://github.com/GTNewHorizons/Angelica/commit/586cce1c40541deb3b4de0158f105eae61ae8c37) | 2026-11-22 | 已适配，待实机验证 | `OFF` 关闭排序，`FAST` 保留排序，`FANCY` 在无光影 OpenGL 视图中采集地形、区块 pass 1 TESR、粒子、天气和晚绘制云层并按深度合成。地形以 TESR 深度为界分开前后片元。 |
 | [`1758f3be`，#2333](https://github.com/GTNewHorizons/Angelica/commit/1758f3be1a543f253159bda6cf8ec7f7c15eee87) | 2026-11-23 | 待移植，依赖 #2332 | 上游把半透明 TESR 重放到 Glow Depth，供发光片元与半透明地形比较深度，支持 TESR 退出重放，并剔除对颜色无贡献的片元。以本地 TESR 批次和分层目标为接入点，验证退出规则以及重放期间粒子和声音的副作用。 |
 | [`2658ac58`，#2352](https://github.com/GTNewHorizons/Angelica/commit/2658ac584e2c22d4f842f5903737ae91ead13c5f) | 2026-11-23 | 待移植，接续 #2333 | 上游给 GLSM 和 FFP 加入 depth peeling，按层绘制半透明 TESR 批次，并在启用混合的立即绘制前提交待处理批次。本地已有 `BatchStateGuard`，后续适配须围绕现有批次边界检查提交顺序，并单独验证重叠表面、立即绘制以及状态恢复。 |
 | [`fbfcafc7`，#2376](https://github.com/GTNewHorizons/Angelica/commit/fbfcafc7b579b9054ddaca1e9888ba244bf4549d) | 2026-11-23 | 本地已有等价快照，GTNH 补丁不适用 | 上游为 1.7.10 GTNH LiquidLogged 的 `Fluid[]` 快照补充逐格流体等级，并经 `WorldSlice` 跨区段查询。Actinium 支持 1.12.2 JBredwards Fluidlogged API，现有快照保留含 `BlockLiquid.LEVEL` 的 `IBlockState`，无需另存等级或引入 GTNH LiquidLogged。 |
@@ -30,6 +30,12 @@
 在「质量」页开关「在半透明地形前绘制方块实体」，从同一视角隔着染色玻璃观察 Forge pass 1 的普通 TESR 和 FastTESR，例如 Ender IO 储罐内的液体。同时从反面看 TESR 前方和后方的地形，记录透明混合的差异。分无光影和 MakeUp 或 Complementary 验证，并检查 MakeUp 雨滴仍可见。有 GregTech CEu Bloom 或 Distant Horizons 时，分别核对对应的半透明路径。
 
 启用项目已有的渲染计时 DEBUG 后，同一外层视图的区块方块实体应记录 `block-entities-main-early`（Forge pass 1），原位置继续显示普通实体和额外注册的方块实体。关闭选项时，区块方块实体的 Forge pass 1 应恢复为 `block-entities-main`。用红蓝立体模式再核对两个视图分别绘制一次。
+
+## #2332 半透明分层验证
+
+`check build --no-daemon` 和 22 项定向 OpenGL 测试通过。测试覆盖分层深度、地形前后片元、添加混合、stencil 复制、嵌套视图和跨帧状态恢复。已部署 Forge 1.12.2 测试包。
+
+在 Forge 1.12.2 实例中关闭光影包，进入视频设置的「质量」页，切换「半透明渲染模式」。从两侧隔着染色玻璃观察 Ender IO 储罐内的液体，核对前方玻璃覆盖 TESR、后方玻璃保留在 TESR 后方。测试粒子、雨雪和云层相互遮挡，并在雨天启用 MakeUp，确认光影包继续使用自己的合成管线且雨滴可见。切换窗口大小后重复观察同一场景。
 
 ## #2376 流体等级核对
 

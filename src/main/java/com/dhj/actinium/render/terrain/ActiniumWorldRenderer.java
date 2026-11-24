@@ -41,6 +41,8 @@ import net.coderbot.iris.pipeline.ShadowRenderer;
 import com.dhj.actinium.compat.depthsupdate.DepthsUpdateCompat;
 import com.dhj.actinium.render.terrain.fog.GLStateManagerFogService;
 import com.dhj.actinium.runtime.ActiniumRuntime;
+import com.dhj.actinium.render.translucency.TranslucencyLayers;
+import com.dhj.actinium.render.translucency.TranslucentLayer;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.jetbrains.annotations.Nullable;
@@ -173,7 +175,19 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
         this.prepareTerrainPasses(createChunkRenderMatrices(), x, y, z);
 
         RenderDebugHooksHolder.check("actinium:draw-chunk-layer:" + renderLayer + ":before-super");
-        super.drawChunkLayer(renderLayer, x, y, z);
+        boolean layered = renderLayer == BlockRenderLayer.TRANSLUCENT && TranslucencyLayers.INSTANCE.active()
+            && this.renderSectionManager.getRenderPassConfiguration().vanillaRenderStages().get(renderLayer).stream()
+                .anyMatch(this.renderSectionManager.getRenderLists()::hasPass);
+        if (layered) {
+            TranslucencyLayers.INSTANCE.begin(TranslucentLayer.TERRAIN);
+        }
+        try {
+            super.drawChunkLayer(renderLayer, x, y, z);
+        } finally {
+            if (layered) {
+                TranslucencyLayers.INSTANCE.end();
+            }
+        }
         RenderDebugHooksHolder.check("actinium:draw-chunk-layer:" + renderLayer + ":after-super");
 
         GLSMCurrentAttribs.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
@@ -378,14 +392,40 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
     }
 
     public void renderBlockEntitiesBeforeTranslucent(Minecraft mc, TileEntityRenderContext context) {
-        if (ActiniumRuntime.options().performance.blockEntitiesBeforeTranslucentTerrain
-                && this.blockEntityPassOrder.claimEarlyDraw(RenderWorldRecursionGuard.outerPassId())) {
-            this.earlyBlockEntityRendering.render(OpenGlHelper.lightmapTexUnit, () -> {
-                        RenderHelper.enableStandardItemLighting();
-                        mc.entityRenderer.enableLightmap();
-                    },
-                    () -> this.renderBlockEntitiesInPhase(context, 1, "block-entities-main-early"));
+        boolean layered = TranslucencyLayers.INSTANCE.active();
+        if ((!layered && !ActiniumRuntime.options().performance.blockEntitiesBeforeTranslucentTerrain)
+                || !this.blockEntityPassOrder.claimEarlyDraw(RenderWorldRecursionGuard.outerPassId())) {
+            return;
         }
+        if (layered && !this.hasPassOneBlockEntities()) {
+            return;
+        }
+
+        this.earlyBlockEntityRendering.render(OpenGlHelper.lightmapTexUnit, () -> {
+            RenderHelper.enableStandardItemLighting();
+            mc.entityRenderer.enableLightmap();
+        }, () -> {
+            if (layered) {
+                TranslucencyLayers.INSTANCE.begin(TranslucentLayer.BLOCK_ENTITIES);
+            }
+            try {
+                this.renderBlockEntitiesInPhase(context, 1, "block-entities-main-early");
+            } finally {
+                if (layered) {
+                    TranslucencyLayers.INSTANCE.end();
+                }
+            }
+        });
+    }
+
+    private boolean hasPassOneBlockEntities() {
+        Iterator<TileEntity> blockEntities = this.blockEntityIterator();
+        while (blockEntities.hasNext()) {
+            if (blockEntities.next().shouldRenderInPass(1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void renderBlockEntitiesInPhase(TileEntityRenderContext context, int pass, String timingStage) {
@@ -418,7 +458,7 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
             TileEntityRendererDispatcher.instance.preDrawBatch();
             try {
                 AngelicaTesrMeshCache.INSTANCE.tick();
-                if (ActiniumRuntime.options().performance.useTranslucentFaceSorting
+                if (ActiniumRuntime.options().performance.translucencyMode.sorts()
                         && !RenderWorldRecursionGuard.isNested() && !ShaderProviderHolder.isShadowPass()) {
                     return this.renderSortedBlockEntities(tileEntityRenderContext);
                 }

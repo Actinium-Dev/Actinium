@@ -8,6 +8,7 @@ import dhj.embeddedt.embeddium.api.options.OptionIdentifier;
 import dhj.embeddedt.embeddium.api.options.structure.*;
 import dhj.embeddedt.embeddium.impl.common.util.ScratchRetentionWindow;
 import dhj.embeddedt.embeddium.impl.gui.SodiumGameOptions;
+import dhj.embeddedt.embeddium.impl.gui.TranslucencyMode;
 import dhj.embeddedt.embeddium.impl.gui.framework.TextComponent;
 import dhj.embeddedt.embeddium.impl.render.ShaderModBridge;
 import dhj.embeddedt.embeddium.impl.render.chunk.compile.executor.ChunkBuilder;
@@ -21,16 +22,17 @@ public class CommonOptionPages {
     public static OptionGroup sortingGroup(SodiumGameOptions sodiumOpts) {
         return OptionGroup.createBuilder()
                 .setId(StandardOptions.Group.SORTING)
-                .add(OptionImpl.createBuilder(boolean.class, sodiumOpts)
+                .add(OptionImpl.createBuilder(TranslucencyMode.class, sodiumOpts)
                         .setId(StandardOptions.Option.TRANSLUCENT_FACE_SORTING.cast())
-                        .setName(TextComponent.translatable("sodium.options.translucent_face_sorting.name"))
-                        .setTooltip(TextComponent.translatable("sodium.options.translucent_face_sorting.tooltip"))
-                        .setControl(TickBoxControl::new)
+                        .setName(TextComponent.translatable("sodium.options.translucency_mode.name"))
+                        .setTooltip(TextComponent.translatable("sodium.options.translucency_mode.tooltip"))
+                        .setControl(option -> new CyclingControl<>(option, TranslucencyMode.class))
                         .setImpact(OptionImpact.VARIES)
-                        .setBinding((opts, value) -> opts.performance.useTranslucentFaceSorting = value, opts -> opts.performance.useTranslucentFaceSorting)
+                        .setBinding((opts, value) -> opts.performance.translucencyMode = value,
+                                opts -> opts.performance.translucencyMode)
                         .setEnabled(!ShaderModBridge.isNvidiumEnabled())
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setDefaultValue(true)
+                        .setDefaultValue(TranslucencyMode.FAST)
                         .build())
                 .add(OptionImpl.createBuilder(int.class, sodiumOpts)
                         .setId(StandardOptions.Option.CHUNK_FADE_IN_DURATION.cast())

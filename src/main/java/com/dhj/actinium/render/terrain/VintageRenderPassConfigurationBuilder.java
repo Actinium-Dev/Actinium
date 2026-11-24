@@ -1,5 +1,6 @@
 package com.dhj.actinium.render.terrain;
 
+import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
 import com.google.common.collect.ImmutableListMultimap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import net.minecraft.client.Minecraft;
@@ -46,6 +47,11 @@ public class VintageRenderPassConfigurationBuilder {
         if (ActiniumRuntime.options().quality.chunkFadeInDuration > 0) {
             extraDefines.put("CHUNK_FADE_IN_DURATION_MS", String.valueOf(ActiniumRuntime.options().quality.chunkFadeInDuration));
         }
+        if (chunkRenderType == BlockRenderLayer.TRANSLUCENT
+                && !BackendManager.RENDER_BACKEND.isSDLGPU()
+                && ActiniumRuntime.options().performance.translucencyMode.composites()) {
+            extraDefines.put("TRANSLUCENCY_SPLIT", "");
+        }
 
         return TerrainRenderPass.builder().extraDefines(extraDefines).pipelineState(blocksTextureState(mipped)).vertexType(vertexType).primitiveType(QuadPrimitiveType.TRIANGULATED);
     }
@@ -79,22 +85,16 @@ public class VintageRenderPassConfigurationBuilder {
                 .useReverseOrder(true)
                 .semantic(TerrainRenderPass.Semantic.WATER)
                 .writesDepth(true)
-                .useTranslucencySorting(ActiniumRuntime.options().performance.useTranslucentFaceSorting)
+                .useTranslucencySorting(ActiniumRuntime.options().performance.translucencyMode.sorts())
                 .build();
         translucentPass = builderForRenderType(BlockRenderLayer.TRANSLUCENT, vertexType, mipEnabled)
                 .name("translucent")
                 .fragmentDiscard(false)
                 .useReverseOrder(true)
                 .semantic(TerrainRenderPass.Semantic.TRANSLUCENT)
-                // Vanilla 1.12.2 wraps the whole translucent stage (terrain plus the pass-1
-                // tile-entity re-render such as EnderIO tank fluid) in depthMask(false), see
-                // EntityRenderer around lines 1539/1564. Writing depth here makes translucent
-                // terrain (e.g. the tank glass) occlude pass-1 TESR geometry drawn afterwards,
-                // which hid EnderIO tank fluid on both the fixed-function and shader paths (#58).
-                // The earlier flip to true (64b9c32/da83c59) rested on the incorrect premise
-                // that vanilla keeps the depth mask on for translucent terrain.
+                // Keep late pass-one TESRs visible when the terrain writes to the main target.
                 .writesDepth(false)
-                .useTranslucencySorting(ActiniumRuntime.options().performance.useTranslucentFaceSorting)
+                .useTranslucencySorting(ActiniumRuntime.options().performance.translucencyMode.sorts())
                 .build();
 
         ImmutableListMultimap.Builder<BlockRenderLayer, TerrainRenderPass> vanillaRenderStages = ImmutableListMultimap.builder();
@@ -159,4 +159,3 @@ public class VintageRenderPassConfigurationBuilder {
                 fluidMaterial);
     }
 }
-

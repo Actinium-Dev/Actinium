@@ -1,8 +1,12 @@
 package dhj.embeddedt.embeddium.impl.gui;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +32,34 @@ class SodiumGameOptionsSerializationTest {
     @AfterEach
     void deleteTestConfig() throws IOException {
         Files.deleteIfExists(TEST_CONFIG_PATH);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+            {} | FAST
+            {"use_translucent_face_sorting":false} | OFF
+            {"use_translucent_face_sorting":true} | FAST
+            {"use_translucent_face_sorting_v2":false} | OFF
+            {"use_translucent_face_sorting":false,"use_translucent_face_sorting_v2":true} | FAST
+            {"translucency_mode":"FANCY","use_translucent_face_sorting":false} | FANCY
+            {"translucency_mode":"OFF","use_translucent_face_sorting_v2":true} | OFF
+            {"translucency_mode":"FAST","use_translucent_face_sorting_v2":false} | FAST
+            {"translucency_mode":null,"use_translucent_face_sorting":false} | FAST
+            {"translucency_mode":"UNKNOWN","use_translucent_face_sorting":false} | FAST
+            """)
+    void migratesTranslucencyModeAndRewritesConfig(String performanceJson, TranslucencyMode expected) throws IOException {
+        Files.createDirectories(TEST_CONFIG_PATH.getParent());
+        Files.writeString(TEST_CONFIG_PATH, "{\"performance\":" + performanceJson + "}");
+
+        SodiumGameOptions options = SodiumGameOptions.load(TEST_CONFIG_NAME);
+        assertEquals(expected, options.performance.translucencyMode);
+
+        JsonObject savedPerformance = JsonParser.parseString(Files.readString(TEST_CONFIG_PATH))
+                .getAsJsonObject().getAsJsonObject("performance");
+        assertEquals(expected.name(), savedPerformance.get("translucency_mode").getAsString());
+        assertFalse(savedPerformance.has("use_translucent_face_sorting"));
+        assertFalse(savedPerformance.has("use_translucent_face_sorting_v2"));
+        assertEquals(expected, SodiumGameOptions.load(TEST_CONFIG_NAME).performance.translucencyMode);
     }
 
     @Test

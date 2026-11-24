@@ -147,6 +147,7 @@ public class GLContextState {
     /** Highest image unit bound since the last reset, so cleanup loops stop early. */
     public int maxBoundImageUnit = 0;
     public final BlendStateStack blendState = member(new BlendStateStack(StackIdAllocator.nextId()));
+    boolean layerBlending;
     public final BooleanStateStack blendMode = track(new BooleanStateStack(GL11.GL_BLEND));
     public final BlendState vanillaBlendBefore = new BlendState();
     public final BlendState vanillaBlendAfter = new BlendState();

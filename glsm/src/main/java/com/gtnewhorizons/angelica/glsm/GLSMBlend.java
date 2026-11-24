@@ -79,16 +79,18 @@ public final class GLSMBlend {
         final boolean caching = isCachingEnabled();
         final boolean bypass = BYPASS_CACHE || !caching;
         if (bypass
+                || ctx().blendState.isFuncUnknown()
                 || ctx().blendState.getSrcRgb() != srcFactor
                 || ctx().blendState.getDstRgb() != dstFactor
                 || ctx().blendState.getSrcAlpha() != srcFactor
                 || ctx().blendState.getDstAlpha() != dstFactor) {
-            if (caching) mod(ctx().blendState).setAll(srcFactor, dstFactor, srcFactor, dstFactor);
+            if (caching) {
+                final BlendStateStack blend = mod(ctx().blendState);
+                blend.setAll(srcFactor, dstFactor, srcFactor, dstFactor);
+                blend.clearFuncUnknownState();
+            }
             issueBlendFunc(srcFactor, dstFactor, srcFactor, dstFactor);
-            postBlendFuncChange(
-                srcFactor, dstFactor,
-                GLSMConfig.hudCacheOverride ? GL11.GL_ONE : srcFactor,
-                GLSMConfig.hudCacheOverride ? GL11.GL_ONE_MINUS_SRC_ALPHA : dstFactor);
+            postBlendFuncChange(srcFactor, dstFactor, srcFactor, dstFactor);
         }
         postVanillaBlendChangeIfMoved(snapshotted);
     }
@@ -253,14 +255,36 @@ public final class GLSMBlend {
     }
 
     public static void setHudCacheOverride(boolean enabled) {
-            if (GLSMConfig.hudCacheOverride == enabled) return;
-            GLSMConfig.hudCacheOverride = enabled;
-            final DeferredBlendHandler bh = GLSMHooks.blendHandler;
-            if (bh != null && bh.isOverrideHeld()) return;
-            final BlendStateStack blend = ctx().blendState;
-            GLStateManager.issueBlendFunc(blend);
-            blend.clearFuncUnknownState();
+        if (GLSMConfig.hudCacheOverride == enabled) return;
+        GLSMConfig.hudCacheOverride = enabled;
+        reissueBlendFunc();
+    }
+
+    /** Controls alpha coverage accumulation for the current context's translucency layer. */
+    public static void setLayerBlending(boolean enabled) {
+        final GLContextState glCtx = ctx();
+        if (glCtx.layerBlending == enabled) return;
+        GLStateManager.checkCompiling("setLayerBlending");
+        beforeUncapturedStateChange();
+        glCtx.layerBlending = enabled;
+        reissueBlendFunc();
+    }
+
+    /** Returns whether the current context accumulates translucency layer coverage. */
+    public static boolean isLayerBlending() {
+        return ctx().layerBlending;
+    }
+
+    private static void reissueBlendFunc() {
+        final BlendStateStack blend = ctx().blendState;
+        final DeferredBlendHandler bh = GLSMHooks.blendHandler;
+        if (bh != null && bh.isOverrideHeld()) {
+            blend.setFuncUnknownState();
+            return;
         }
+        issueBlendFunc(blend);
+        blend.clearFuncUnknownState();
+    }
 
     public static void glBlendEquation(int mode) {
         rejectExitCapture();
@@ -303,13 +327,15 @@ public final class GLSMBlend {
             // Cache thread check - only update state on main thread, but always make GL call if needed
             final boolean caching = isCachingEnabled();
             final boolean bypass = BYPASS_CACHE || !caching;
-            if (bypass || ctx().blendState.getSrcRgb() != srcRgb || ctx().blendState.getDstRgb() != dstRgb || ctx().blendState.getSrcAlpha() != srcAlpha || ctx().blendState.getDstAlpha() != dstAlpha) {
-                if (caching) mod(ctx().blendState).setAll(srcRgb, dstRgb, srcAlpha, dstAlpha);
+            final BlendStateStack blend = glCtx.blendState;
+            if (bypass || blend.isFuncUnknown() || blend.getSrcRgb() != srcRgb || blend.getDstRgb() != dstRgb
+                || blend.getSrcAlpha() != srcAlpha || blend.getDstAlpha() != dstAlpha) {
+                if (caching) {
+                    mod(blend).setAll(srcRgb, dstRgb, srcAlpha, dstAlpha);
+                    blend.clearFuncUnknownState();
+                }
                 issueBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
-                postBlendFuncChange(
-                    srcRgb, dstRgb,
-                    GLSMConfig.hudCacheOverride ? GL11.GL_ONE : srcAlpha,
-                    GLSMConfig.hudCacheOverride ? GL11.GL_ONE_MINUS_SRC_ALPHA : dstAlpha);
+                postBlendFuncChange(srcRgb, dstRgb, srcAlpha, dstAlpha);
             }
             postVanillaBlendChangeIfMoved(snapshotted);
         }

@@ -47,9 +47,16 @@ uniform float u_FogDensity; // The density of the shader fog
 #endif
 
 #ifndef LEGACY
-out vec4 fragColor; // The output fragment for the color framebuffer
+layout(location = 0) out vec4 fragColor;
 #else
 #define fragColor gl_FragColor
+#endif
+
+#if !defined(LEGACY) && defined(TRANSLUCENCY_SPLIT)
+uniform bool u_Layered;
+uniform bool u_SplitEnabled;
+uniform sampler2D u_SplitDepth;
+layout(location = 1) out vec4 fragBehind;
 #endif
 
 void main() {
@@ -121,5 +128,16 @@ void main() {
 
 #else // No fog
     fragColor = diffuseColor;
+#endif
+
+#if !defined(LEGACY) && defined(TRANSLUCENCY_SPLIT)
+    if (u_Layered && fragColor.a <= 0.0) {
+        discard;
+    }
+    fragBehind = vec4(0.0);
+    if (u_SplitEnabled && gl_FragCoord.z > texelFetch(u_SplitDepth, ivec2(gl_FragCoord.xy), 0).r) {
+        fragBehind = fragColor;
+        fragColor = vec4(0.0);
+    }
 #endif
 }

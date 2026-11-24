@@ -1,5 +1,8 @@
 package com.dhj.actinium.render;
 
+import com.dhj.actinium.render.translucency.TranslucencyLayers;
+import com.dhj.actinium.render.translucency.TranslucentLayer;
+
 import com.dhj.actinium.api.clouds.CloudLayer;
 import com.dhj.actinium.api.clouds.CloudLayerProvider;
 import com.dhj.actinium.compat.galaxyspace.GalaxySpaceClouds;
@@ -161,7 +164,8 @@ public class CloudRenderer extends IRenderHandler implements IResourceManagerRel
         final Matrix4f projection = GLSMMatrices.getProjectionMatrix();
         cloudView.update(projection, GLSMMatrices.getModelViewMatrix(), viewport.width, viewport.height);
         cloudProjection.set(projection);
-        final boolean extended = extendFarPlane(cloudProjection, requiredFarPlane(descriptions) * FAR_PLANE_MARGIN);
+        final boolean extended = !TranslucencyLayers.INSTANCE.isOpenLayer(TranslucentLayer.CLOUDS)
+            && extendFarPlane(cloudProjection, requiredFarPlane(descriptions) * FAR_PLANE_MARGIN);
         final Entity view = mc.getRenderViewEntity();
         final double cameraY = view.lastTickPosY + (view.posY - view.lastTickPosY) * partialTicks + cloudView.offsetY;
         sortCameraY = cameraY;

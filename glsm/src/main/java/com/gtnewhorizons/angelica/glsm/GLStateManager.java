@@ -1162,19 +1162,28 @@ public class GLStateManager {
     }
 
     static void issueBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        if (GLSMConfig.hudCacheOverride) {
-            RENDER_BACKEND.blendFuncSeparate(srcRgb, dstRgb, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        } else {
-            RENDER_BACKEND.blendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
-        }
+        final boolean layer = GLSMBlend.isLayerBlending();
+        RENDER_BACKEND.blendFuncSeparate(srcRgb, dstRgb,
+            emittedBlendSrcAlpha(layer, dstRgb, srcAlpha), emittedBlendDstAlpha(layer, dstRgb, dstAlpha));
+    }
+
+    private static int emittedBlendSrcAlpha(boolean layer, int dstRgb, int srcAlpha) {
+        if (layer && dstRgb == GL11.GL_ONE) return GL11.GL_ZERO;
+        return layer || GLSMConfig.hudCacheOverride ? GL11.GL_ONE : srcAlpha;
+    }
+
+    private static int emittedBlendDstAlpha(boolean layer, int dstRgb, int dstAlpha) {
+        if (layer && dstRgb == GL11.GL_ONE) return GL11.GL_ONE;
+        return layer || GLSMConfig.hudCacheOverride ? GL11.GL_ONE_MINUS_SRC_ALPHA : dstAlpha;
     }
 
     static void postBlendFuncChange(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
         if (GLSMHooks.BLEND_FUNC_CHANGE.hasListeners()) {
+            final boolean layer = GLSMBlend.isLayerBlending();
             GLSMHooks.blendFuncChangeEvent.srcRgb = srcRgb;
             GLSMHooks.blendFuncChangeEvent.dstRgb = dstRgb;
-            GLSMHooks.blendFuncChangeEvent.srcAlpha = srcAlpha;
-            GLSMHooks.blendFuncChangeEvent.dstAlpha = dstAlpha;
+            GLSMHooks.blendFuncChangeEvent.srcAlpha = emittedBlendSrcAlpha(layer, dstRgb, srcAlpha);
+            GLSMHooks.blendFuncChangeEvent.dstAlpha = emittedBlendDstAlpha(layer, dstRgb, dstAlpha);
             GLSMHooks.BLEND_FUNC_CHANGE.post(GLSMHooks.blendFuncChangeEvent);
         }
     }

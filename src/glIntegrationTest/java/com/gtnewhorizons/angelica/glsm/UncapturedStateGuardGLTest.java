@@ -10,6 +10,8 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL14;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,6 +96,22 @@ class UncapturedStateGuardGLTest extends GLStateManagerIntegrationFixture {
         GLSMBlend.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
         assertEquals(0, flushes.get(), "the batch records the blend factors per draw");
+    }
+
+    @Test
+    void layerBlendingDrainsTheBatchBeforeChangingTheOverride() {
+        final var layerModesAtFlush = new ArrayList<Boolean>();
+        final Runnable prior = BatchStateGuard.flush;
+        BatchStateGuard.flush = () -> layerModesAtFlush.add(GLSMBlend.isLayerBlending());
+        try {
+            GLSMBlend.setLayerBlending(true);
+            GLSMBlend.setLayerBlending(true);
+            GLSMBlend.setLayerBlending(false);
+            assertEquals(List.of(false, true), layerModesAtFlush);
+        } finally {
+            BatchStateGuard.flush = prior;
+            GLSMBlend.setLayerBlending(false);
+        }
     }
 
     @Test

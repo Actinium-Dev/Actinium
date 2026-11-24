@@ -1,11 +1,15 @@
 package com.gtnewhorizons.angelica.glsm;
 
+import com.gtnewhorizons.angelica.glsm.hooks.DeferredBlendHandler;
+import com.gtnewhorizons.angelica.glsm.hooks.GLSMHooks;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL14;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HudCacheBlendOverrideIntegrationTest extends GLStateManagerIntegrationFixture {
     @BeforeEach
@@ -13,6 +17,12 @@ class HudCacheBlendOverrideIntegrationTest extends GLStateManagerIntegrationFixt
         GLStateManager.setHudCacheOverride(false);
         GLStateManager.tryBlendFuncSeparate(
             GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
+    }
+
+    @AfterEach
+    void resetOverrides() {
+        GLSMBlend.setLayerBlending(false);
+        GLSMBlend.setHudCacheOverride(false);
     }
 
     @Test
@@ -55,6 +65,52 @@ class HudCacheBlendOverrideIntegrationTest extends GLStateManagerIntegrationFixt
 
         assertCachedFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO, GL11.GL_ONE_MINUS_SRC_ALPHA);
         assertDriverFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+    }
+
+    @Test
+    void layerAccumulatesCoverageAndAdditiveDrawsPreserveIt() {
+        GLSMBlend.setLayerBlending(true);
+        assertTrue(GLSMBlend.isLayerBlending());
+        assertDriverFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        final int depth = GLStateManager.pushState(StateSet.BLEND);
+        GLSMBlend.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
+        assertDriverFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO, GL11.GL_ONE);
+        assertCachedFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE);
+        GLStateManager.popStateTo(depth);
+        assertDriverFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        GLSMBlend.tryBlendFuncSeparate(GL11.GL_SRC_COLOR, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ZERO);
+        GLSMBlend.setHudCacheOverride(true);
+        assertDriverFunc(GL11.GL_SRC_COLOR, GL11.GL_ONE, GL11.GL_ZERO, GL11.GL_ONE);
+        GLSMBlend.setLayerBlending(false);
+        assertDriverFunc(GL11.GL_SRC_COLOR, GL11.GL_ONE, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GLSMBlend.setHudCacheOverride(false);
+        assertDriverFunc(GL11.GL_SRC_COLOR, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ZERO);
+    }
+
+    @Test
+    void shaderLockKeepsDriverFactorsUntilTheSameRequestedFactorsAreReapplied() {
+        final DeferredBlendHandler previous = GLSMHooks.blendHandler;
+        final var retainedOverride = new DeferredBlendHandler() {
+            boolean locked = true;
+
+            @Override public boolean isOverrideHeld() { return true; }
+            @Override public boolean isBlendLocked() { return locked; }
+            @Override public void deferBlendModeToggle(boolean enabled) { throw new AssertionError(); }
+            @Override public void deferBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) { throw new AssertionError(); }
+            @Override public void flushDeferredBlend() { throw new AssertionError(); }
+        };
+        GLSMHooks.blendHandler = retainedOverride;
+        try {
+            GLSMBlend.setLayerBlending(true);
+            assertDriverFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
+            retainedOverride.locked = false;
+            GLSMBlend.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO);
+            assertDriverFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        } finally {
+            GLSMHooks.blendHandler = previous;
+        }
     }
 
     private static void assertDriverFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
