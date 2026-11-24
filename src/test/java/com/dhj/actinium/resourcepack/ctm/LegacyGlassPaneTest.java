@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
+import com.dhj.actinium.resourcepack.ctm.api.client.QuadProcessor;
 import com.dhj.actinium.resourcepack.ctm.client.processor.ProcessingDataKeys;
 import com.dhj.actinium.resourcepack.ctm.client.processor.simple.CompactQuadProcessor;
 import com.dhj.actinium.resourcepack.ctm.client.properties.OrientedConnectingCtmProperties;
@@ -135,19 +136,7 @@ class LegacyGlassPaneTest {
 
     @Test
     void compactCtmKeepsTheSameDiffuseLightingAcrossPaneWallRows() {
-        ProcessingDataKeys.init();
-        var values = new Properties();
-        values.setProperty("matchBlocks", "glass_pane");
-        values.setProperty("connect", "sides");
-        values.setProperty("tiles", "0-4");
-        var properties = new OrientedConnectingCtmProperties(values,
-                new ResourceLocation("mcpatcher/ctm/glass/glasspane.properties"), "Test pack", 0, null, "compact");
-        properties.init();
-        var tiles = new TextureAtlasSprite[5];
-        for (int tile = 0; tile < tiles.length; tile++) {
-            tiles[tile] = new Sprite("test:tile_" + tile);
-        }
-        var processor = new CompactQuadProcessor.Factory().createProcessor(properties, tiles);
+        var processor = compactPaneProcessor(newTiles());
         var model = new LegacyGlassPane.Model(new LegacyGlassPane.Connections(false, false, true, true),
                 false, DefaultVertexFormats.BLOCK, GLASS, RIM);
         var walls = new ArrayList<BakedQuad>();
@@ -166,6 +155,60 @@ class LegacyGlassPaneTest {
                         "CTM changed directional shading in row " + y);
             }
         }
+    }
+
+    @Test
+    void compactCtmTexturesBothSidesOfEachHalfWidthPaneEnd() {
+        var tiles = newTiles();
+        var processor = compactPaneProcessor(tiles);
+        var world = new PaneWall();
+
+        for (int x : new int[]{-1, 1}) {
+            var pos = new BlockPos(x, 0, 0);
+            var state = world.getBlockState(pos);
+            var connections = new LegacyGlassPane.Connections(false, false, x > 0, x < 0);
+            var model = new LegacyGlassPane.Model(connections, false, DefaultVertexFormats.BLOCK, GLASS, RIM);
+
+            for (var face : List.of(EnumFacing.NORTH, EnumFacing.SOUTH)) {
+                var walls = new ArrayList<BakedQuad>();
+                model.addWall(walls, face);
+                var input = walls.getFirst();
+                var context = new ProcessingContextImpl();
+                var result = processor.processQuad(input, GLASS, world, pos, state, state, 0, 0, context);
+
+                assertEquals(QuadProcessor.ProcessingResult.STOP, result);
+                var parts = context.getExtraQuads();
+                assertEquals(2, parts.size());
+                for (var part : parts) {
+                    assertSame(tiles[2], part.getSprite(), "The vertical strip tile keeps the outer side border");
+                    assertTrue(spans(part, x < 0 ? .75f : .25f, 0));
+                    assertFalse(spans(part, x < 0 ? .25f : .75f, 0));
+                    assertEquals(input.shouldApplyDiffuseLighting(), part.shouldApplyDiffuseLighting());
+                }
+                assertTrue(spans(parts.getFirst(), .75f, 1));
+                assertTrue(spans(parts.getLast(), .25f, 1));
+            }
+        }
+    }
+
+    private static TextureAtlasSprite[] newTiles() {
+        var tiles = new TextureAtlasSprite[5];
+        for (int tile = 0; tile < tiles.length; tile++) {
+            tiles[tile] = new Sprite("test:tile_" + tile);
+        }
+        return tiles;
+    }
+
+    private static QuadProcessor compactPaneProcessor(TextureAtlasSprite[] tiles) {
+        ProcessingDataKeys.init();
+        var values = new Properties();
+        values.setProperty("matchBlocks", "glass_pane");
+        values.setProperty("connect", "sides");
+        values.setProperty("tiles", "0-4");
+        var properties = new OrientedConnectingCtmProperties(values,
+                new ResourceLocation("mcpatcher/ctm/glass/glasspane.properties"), "Test pack", 0, null, "compact");
+        properties.init();
+        return new CompactQuadProcessor.Factory().createProcessor(properties, tiles);
     }
 
     private static long covering(List<BakedQuad> quads, float x, float z) {

@@ -66,14 +66,25 @@ public final class CompactQuadProcessor implements QuadProcessor {
             return SimpleQuadProcessor.process(quad, sprite, tiles[bits == 0 ? 0 : 1], context);
         }
         BakedQuad[] parts = new BakedQuad[4];
+        boolean hasParts = false;
         for (int i = 0; i < parts.length; i++) {
             parts[i] = QuadClipper.clipSpriteQuadrant(quad, sprite, i);
+            if (parts[i] == null) {
+                continue;
+            }
             var tile = tiles[tileIndex(bits, i)];
-            if (parts[i] == null || tile != null && RenderUtil.isMissingSprite(tile)) {
+            if (tile != null && RenderUtil.isMissingSprite(tile)) {
                 return ProcessingResult.NEXT_PROCESSOR;
             }
+            hasParts = true;
+        }
+        if (!hasParts) {
+            return ProcessingResult.NEXT_PROCESSOR;
         }
         for (int i = 0; i < parts.length; i++) {
+            if (parts[i] == null) {
+                continue;
+            }
             var tile = tiles[tileIndex(bits, i)];
             context.getExtraQuads().add(tile == null ? parts[i] : QuadClipper.transformUVs(parts[i], sprite, tile, CtmSubmap.X1));
         }
