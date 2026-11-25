@@ -134,17 +134,14 @@ public class RenderSystem {
         final String glVersion = RENDER_BACKEND.getString(GL11.GL_VERSION);
         isMobileGlues = (glVersion != null && glVersion.contains("MobileGlues")) || hasExtension("GL_MG_mobileglues");
         final boolean clipDistanceAvailable = resolveClipCullDistanceSupport(hasExtension("GL_EXT_clip_cull_distance"), isGLES, isMobileGlues);
-        if (isGLES && !isMobileGlues && !RENDER_BACKEND.isSDLGPU()) {
-            final int maxClipDistances = clipDistanceAvailable ? RENDER_BACKEND.getInteger(GL30.GL_MAX_CLIP_DISTANCES) : 0;
-            hasClipCullDistance = maxClipDistances >= GLStateManager.MAX_CLIP_PLANES;
-            if (!hasClipCullDistance) {
-                GLStateManager.LOGGER.info("Emulating clip distances (native clip distances: {}, required: {})", maxClipDistances, GLStateManager.MAX_CLIP_PLANES);
-            }
-        } else {
-            hasClipCullDistance = clipDistanceAvailable;
-            if (isMobileGlues) {
-                GLStateManager.LOGGER.info("MobileGlues detected, clip distance support: {}", hasClipCullDistance);
-            }
+        final int maxClipDistances = clipDistanceAvailable ? RENDER_BACKEND.getInteger(GL30.GL_MAX_CLIP_DISTANCES) : 0;
+        hasClipCullDistance = maxClipDistances >= GLStateManager.MAX_CLIP_PLANES;
+        if (!hasClipCullDistance) {
+            GLStateManager.LOGGER.info("Emulating clip distances (native clip distances: {}, required: {})", maxClipDistances, GLStateManager.MAX_CLIP_PLANES);
+        }
+
+        if (isMobileGlues) {
+            GLStateManager.LOGGER.info("MobileGlues detected, clip distance support: {}", hasClipCullDistance);
         }
 
         if (supportsImageLoadStore) {

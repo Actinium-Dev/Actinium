@@ -1098,7 +1098,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 	}
 
 	public void onClipPlanesInUseChanged() {
-		if (current == null || BackendManager.RENDER_BACKEND.isSDLGPU()) return;
+		if (current == null) return;
 		programMatch.requestProgramRebind();
 	}
 
@@ -1621,8 +1621,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 				kind = Instancing.NONE;
 				plain = program;
 			}
-			if (plain == null || variantSource == null || !GLSMRasterizer.clipEmulationActive()
-				|| BackendManager.RENDER_BACKEND.isSDLGPU()) return plain;
+			if (plain == null || variantSource == null || !GLSMRasterizer.clipEmulationActive()) return plain;
 			final int index = kind.ordinal();
 			if (!clippedVariantAttempted[index]) {
 				clippedVariantAttempted[index] = true;

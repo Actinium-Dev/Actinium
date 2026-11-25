@@ -22,7 +22,7 @@
 | 9 | [`a6d014a9`，#2336](https://github.com/GTNewHorizons/Angelica/pull/2336) | 2026-11-06 | 已有对应路径 | 上游把 1.7.10 `MixinRenderFallingBlock` 的 `renderStandardBlock` 改为 `renderBlockByRenderType`。本地无此覆盖；1.12.2 patched `RenderFallingBlock.doRender` 绑定方块图集，从 `BlockRendererDispatcher.getModelForState` 取当前状态对应的烘焙模型，经 `BlockModelRenderer.renderModel` 绘制。当前没有相同的强制标准方块绘制路径。 |
 | 10 | [`38762184`，#2346](https://github.com/GTNewHorizons/Angelica/pull/2346) | 2026-11-07 | 已移植，客户端待验证 | LWJGL3 接入原生 GLES 函数，固定管线和游戏着色器转译为 ESSL，GLSM 与 SDL GPU 共用 proxy 纹理探测。详见[验证记录](compat/gles.md)。 |
 | 11 | [`aee989d2`，#2347](https://github.com/GTNewHorizons/Angelica/pull/2347) | 2026-11-07 | 分项评估 | 上游在有光影且 TESR 变换压扁物品模型时，把固定管线方向光烘入顶点色并跳过相关实例化与物品缓存；预着色文字跳过再次照明。本地 Storage Drawers 的 `StorageDrawersLightingImpl` 只修正设置灯光时的 model-view 矩阵，覆盖范围不同。先验证 1.12.2 抽屉或桶的扁平物品图标，再按 `BufferBuilder` 顶点格式和本地物品批次路径适配；上游 1.7.10 `Tessellator.rawBuffer` 和 `RenderBlocks` 的改动不直接取用。 |
-| 12 | [`9493d630`，#2348](https://github.com/GTNewHorizons/Angelica/pull/2348) | 2026-11-07 | 已移植，客户端待验证 | 硬件裁剪距离不足时，固定管线和 Iris 的顶点及片元程序使用插值距离裁剪片元。GLES 固定管线和桌面 OpenGL 的 Iris 变体切换已通过集成测试。详见[验证记录](compat/gles.md)。 |
+| 12 | [`9493d630`，#2348](https://github.com/GTNewHorizons/Angelica/pull/2348) | 2026-11-07 | 已移植，游戏内未实测 | GLSM 根据设备能力和原生平面数选择裁剪路径。固定管线与 Iris 顶点、片元两阶段的属性程序支持片元裁剪，SDL 支持按下标更新平面方程。[实现与验证](mobileglues-clip-cull-distance.md) |
 | 13 | [`d69fd20a`，#2351](https://github.com/GTNewHorizons/Angelica/pull/2351) | 2026-11-07 | 分项评估 | `CaptureGate` 启动时增加 `GL_EXT_debug_tool` 探测，`GLSMInitConfig` 向帧调试标记提供版本标签。两项可独立于 Tracy 评估，接入本地 `GLStateManager`、`GLDebug` 和 `MixinOpenGlHelper` 的初始化路径。Tracy 首次连接消息依赖原生后端；Spark 改动针对 `Forge1710SparkPlugin.getKnownSources`，不移植该 Mixin。 |
 | 14 | [`367f9d91`，#2353](https://github.com/GTNewHorizons/Angelica/pull/2353) | 2026-11-08 | 不直接移植 | 为 1.7.10 的 `RenderBlocks.renderBlockByRenderType` 增加 LOTR Coremod 的 `LOTRReplacedMethods$BlockRendering.renderStandardBlock` 调用目标。本地 `VintageBlockRenderer.renderBlock` 与 `renderModel` 使用 1.12.2 的 `IBlockState` 和 `IBakedModel`；`ModdedBiomeDetector.initializeLOTR` 是独立的生物群系探测。 |
 | 15 | [`60d1a3de`，#2354](https://github.com/GTNewHorizons/Angelica/pull/2354) | 2026-11-09 | 已实现，待实测 | 沿用本地 Fluidlogged API 的存储流体绘制；`ChunkBuilderMeshingTask.prescanDeferred` 同时检查快照中的宿主与存储流体方块，任一个 ID 被配置为仅主线程渲染时，整格交给主线程。隐藏宿主跳过全部方块层，仍可捕获流体。自动化测试覆盖整格分流及无流体查询的路径；实机验证流体仅绘制一次和跨区段接面。 |
@@ -34,6 +34,6 @@
 
 1. **显示列表回放（第 7、1 项）**：完整构建、分配器单测及启用生产 GL 重定向的 34 项定向 GL 集成测试已通过。覆盖带光照与纹理的索引列表首次及重复回放的像素结果、显式高位 ID 的占用与删除复用、普通与宽线回放后的 VAO/EBO 绑定。用户在 `1.12.2-Cleanroom` 测试实例试用后暂未发现问题。
 2. **批次 program 与流体线程安全（第 4、15 项）**：两项可独立推进。前者覆盖无光影和延迟管线，并比较批次绘制前后的 program 与 framebuffer；后者覆盖工作线程、主线程延迟捕获和跨区段接面。
-3. **GLES 和 clip distance（第 10、12 项）**：点大小查询已验证，完整客户端仍需在真实 GLES 上下文中启动验证。clip distance 从现有 `ClipPlaneInjectionTest` 扩展，另在 GL 集成验证启停、`push/pop`、列表回放和 Iris 普通、实例化、宽线变体切换，并在 SDL 检查能力报告与 uniform 上传。
+3. **GLES 和 clip distance（第 10、12 项）**：点大小查询可单独验证；原生 GLES 启动需要真实 ES 上下文。裁剪启停、属性栈、显示列表、Iris 变体和 SDL 数组上传已通过自动化验证，游戏内画面待按[实测步骤](mobileglues-clip-cull-distance.md#游戏内验证方法)核对。
 4. **先验证再决定范围（第 5、11、13 项）**：SDL 读回单独验证 fence、映射长度及 buffer 重分配；抽屉和桶先在 1.12.2 光影环境重现，兼顾普通、附魔物品与文字；捕获工具先验证 `GL_EXT_debug_tool` 探测和帧标记，Tracy 帧图等原生后端接入后再做。
 5. **天气（前序 `f2c07dea` → 第 18 项）**：适配实现、与原版的差异和验证场景见[后续台账](sync-angelica-fbfcafc7.md#天气实例化与模组-api)。

@@ -63,6 +63,8 @@ moltenvk（独立分发，不参与主 jar 合并）
 
 Outlands 管理窗口和输入，并提供与 lwjgl3ify 对应的创建、销毁、能力覆盖及共享 drawable 入口。Actinium 通过回调认领无 GL 窗口，显式 transformer 负责 SDL 专用的呈现与共享 drawable 生命周期。GLSM 继续持有每个 drawable 的逻辑状态，SDL 后端将其应用到自己的 frame/context。退出前必须等待执行中的 GPU 提交并释放窗口认领，再销毁宿主窗口。
 
+SDL Vulkan 在创建设备时协商原生裁剪距离支持。[裁剪状态与程序变体](mobileglues-clip-cull-distance.md)
+
 ## 原生 OpenGL ES 后端
 
 图形设置的「OpenGL 上下文」可以请求 OpenGL ES 3.2。`CoreProfileDisplayCreator` 将 GLES 档位交给 Outlands 创建 SDL 窗口，并验证驱动报告的上下文版本。`angelica.glProfile=es` 在启动时指定同一档位。桌面 OpenGL 仍使用原有版本探测。

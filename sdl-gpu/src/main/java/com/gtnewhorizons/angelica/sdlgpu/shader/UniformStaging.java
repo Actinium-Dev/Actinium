@@ -14,6 +14,17 @@ public final class UniformStaging {
     public boolean fsUniformDirty;
     public float[][] uniformDataBySlot;
     public long[] uniformValueHashBySlot;
+    private float[][] arrayScratchBySlot;
+
+    public float[] arrayScratch(int location, int length) {
+        if (arrayScratchBySlot == null) arrayScratchBySlot = new float[uniformDataBySlot.length][];
+        float[] scratch = arrayScratchBySlot[location];
+        if (scratch == null || scratch.length != length) {
+            scratch = new float[length];
+            arrayScratchBySlot[location] = scratch;
+        }
+        return scratch;
+    }
 
     public void allocate(ShaderManager.ProgramObject prog) {
         if (prog.vertexUboSize > 0) {
