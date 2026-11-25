@@ -3,6 +3,7 @@ package com.dhj.actinium.mixin.features.iris;
 import com.dhj.actinium.config.ActiniumRuntimeOptions;
 import com.dhj.actinium.render.FastLitItemDisplayListCache;
 import com.dhj.actinium.render.ItemVertexAlphaOverrides;
+import com.gtnewhorizons.angelica.rendering.tesr.FlattenedItemLighting;
 import net.irisshaders.iris.api.v0.IrisApi;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.RenderItem;
@@ -77,6 +78,7 @@ public abstract class ForgeHooksClientIrisMixin {
             Tessellator tessellator = Tessellator.getInstance();
             FastLitItemDisplayListCache.CachedDisplayList cached = !vertexAlphaScaled
                     && ActiniumRuntimeOptions.useFastLitItemDisplayLists()
+                    && !FlattenedItemLighting.applies()
                     ? FastLitItemDisplayListCache.getOrCompile(renderItem, model, quads, color, stack)
                     : null;
             if (cached != null) {

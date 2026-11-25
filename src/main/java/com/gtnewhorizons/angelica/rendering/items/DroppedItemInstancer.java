@@ -15,6 +15,7 @@ import com.gtnewhorizons.angelica.rendering.SkippedGlintBlock;
 import com.gtnewhorizons.angelica.rendering.tesr.BatchEligibility;
 import com.gtnewhorizons.angelica.rendering.tesr.EntityMaterials;
 import com.gtnewhorizons.angelica.rendering.tesr.EntityShadowReplay;
+import com.gtnewhorizons.angelica.rendering.tesr.FlattenedItemLighting;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
 import com.gtnewhorizons.angelica.rendering.tesr.TemplateBuffer;
 import com.gtnewhorizons.angelica.rendering.tesr.TemplateCapture;
@@ -93,6 +94,8 @@ public final class DroppedItemInstancer {
         ALPHA_OVERRIDE,
         /** The draw happens inside a display list recording. */
         RECORDING,
+        /** The TESR requires view-dependent vertex lighting. */
+        FLATTENED_LIGHTING,
         /** The model class carries no guarantee that its quads stay the same between frames. */
         STABLE,
         /** The model has no quads in the {@code ITEM} format. */
@@ -285,6 +288,9 @@ public final class DroppedItemInstancer {
         final ModelPartBatcher batcher = ModelPartBatcher.INSTANCE;
         if (!BatchEligibility.batchingAllowed() || !batcher.isActive()) {
             return bail(BailReason.NOT_ALLOWED, drawsBefore);
+        }
+        if (FlattenedItemLighting.applies()) {
+            return bail(BailReason.FLATTENED_LIGHTING, drawsBefore);
         }
         if (GLStateManager.isRecordingDisplayList()) {
             return bail(BailReason.RECORDING, drawsBefore);
