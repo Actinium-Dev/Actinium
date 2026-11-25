@@ -5,7 +5,6 @@ import com.gtnewhorizons.angelica.sdlgpu.device.Device;
 import com.gtnewhorizons.angelica.sdlgpu.device.FenceWait;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import com.gtnewhorizons.angelica.sdlgpu.frame.FrameManager;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -22,6 +21,7 @@ public final class FenceTracker {
     private long nextFenceId = 1;
     private final Long2LongOpenHashMap fenceMap = new Long2LongOpenHashMap();
     private final LongArrayList pendingFenceSyncs = new LongArrayList();
+    private static final long FAILED_FENCE = -1L;
     private final Long2IntOpenHashMap fenceRefcounts = new Long2IntOpenHashMap();
 
     private Runnable unresolvedFenceFlush;
@@ -64,16 +64,20 @@ public final class FenceTracker {
         if (pendingFenceSyncs.isEmpty()) return;
         final long fence = frameManager.frame().lastAcquiredFence;
         frameManager.frame().lastAcquiredFence = 0;
+        boolean fenceTaken = false;
         for (int i = 0; i < pendingFenceSyncs.size(); i++) {
             final long id = pendingFenceSyncs.getLong(i);
+            if (!fenceMap.containsKey(id)) continue;
             if (fence != 0) {
                 fenceMap.put(id, fence);
                 fenceRefcounts.addTo(fence, 1);
+                fenceTaken = true;
             } else {
-                fenceMap.remove(id);
+                fenceMap.put(id, FAILED_FENCE);
             }
         }
         pendingFenceSyncs.clear();
+        if (fence != 0 && !fenceTaken) device.fenceReleaser().release(fence);
     }
 
     public int clientWaitSync(long sync, int flags, long timeout) {
@@ -84,6 +88,7 @@ public final class FenceTracker {
             fence = flushForUnresolved(sync);
             if (fence == 0) return GL32.GL_TIMEOUT_EXPIRED;
         }
+        if (fence == FAILED_FENCE) return GL32.GL_WAIT_FAILED;
         if (FenceWait.isSignaled(device, fence)) return GL32.GL_ALREADY_SIGNALED;
         if (timeout == 0) return GL32.GL_TIMEOUT_EXPIRED;
         final boolean signaled;
@@ -98,7 +103,7 @@ public final class FenceTracker {
 
     public void deleteSync(long sync) {
         final long fence = fenceMap.remove(sync);
-        if (fence == 0 || device.getDevice() == 0) return;
+        if (fence == 0 || fence == FAILED_FENCE || device.getDevice() == 0) return;
         final int newCount = fenceRefcounts.addTo(fence, -1) - 1;
         if (newCount <= 0) {
             fenceRefcounts.remove(fence);
@@ -120,7 +125,7 @@ public final class FenceTracker {
     public boolean isFenceSignaled(long sync) {
         if (!fenceMap.containsKey(sync)) return true;
         final long fence = fenceMap.get(sync);
-        if (fence == 0) return false;
+        if (fence == 0 || fence == FAILED_FENCE) return false;
         return FenceWait.isSignaled(device, fence);
     }
 
@@ -131,6 +136,7 @@ public final class FenceTracker {
     public void waitSync(long sync) {
         if (!fenceMap.containsKey(sync)) return;
         long fence = fenceMap.get(sync);
+        if (fence == FAILED_FENCE) return;
         if (fence == 0) {
             flushForUnresolved(sync);
             return;
