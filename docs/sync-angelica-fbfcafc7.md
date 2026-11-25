@@ -14,7 +14,7 @@
 | [`ef8648cd`，#2331](https://github.com/GTNewHorizons/Angelica/commit/ef8648cdc06a85c793cad1874d6cbdacf3e09778) | 2026-11-22 | 已适配并实机验证 | 区块的 Forge pass 1 TESR 在 Iris deferred 之后、半透明地形之前绘制。同一外层视图的原 pass 1 跳过这批区块方块实体。普通实体、`setTileEntities` 额外注册项、阴影和嵌套视图沿用原时机。 |
 | [`586cce1c`，#2332](https://github.com/GTNewHorizons/Angelica/commit/586cce1c40541deb3b4de0158f105eae61ae8c37) | 2026-11-22 | 已适配，待实机验证 | `OFF` 关闭排序，`FAST` 保留排序，`FANCY` 在无光影 OpenGL 视图中采集地形、区块 pass 1 TESR、粒子、天气和晚绘制云层并按深度合成。地形以 TESR 深度为界分开前后片元。 |
 | [`1758f3be`，#2333](https://github.com/GTNewHorizons/Angelica/commit/1758f3be1a543f253159bda6cf8ec7f7c15eee87) | 2026-11-23 | 已适配，待实机验证 | 精细模式采集区块 pass 1 TESR 中关闭深度写入的发光绘制，将较近的深度写入方块实体层。支持按类排除重放，排除项和延迟批次在原始绘制提交时直接采集。 |
-| [`2658ac58`，#2352](https://github.com/GTNewHorizons/Angelica/commit/2658ac584e2c22d4f842f5903737ae91ead13c5f) | 2026-11-23 | 已适配，待实机验证 | 无光影的桌面 OpenGL 3.3+ 精细模式按像素从远到近处理最多四层重叠的半透明 TESR。快速和精细模式在提交混合的立即绘制前先提交待处理的批次。 |
+| [`2658ac58`，#2352](https://github.com/GTNewHorizons/Angelica/commit/2658ac584e2c22d4f842f5903737ae91ead13c5f) | 2026-11-23 | 已适配并实机验证 | 无光影的桌面 OpenGL 3.3+ 精细模式按像素从远到近处理最多四层重叠的半透明 TESR。快速和精细模式在提交混合的立即绘制前先提交待处理的批次。 |
 | [`fbfcafc7`，#2376](https://github.com/GTNewHorizons/Angelica/commit/fbfcafc7b579b9054ddaca1e9888ba244bf4549d) | 2026-11-23 | 本地已有等价快照，GTNH 补丁不适用 | 上游为 1.7.10 GTNH LiquidLogged 的 `Fluid[]` 快照补充逐格流体等级，并经 `WorldSlice` 跨区段查询。Actinium 支持 1.12.2 JBredwards Fluidlogged API，现有快照保留含 `BlockLiquid.LEVEL` 的 `IBlockState`，无需另存等级或引入 GTNH LiquidLogged。 |
 
 ## #2330 方块实体排序验证
@@ -47,7 +47,7 @@
 
 TESR 按材质和渲染层成批提交，跨批次的相交表面可能按错误顺序混合。无光影的桌面 OpenGL 3.3+ 精细模式先绘制不透明批次，再复制当前场景深度。剥离循环用两个临时深度附件交替找出可见的最远片元，将颜色混合回当前 framebuffer，最多处理四层。异步遮挡查询按提交位置调整层数。快速模式和精细模式在启用混合的 `glBegin`、显示列表调用或 Tessellator 直接绘制前提交已排队的几何。使用光影包时沿用 Iris 管线。
 
-`check build --no-daemon` 和 14 项定向 OpenGL 测试通过，覆盖四层半透明混合、不透明深度遮挡、framebuffer 与纹理绑定恢复、发光深度重放及 Tessellator 绘制路由。
+`check build --no-daemon` 和 14 项定向 OpenGL 测试通过，覆盖四层半透明混合、不透明深度遮挡、framebuffer 与纹理绑定恢复、发光深度重放及 Tessellator 绘制路由。2026 年 11 月 25 日，用户确认客户端实机验证完成。
 
 在桌面 OpenGL 实例中关闭光影包，让两个相邻的半透明方块实体沿视线交叠，其中至少一个走 Actinium 实例化批次。切换半透明渲染模式的快速和精细选项，绕到交叠面的两侧，确认精细模式按各像素实际深度混合。将不透明方块放在两个表面之间，确认它只遮住后方表面。再用带加法混合发光的 TESR 配合染色玻璃检查遮挡，随后调整窗口大小并打开物品栏。启用 MakeUp 重复观察一次，确认光影包路径和雨天渲染正常。
 
