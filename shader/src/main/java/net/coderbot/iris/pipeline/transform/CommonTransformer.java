@@ -95,15 +95,19 @@ public class CommonTransformer {
 
 	private static final String EMULATED_VERTEX_CLIP;
 	private static final String NATIVE_VERTEX_CLIP;
+	private static final String DEFAULT_VERTEX_CLIP;
 	static {
 		String eyePosition = "vec4 _cp_ep = iris_ModelViewMatrix * iris_Vertex; ";
 		StringBuilder nativeClip = new StringBuilder("{ ").append(eyePosition);
+		StringBuilder defaults = new StringBuilder("{ ");
 		String[] distances = new String[8];
 		for (int i = 0; i < distances.length; i++) {
 			distances[i] = "dot(actinium_ClipPlane[" + i + "], _cp_ep)";
 			nativeClip.append("gl_ClipDistance[").append(i).append("] = ").append(distances[i]).append("; ");
+			defaults.append("gl_ClipDistance[").append(i).append("] = 0.0; ");
 		}
 		NATIVE_VERTEX_CLIP = nativeClip.append('}').toString();
+		DEFAULT_VERTEX_CLIP = defaults.append('}').toString();
 		StringBuilder emulatedClip = new StringBuilder("{ ").append(eyePosition);
 		ClipDistanceGlsl.appendVsAssign(emulatedClip, distances);
 		EMULATED_VERTEX_CLIP = emulatedClip.append('}').toString();
@@ -125,13 +129,11 @@ public class CommonTransformer {
 		} else if (parameters.type == ShaderType.VERTEX) {
 			root.injectVariable("uniform vec4 actinium_ClipPlane[8];");
 			if (BackendManager.RENDER_BACKEND.isSDLGPU()) {
-				// Vulkan consumes every declared distance. Disabled planes have zero equations;
-				// a pack can override the resulting defaults before returning from main.
-				root.prependMain(NATIVE_VERTEX_CLIP);
-			} else {
-				root.injectVariable("uniform bool actinium_ClipPlanesEnabled;");
-				root.appendMain("if (actinium_ClipPlanesEnabled) " + NATIVE_VERTEX_CLIP);
+				// Vulkan consumes each declared distance, including those the pack leaves unset.
+				root.prependMain(DEFAULT_VERTEX_CLIP);
 			}
+			root.injectVariable("uniform bool actinium_ClipPlanesEnabled;");
+			root.appendMain("if (actinium_ClipPlanesEnabled) " + NATIVE_VERTEX_CLIP);
 		}
 	}
 }

@@ -1297,6 +1297,10 @@ public final class ShaderManager {
         if (index < 0) return -1;
         final int base = prog.nameToLocation.getInt(name.substring(0, name.lastIndexOf('[')));
         if (base < 0 || base >= prog.uniformSlotCount || index >= prog.arrayLenBySlot[base]) return -1;
+        if (prog.arrayLenBySlot[base] == 1) {
+            final UniformMemberInfo member = prog.memberInfo(base);
+            if (member == null || member.arrayStride() == 0) return -1;
+        }
         return base + index;
     }
 

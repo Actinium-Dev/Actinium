@@ -59,6 +59,29 @@ class SDLGPUUniformDedupTest {
     }
 
     @Test
+    void indexedLookupRequiresAnArrayAndANonEmptyIndex() {
+        final ShaderManager manager = new ShaderManager(null);
+        final int program = manager.createProgram();
+        final ShaderManager.ProgramObject lookup = manager.getProgram(program);
+        final List<ShaderManager.UboMember> members = List.of(
+            new ShaderManager.UboMember("exposure", 0, 4, 0, 1, 1, Spvc.SPVC_BASETYPE_FP32, 1),
+            new ShaderManager.UboMember("planes", 16, 16, 16, 4, 1, Spvc.SPVC_BASETYPE_FP32, 1));
+        final ShaderManager.StageReflection reflection = new ShaderManager.StageReflection(
+            ShaderManager.ResourceCounts.EMPTY, List.of(), List.of(), List.of(), List.of(), 32,
+            members, List.of(), List.of(), List.of(), -1, 0, 0, 0, 0, ShaderManager.BlockReflection.emptyBlocks());
+        ShaderManager.applyUboMembers(lookup, reflection, true);
+        lookup.buildUniformSlotArrays();
+        lookup.linked = true;
+
+        assertTrue(manager.getUniformLocation(program, "exposure") >= 0);
+        assertEquals(-1, manager.getUniformLocation(program, "exposure[0]"));
+        final int plane = manager.getUniformLocation(program, "planes");
+        assertTrue(plane >= 0);
+        assertEquals(plane, manager.getUniformLocation(program, "planes[0]"));
+        assertEquals(-1, manager.getUniformLocation(program, "planes[]"));
+    }
+
+    @Test
     void partialAndBulkClipPlaneWritesReachBothUniformBlocks() {
         st.releaseUniformStaging(prog);
         final ShaderManager manager = new ShaderManager(null);

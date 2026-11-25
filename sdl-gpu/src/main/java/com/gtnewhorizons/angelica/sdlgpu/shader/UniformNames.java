@@ -9,7 +9,7 @@ public final class UniformNames {
         if (len == 0 || name.charAt(len - 1) != ']') return -1;
         int i = len - 1;
         while (i > 0 && isDigit(name.charAt(i - 1))) i--;
-        if (i == 0 || name.charAt(i - 1) != '[') return -1;
+        if (i == 0 || i == len - 1 || name.charAt(i - 1) != '[') return -1;
         if (name.charAt(i) == '0' && i + 1 != len - 1) return -1;
         long index = 0;
         for (int c = i; c < len - 1; c++) {
