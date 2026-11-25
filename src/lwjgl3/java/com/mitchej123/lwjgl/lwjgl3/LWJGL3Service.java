@@ -209,7 +209,8 @@ public record LWJGL3Service(
     @Override
     public void glUnmapBuffer(int target) {
         if (isGlesContextCurrent()) {
-            throw GlesCalls.unsupported("glUnmapBuffer");
+            GLES30.glUnmapBuffer(target);
+            return;
         }
         GL15C.glUnmapBuffer(target);
     }

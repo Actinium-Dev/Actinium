@@ -9,6 +9,10 @@ import com.gtnewhorizons.angelica.glsm.hooks.GLSMInitConfig;
 import com.gtnewhorizons.angelica.glsm.streaming.TessellatorStreamingDrawer;
 import com.gtnewhorizons.angelica.lwjgl3.Lwjgl3Context;
 import com.gtnewhorizons.angelica.lwjgl3.Lwjgl3GLRenderBackend;
+import dhj.embeddedt.embeddium.impl.gl.buffer.GlBufferMapFlags;
+import dhj.embeddedt.embeddium.impl.gl.buffer.GlBufferUsage;
+import dhj.embeddedt.embeddium.impl.gl.device.RenderDevice;
+import dhj.embeddedt.embeddium.impl.gl.util.EnumBitField;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -108,6 +112,31 @@ class GlesSmokeTest {
     @AfterEach
     void checkDriverError() {
         assertNoDriverError();
+    }
+
+    @Test
+    void celeritasUnmapsAndRemapsAnUploadBuffer() {
+        RenderDevice.enterManagedCode();
+        try (var commands = RenderDevice.INSTANCE.createCommandList()) {
+            var buffer = commands.createMutableBuffer();
+            try {
+                commands.allocateStorage(buffer, Integer.BYTES, GlBufferUsage.STREAM_DRAW);
+                var mapping = commands.mapBuffer(buffer, 0, Integer.BYTES, EnumBitField.of(GlBufferMapFlags.WRITE));
+                int uploaded = 0x715a3328;
+                mapping.getMemoryBuffer().putInt(0, uploaded);
+                commands.unmap(mapping);
+                assertTrue(mapping.isDisposed());
+
+                var readback = commands.mapBuffer(buffer, 0, Integer.BYTES, EnumBitField.of(GlBufferMapFlags.READ));
+                int downloaded = readback.getMemoryBuffer().getInt(0);
+                commands.unmap(readback);
+                assertEquals(uploaded, downloaded);
+            } finally {
+                commands.deleteBuffer(buffer);
+            }
+        } finally {
+            RenderDevice.exitManagedCode();
+        }
     }
 
     private static int divisor(int attribute) {
