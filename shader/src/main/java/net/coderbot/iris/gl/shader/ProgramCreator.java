@@ -3,8 +3,9 @@
 package net.coderbot.iris.gl.shader;
 
 import com.gtnewhorizons.angelica.glsm.GLDebug;
-import com.gtnewhorizons.angelica.glsm.GLStateManager;
+import com.gtnewhorizons.angelica.glsm.GLSMPrograms;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
+import com.gtnewhorizons.angelica.glsm.ffp.InstancedAttribs;
 import com.gtnewhorizons.angelica.glsm.shader.ProgramBinaryCache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -12,7 +13,6 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.KHRDebug;
-import com.gtnewhorizons.angelica.glsm.GLSMPrograms;
 
 public class ProgramCreator {
 
@@ -23,14 +23,24 @@ public class ProgramCreator {
 	public static final int AT_TANGENT = 13;
 	public static final int AT_MIDBLOCK = 14;
 
+	private record AttributeBinding(String name, int location) {}
+
+	private static final AttributeBinding[] ATTRIBUTE_BINDINGS = {
+		new AttributeBinding("iris_InstEntity", InstancedAttribs.LOC_ENTITY),
+		new AttributeBinding("mc_Entity", MC_ENTITY),
+		new AttributeBinding("mc_midTexCoord", MC_MID_TEX_COORD),
+		new AttributeBinding("iris_CubeTangent", AT_TANGENT),
+		new AttributeBinding("at_tangent", AT_TANGENT),
+		new AttributeBinding("at_midBlock", AT_MIDBLOCK)
+	};
+
 	@Nullable
 	public static ProgramBinaryCache.Key cacheKey() {
 		if (!ProgramBinaryCache.isEnabled()) return null;
 		final ProgramBinaryCache.Key key = ProgramBinaryCache.key();
-		key.attribute("mc_Entity", MC_ENTITY);
-		key.attribute("mc_midTexCoord", MC_MID_TEX_COORD);
-		key.attribute("at_tangent", AT_TANGENT);
-		key.attribute("at_midBlock", AT_MIDBLOCK);
+		for (AttributeBinding binding : ATTRIBUTE_BINDINGS) {
+			key.attribute(binding.name(), binding.location());
+		}
 		return key;
 	}
 
@@ -49,11 +59,9 @@ public class ProgramCreator {
 	public static int create(String name, @Nullable ProgramBinaryCache.Key cacheKey, GlShader... shaders) {
 		int program = GLSMPrograms.glCreateProgram();
 
-		// TODO: This is *really* hardcoded, we need to refactor this to support external calls to glBindAttribLocation
-		RenderSystem.bindAttributeLocation(program, MC_ENTITY, "mc_Entity");
-		RenderSystem.bindAttributeLocation(program, MC_MID_TEX_COORD, "mc_midTexCoord");
-		RenderSystem.bindAttributeLocation(program, AT_TANGENT, "at_tangent");
-		RenderSystem.bindAttributeLocation(program, AT_MIDBLOCK, "at_midBlock");
+		for (AttributeBinding binding : ATTRIBUTE_BINDINGS) {
+			RenderSystem.bindAttributeLocation(program, binding.location(), binding.name());
+		}
 
 		for (GlShader shader : shaders) {
             GLSMPrograms.glAttachShader(program, shader.getHandle());
@@ -63,7 +71,6 @@ public class ProgramCreator {
 
 		GLDebug.nameObject(KHRDebug.GL_PROGRAM, program, name);
 
-		//Always detach shaders according to https://www.khronos.org/opengl/wiki/Shader_Compilation#Cleanup
         for (GlShader shader : shaders) {
             RenderSystem.detachShader(program, shader.getHandle());
         }
