@@ -64,7 +64,12 @@ Actinium 以 `modCompileOnly` 声明 JBredwards Fluidlogged API `3.0.6`。启用
 - **GLES，#2346 `38762184`。** 点大小查询已移植并在真实 GLES 3.2 和桌面 GL 上验证。完整原生 GLES 支持仍需适配 LWJGL3 的 ES 函数入口、proxy texture 与 shader 转译，proxy texture 可复用 SDL 的实现。[点大小验证记录](compat/gles.md) · [上游 #2346](https://github.com/GTNewHorizons/Angelica/pull/2346)
 - **Clip distance，#2348 `9493d630`。** 待移植模拟路径。本地已有原生能力判定，后续需接入实际平面数、FFP 变体和片元裁剪、Iris 变体缓存以及 SDL 能力与 uniform 更新，保留 MobileGlues 判定。验证启停、属性栈、显示列表和 Iris 适用变体。[本地能力判定](../glsm/src/main/java/com/gtnewhorizons/angelica/glsm/RenderSystem.java#L433) · [上游 #2348](https://github.com/GTNewHorizons/Angelica/pull/2348)
 - **帧图捕获和调试标记，#2326 `e46eb463`、#2351 `d69fd20a`。** Tracy 帧图等待原生采集后端接入。`CaptureGate` 已能通过环境变量和 Linux 进程映射识别部分工具。`GL_EXT_debug_tool` 探测与帧标记版本信息可独立评估。[本地工具探测](../glsm/src/main/java/com/gtnewhorizons/angelica/glsm/CaptureGate.java) · [上游 #2326](https://github.com/GTNewHorizons/Angelica/pull/2326) · [上游 #2351](https://github.com/GTNewHorizons/Angelica/pull/2351)
-- **SDL 读回，#2326 `e46eb463`。** `ReadbackShadows` 已有 transfer buffer、`serve` 和失效入口，槽内记录容量与有效标志。独立评估上游的逐槽 fence、有效字节长度以及写入和释放时的失效处理。验证同一槽从大范围改为小范围读回、改写和重分配，以及提交完成前后的读取行为。[本地 SDL 读回](../sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/resource/ReadbackShadows.java) · [上游 #2326](https://github.com/GTNewHorizons/Angelica/pull/2326)
+
+## #2326 SDL 缓冲区读回验证
+
+已适配逐槽 fence、有效字节范围和缓冲区写入失效。拷贝保留 GPU 目标缓冲区的数据，读回缓存未命中时可读取该缓冲区。重分配和删除会释放对应的 transfer buffer 和 fence。
+
+`check build --no-daemon` 和 `NativeBufferUploadTest` 的四项原生 SDL GPU 测试通过。读回测试覆盖提交前触发等待、提交后读取、较短下载覆盖旧范围、缓存失效和释放。2026 年 11 月 25 日在 Forge 1.12.2 上运行 SDL GPU（Vulkan）与 BSL v10.1p1，记录到 12 次缓存未命中和零次预下载。该场景覆盖普通读取路径，逐槽 fence 和有效范围由原生测试覆盖。[上游 #2326](https://github.com/GTNewHorizons/Angelica/pull/2326)
 
 ## 天气实例化与模组 API
 

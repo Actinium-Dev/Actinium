@@ -1597,9 +1597,13 @@ public final class ResourceManager {
     }
 
     public long createTransferBuffer(long size) {
+        return createTransferBuffer(size, SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD);
+    }
+
+    public long createTransferBuffer(long size, int usage) {
         try (var stack = stackPush()) {
             final SDL_GPUTransferBufferCreateInfo ci = SDL_GPUTransferBufferCreateInfo.calloc(stack)
-                .usage(SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD)
+                .usage(usage)
                 .size((int) size);
 
             final long handle = SDL_CreateGPUTransferBuffer(device.getDevice(), ci);

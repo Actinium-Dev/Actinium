@@ -2,9 +2,11 @@ package com.gtnewhorizons.angelica.sdlgpu.resource;
 
 import com.gtnewhorizons.angelica.sdlgpu.device.Device;
 import com.gtnewhorizons.angelica.sdlgpu.frame.FrameManager;
+import com.gtnewhorizons.angelica.sdlgpu.frame.FenceTracker;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lwjgl.sdl.SDLError;
@@ -17,6 +19,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.lwjgl.sdl.SDLGPU.*;
@@ -24,7 +27,7 @@ import static org.lwjgl.sdl.SDLInit.SDL_INIT_VIDEO;
 import static org.lwjgl.sdl.SDLInit.SDL_InitSubSystem;
 import static org.lwjgl.sdl.SDLInit.SDL_QuitSubSystem;
 
-/** Exercises the production upload arena against a real SDL GPU device without creating a game window. */
+/** Exercises buffer transfers on a real SDL GPU device without a game window. */
 @Tag("sdl-gpu-device")
 class NativeBufferUploadTest {
     private static Device device;
@@ -97,6 +100,59 @@ class NativeBufferUploadTest {
             resources.deleteBuffer(id);
             MemoryUtil.memFree(initial);
             MemoryUtil.memFree(patch);
+        }
+    }
+
+    @Test
+    void readbackWaitsForSubmissionAndRejectsBytesOutsideTheLatestDownload() {
+        final int source = nextBufferId++;
+        final int destination = nextBufferId++;
+        final ByteBuffer bytes = ByteBuffer.allocate(32);
+        for (int i = 0; i < bytes.capacity(); i++) bytes.put(i, (byte) (7 + i * 3));
+        final long handle = resources.createBuffer(source, SDL_GPU_BUFFERUSAGE_VERTEX, bytes.capacity());
+        assertTrue(handle != 0, SDLError::SDL_GetError);
+        final FenceTracker fences = new FenceTracker(device, frames);
+        fences.setUnresolvedFenceFlush(() -> {
+            frames.submitMidFrame();
+            fences.resolvePendingFences();
+        });
+        final ReadbackShadows shadows = new ReadbackShadows(device, resources, fences);
+        frames.beginFrame();
+        frames.frame().swapchainUnavailable = true;
+        try {
+            resources.uploadToBuffer(frames.ensureCopyPass(), bytes, handle, 0, false);
+            shadows.scheduleDownload(frames.ensureCopyPass(), handle, 0, destination, 0, 32);
+            final ByteBuffer output = ByteBuffer.allocate(32);
+            assertTrue(shadows.serve(destination, 0, output, 32));
+            assertEquals(bytes, output.flip());
+            assertEquals(1, fences.getUnresolvedFlushes());
+
+            shadows.scheduleDownload(frames.ensureCopyPass(), handle, 8, destination, 0, 8);
+            output.clear();
+            assertFalse(shadows.serve(destination, 0, output, 32));
+            assertEquals(0, output.position());
+            frames.submitMidFrame();
+            fences.resolvePendingFences();
+            assertTrue(shadows.serve(destination, 0, output, 8));
+            assertEquals(bytes.slice(8, 8), output.flip());
+            assertEquals(1, fences.getUnresolvedFlushes());
+
+            shadows.scheduleDownload(frames.ensureCopyPass(), handle, 0, destination, 8, 8);
+            shadows.invalidateAll(destination);
+            output.clear();
+            assertFalse(shadows.serve(destination, 0, output, 8));
+            assertFalse(shadows.serve(destination, 8, output, 8));
+            shadows.scheduleDownload(frames.ensureCopyPass(), handle, 0, destination, 0, 8);
+            shadows.release(destination);
+            frames.submitMidFrame();
+            fences.resolvePendingFences();
+            assertFalse(shadows.serve(destination, 0, output, 8));
+        } finally {
+            frames.endFrame();
+            fences.resolvePendingFences();
+            shadows.dispose();
+            fences.dispose();
+            resources.deleteBuffer(source);
         }
     }
 
