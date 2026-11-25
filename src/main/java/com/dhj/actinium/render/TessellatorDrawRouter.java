@@ -2,8 +2,10 @@ package com.dhj.actinium.render;
 
 import com.gtnewhorizon.gtnhlib.client.renderer.TessellatorManager;
 import com.gtnewhorizons.angelica.client.rendering.DeferredDrawBatcher;
+import com.gtnewhorizons.angelica.glsm.GLSMLighting;
 import com.gtnewhorizons.angelica.glsm.ITessellatorData;
 import com.gtnewhorizons.angelica.glsm.hooks.BatchStateGuard;
+import com.gtnewhorizons.angelica.rendering.tesr.FlattenedItemLighting;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
 import net.minecraft.client.renderer.BufferBuilder;
 
@@ -37,6 +39,17 @@ public final class TessellatorDrawRouter {
         if (TessellatorManager.shouldInterceptBufferBuilderDraw()) {
             buffer.finishDrawing();
             TessellatorManager.interceptBufferBuilderDraw(buffer);
+            return true;
+        }
+        if (FlattenedItemLighting.bake(buffer) == FlattenedItemLighting.BakeResult.FIXED_FUNCTION) {
+            BatchStateGuard.beforeDraw();
+            GLSMLighting.disableLighting();
+            try {
+                buffer.finishDrawing();
+                VanillaBufferBuilderRenderer.draw(buffer, "Tessellator");
+            } finally {
+                GLSMLighting.enableLighting();
+            }
             return true;
         }
         if (ModelPartBatcher.isBatchingActive()) {
