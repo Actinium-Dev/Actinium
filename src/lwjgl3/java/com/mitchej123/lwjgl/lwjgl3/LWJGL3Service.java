@@ -512,7 +512,7 @@ public record LWJGL3Service(
     @Override
     public void glUseProgram(int program) {
         if (isGlesContextCurrent()) {
-            GLES20.glUseProgram(program);
+            GLSMPrograms.glUseProgram(program);
             return;
         }
         GL20C.glUseProgram(program);

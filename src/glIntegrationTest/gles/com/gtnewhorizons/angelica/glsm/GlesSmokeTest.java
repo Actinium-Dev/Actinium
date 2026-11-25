@@ -30,6 +30,7 @@ import org.lwjgl.system.MemoryStack;
 
 import java.nio.ByteBuffer;
 
+import static com.mitchej123.lwjgl.LWJGLServiceProvider.LWJGL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -213,6 +214,17 @@ class GlesSmokeTest {
             GLSMVertexInput.glDeleteVertexArrays(first);
             GLSMVertexInput.glDeleteVertexArrays(second);
         }
+    }
+
+    @Test
+    void fixedFunctionDrawSurvivesCeleritasProgramUnbind() {
+        clearTarget();
+        drawQuad(1.0f, 0.0f, 0.0f);
+        assertEquals(0xff0000ff, readPixel(SIZE / 2, SIZE / 2));
+
+        LWJGL.glUseProgram(0);
+        drawQuad(0.0f, 1.0f, 0.0f);
+        assertEquals(0x00ff00ff, readPixel(SIZE / 2, SIZE / 2));
     }
 
     @Test
