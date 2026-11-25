@@ -1,6 +1,7 @@
 package com.gtnewhorizons.angelica.glsm.ffp;
 
 import com.gtnewhorizons.angelica.glsm.GLDebug;
+import com.gtnewhorizons.angelica.glsm.DepthPeel;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.backend.RenderBackend;
 import lombok.Getter;
@@ -110,6 +111,10 @@ public class Program {
     public int locSecondaryColor = -1;
     public int locFogParams = -1;
     public int locFogColor = -1;
+    private final int locPeelDepth;
+    private final int locPeelScene;
+    private final int locPeelMode;
+    private int peelMode = -1;
     private final int locCoverMode;
     private int coverMode = -1;
 
@@ -118,7 +123,16 @@ public class Program {
         this.vertexKey = vertexKey;
         this.fragmentKey = fragmentKey;
         resolveLocations();
+        locPeelDepth = fragmentKey.depthPeel() ? loc("u_PeelDepth") : -1;
+        locPeelScene = fragmentKey.depthPeel() ? loc("u_PeelScene") : -1;
+        locPeelMode = fragmentKey.depthPeel() ? loc("u_PeelMode") : -1;
         locCoverMode = fragmentKey.coverageDiscard() ? loc("u_CoverMode") : -1;
+    }
+
+    void syncPeelMode(int mode) {
+        if (locPeelMode == -1 || peelMode == mode) return;
+        RENDER_BACKEND.uniform1i(locPeelMode, mode);
+        peelMode = mode;
     }
 
     boolean hasCoverMode() {
@@ -274,6 +288,8 @@ public class Program {
             for (int i = 0; i < 4; i++) {
                 if (ffpProgram.locSampler[i] != -1) backend.uniform1i(ffpProgram.locSampler[i], i);
             }
+            if (ffpProgram.locPeelDepth != -1) backend.uniform1i(ffpProgram.locPeelDepth, DepthPeel.TEXTURE_UNIT);
+            if (ffpProgram.locPeelScene != -1) backend.uniform1i(ffpProgram.locPeelScene, DepthPeel.SCENE_TEXTURE_UNIT);
             backend.useProgram(previousProgram);
 
             return ffpProgram;

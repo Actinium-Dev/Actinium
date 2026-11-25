@@ -351,13 +351,38 @@ public final class ModelPartBatcher {
         }
     }
 
+    void drawOpaque() {
+        if (active && mode == Mode.BLOCK_ENTITIES && !shadow) activeSource.endBatchWithType(TransparencyType.OPAQUE, activeGroups);
+    }
+
+    boolean beginPeel() {
+        if (!active || mode != Mode.BLOCK_ENTITIES || shadow) return false;
+        if (!activeSource.hasPendingLayers()) return false;
+        activeSource.openDrawState();
+        return true;
+    }
+
+    void drawPeeled(boolean replay) {
+        activeGroups.setPeelReplay(!replay, replay);
+        activeSource.drawPending(activeGroups);
+    }
+
+    void endPeel() {
+        if (!active || mode != Mode.BLOCK_ENTITIES || shadow) return;
+        try {
+            activeGroups.setPeelReplay(false, false);
+        } finally {
+            activeSource.discard();
+        }
+    }
+
     void flushForStateChange() {
         if (!active) return;
         flushNow(false);
         active = true;
         mvCaptured = false;
         texCaptured = false;
-        activeGroups.beginPass(identity, 0, 0, 0, instancedThisCycle ? TesrBatchRenderer.INSTANCE.instancedRenderer : null, shaderPipeline);
+        activeGroups.continuePass(identity, 0, 0, 0, instancedThisCycle ? TesrBatchRenderer.INSTANCE.instancedRenderer : null, shaderPipeline);
     }
 
     private void flushNow(boolean allowHold) {
@@ -939,6 +964,7 @@ public final class ModelPartBatcher {
                 return consumeTessellator(tess);
             }
             case DRAW_NOW_EXPECTED -> {
+                BatchStateGuard.beforeDraw();
                 BatchEligibility.beginExpectedDraws(GLSMDraws.drawCalls);
                 try {
                     return TessellatorStreamingDrawer.draw(tess);
@@ -947,6 +973,7 @@ public final class ModelPartBatcher {
                 }
             }
             default -> {
+                BatchStateGuard.beforeDraw();
                 return TessellatorStreamingDrawer.draw(tess);
             }
         }

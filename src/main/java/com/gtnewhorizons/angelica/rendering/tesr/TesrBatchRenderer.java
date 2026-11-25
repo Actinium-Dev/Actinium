@@ -84,6 +84,9 @@ public final class TesrBatchRenderer {
     private RetainedTesrGroups pendingDeferredHook;
 
     private final Matrix4f modelView = new Matrix4f();
+    private final Matrix4f passBase = new Matrix4f();
+    private double passCamX, passCamY, passCamZ;
+    private InstancedTemplateRenderer passInstanced;
     private final Matrix4f identity = new Matrix4f();
     private final Vector3f scratchVec = new Vector3f();
 
@@ -120,7 +123,12 @@ public final class TesrBatchRenderer {
             // leave the batch bound to a program other than the one it recorded.
             deferred.compileInstancedVariants();
         }
-        retained[passKey].beginPass(baseMV, camX, camY, camZ, instancedCapable() ? instancedRenderer : null, deferred);
+        passBase.set(baseMV);
+        passCamX = camX;
+        passCamY = camY;
+        passCamZ = camZ;
+        passInstanced = instancedCapable() ? instancedRenderer : null;
+        retained[passKey].beginPass(baseMV, camX, camY, camZ, passInstanced, deferred);
         if (passKey == PASS_MAIN_0) {
             instancedRenderer.releaseRetired();
             final long now = System.currentTimeMillis();
@@ -416,6 +424,43 @@ public final class TesrBatchRenderer {
         bufferSource.endBatch(hook);
     }
 
+    void drawOpaque() {
+        if (activePass < 0) return;
+        try {
+            bufferSource.endBatchWithType(TransparencyType.OPAQUE, retained[activePass]);
+        } finally {
+            bufferSource.pauseBatch();
+        }
+    }
+
+    boolean beginPeel() {
+        if (activePass < 0 || !bufferSource.hasPendingLayers()) return false;
+        bufferSource.openDrawState();
+        return true;
+    }
+
+    void drawPeeled(boolean replay) {
+        retained[activePass].setPeelReplay(!replay, replay);
+        bufferSource.drawPending(retained[activePass]);
+    }
+
+    void endPeel() {
+        if (activePass < 0) return;
+        try {
+            retained[activePass].setPeelReplay(false, false);
+        } finally {
+            bufferSource.discard();
+        }
+    }
+
+    void flushAndContinue() {
+        if (activePass < 0) return;
+        final RetainedTesrGroups hook = retained[activePass];
+        bufferSource.endBatchWithType(TransparencyType.OPAQUE, hook);
+        bufferSource.endBatch(hook);
+        hook.continuePass(passBase, passCamX, passCamY, passCamZ, passInstanced, null);
+    }
+
     private void flushNow() {
         final RetainedTesrGroups hook = activePass >= 0 ? retained[activePass] : null;
         if (Tracy.ENABLED) Tracy.beginZone(Z_TESR_OPAQUE);
@@ -626,6 +671,7 @@ public final class TesrBatchRenderer {
             try {
                 layer.startDrawing();
                 layerStarted = true;
+                BatchStateGuard.beforeDraw();
                 immediateMesh.upload(format, template.drawMode, immediateScratch, vertexCount);
                 immediateMesh.render();
             } catch (Throwable t) {

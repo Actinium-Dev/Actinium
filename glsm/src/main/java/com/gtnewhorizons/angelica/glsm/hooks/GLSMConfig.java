@@ -1,9 +1,15 @@
 package com.gtnewhorizons.angelica.glsm.hooks;
 
+import com.gtnewhorizons.angelica.glsm.DepthPeel;
 import com.gtnewhorizons.angelica.glsm.GLContextState;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 
 public final class GLSMConfig {
+
+    /** Selects the FFP depth peel variant for draws in the current context. */
+    public static boolean depthPeel() {
+        return DepthPeel.shaderActive();
+    }
 
     public static float getLastBrightnessX() {
         return GLStateManager.getLastBrightnessX();

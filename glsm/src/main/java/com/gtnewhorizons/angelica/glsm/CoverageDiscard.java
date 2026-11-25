@@ -1,8 +1,9 @@
 package com.gtnewhorizons.angelica.glsm;
 
+import com.gtnewhorizons.angelica.glsm.hooks.GLSMConfig;
 import org.lwjgl.opengl.GL11;
 
-/** Selects which fragments contribute depth during glow rendering. */
+/** Rejects fragments that make no visible contribution to a depth capture. */
 public final class CoverageDiscard {
     public static final int OFF = 0;
     private static final int ALPHA = 1;
@@ -23,6 +24,14 @@ public final class CoverageDiscard {
         """.formatted(OFF, RGB, RGB_ALPHA);
 
     private CoverageDiscard() {}
+
+    public static boolean active() {
+        return GLSMConfig.depthPeel() || DepthEcho.discardsCoverage();
+    }
+
+    public static int drawMode() {
+        return GLSMConfig.depthPeel() || DepthEcho.replaying() ? mode() : OFF;
+    }
 
     public static int mode() {
         if (!GLSMBlend.getBlendMode().isEnabled()) return OFF;

@@ -4,7 +4,7 @@ import com.gtnewhorizon.gtnhlib.client.renderer.vertex.VertexFlags;
 import com.gtnewhorizon.gtnhlib.client.renderer.vertex.VertexFormat;
 import com.gtnewhorizons.angelica.glsm.CompatUniformManager;
 import com.gtnewhorizons.angelica.glsm.CoverageDiscard;
-import com.gtnewhorizons.angelica.glsm.DepthEcho;
+import com.gtnewhorizons.angelica.glsm.DepthPeel;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.QuadConverter;
 import com.gtnewhorizons.angelica.glsm.debug.GLSMDebug;
@@ -240,8 +240,9 @@ public final class ShaderManager {
         final boolean perfDebugEnabled = GLSMPerfDebug.isEnabled();
         final long perfStart = perfDebugEnabled ? GLSMPerfDebug.begin(GLSMPerfDebug.Stage.FFP_UNIFORMS) : 0L;
         uniforms.upload(currentProgram);
+        if (currentProgram.getFragmentKey().depthPeel()) currentProgram.syncPeelMode(DepthPeel.shaderMode());
         if (currentProgram.hasCoverMode()) {
-            currentProgram.syncCoverMode(DepthEcho.replaying() ? CoverageDiscard.mode() : CoverageDiscard.OFF);
+            currentProgram.syncCoverMode(CoverageDiscard.drawMode());
         }
         if (perfDebugEnabled) GLSMPerfDebug.end(GLSMPerfDebug.Stage.FFP_UNIFORMS, perfStart);
     }
@@ -259,7 +260,7 @@ public final class ShaderManager {
             program.syncCoverMode(CoverageDiscard.mode());
             draw.run();
         } finally {
-            program.syncCoverMode(CoverageDiscard.OFF);
+            program.syncCoverMode(CoverageDiscard.drawMode());
         }
     }
 
