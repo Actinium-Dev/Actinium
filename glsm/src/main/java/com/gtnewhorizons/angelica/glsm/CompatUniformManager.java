@@ -59,7 +59,8 @@ public class CompatUniformManager {
     static final int MAT_FIELDS = 5;
     static final int LOC_MAT_BASE = LOC_LIGHT_BASE + 2 * LIGHT_FIELDS; // 43
 
-    static final int LOC_COUNT = LOC_MAT_BASE + MAT_FIELDS; // 48
+    static final int LOC_CLIP_PLANE_MASK = LOC_MAT_BASE + MAT_FIELDS;
+    static final int LOC_COUNT = LOC_CLIP_PLANE_MASK + 1;
 
     private static final String[] LIGHT_FIELD_NAMES = {
         "ambient", "diffuse", "specular", "position", "halfVector",
@@ -93,6 +94,7 @@ public class CompatUniformManager {
         UNIFORM_NAMES[LOC_SCENE_COLOR] = "actinium_SceneColor";
         UNIFORM_NAMES[LOC_CLIP_PLANES] = "actinium_ClipPlane[0]";
         UNIFORM_NAMES[LOC_CLIP_PLANES_ENABLED] = "actinium_ClipPlanesEnabled";
+        UNIFORM_NAMES[LOC_CLIP_PLANE_MASK] = "actinium_ClipPlaneMask";
         UNIFORM_NAMES[LOC_IRIS_COLOR_MODULATOR] = "iris_ColorModulator";
         for (int li = 0; li < 2; li++) {
             for (int fi = 0; fi < LIGHT_FIELDS; fi++) {
@@ -185,7 +187,8 @@ public class CompatUniformManager {
             state.markLightingUploaded(litGen);
         }
 
-        final boolean hasClipPlaneUniforms = locs[LOC_CLIP_PLANES] != -1 || locs[LOC_CLIP_PLANES_ENABLED] != -1;
+        final boolean hasClipPlaneUniforms = locs[LOC_CLIP_PLANES] != -1 || locs[LOC_CLIP_PLANES_ENABLED] != -1
+            || locs[LOC_CLIP_PLANE_MASK] != -1;
         if (hasClipPlaneUniforms) {
             final int cpGen = GLStateManager.getClipPlaneGeneration();
             final boolean clipPlaneChanged = state.needsClipPlaneUpload(cpGen);
@@ -434,6 +437,9 @@ public class CompatUniformManager {
     }
 
     private static void uploadClipPlanes(int[] locs) {
+        if (locs[LOC_CLIP_PLANE_MASK] != -1) {
+            RENDER_BACKEND.uniform1i(locs[LOC_CLIP_PLANE_MASK], GLStateManager.ctx().clipPlaneEnabledMask);
+        }
         if (locs[LOC_CLIP_PLANES_ENABLED] != -1) {
             RENDER_BACKEND.uniform1i(locs[LOC_CLIP_PLANES_ENABLED], GLStateManager.anyClipPlaneEnabled() ? 1 : 0);
         }

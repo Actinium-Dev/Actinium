@@ -1,10 +1,12 @@
 package com.gtnewhorizons.angelica.sdlgpu.shader;
 
+import com.gtnewhorizons.angelica.sdlgpu.device.Device;
 import com.gtnewhorizons.angelica.sdlgpu.frame.ContextState;
 import com.gtnewhorizons.angelica.sdlgpu.pipeline.PipelineApplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.lwjgl.opengl.GL20;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.spvc.Spvc;
 
@@ -168,13 +170,114 @@ class SDLGPUUniformDedupTest {
         }
     }
 
+    @Test
+    void overlappingArrayAndScalarWritesInvalidateBothCachedValues() {
+        final ShaderManager.ProgramObject array = programWithSharedMember(new ShaderManager.UboMember(
+            "weights", 0, 32, 16, 1, 1, Spvc.SPVC_BASETYPE_FP32, 2));
+        final ShaderManager.ProgramObject scalar = programWithSharedMember(new ShaderManager.UboMember(
+            "exposure", 16, 4, 0, 1, 1, Spvc.SPVC_BASETYPE_FP32, 1));
+        final ContextState.UniformBlockState block = st.uniformBlocks[ShaderManager.BLOCK_PER_PASS];
+        try {
+            st.boundProgramObj = array;
+            applier.putUniform(st, 0, new float[]{1, 2});
+            st.boundProgramObj = scalar;
+            applier.putUniform(st, 0, new float[]{9});
+            st.boundProgramObj = array;
+            applier.putUniform(st, 0, new float[]{3});
+            assertEquals(3f, block.fb.get(0));
+            assertEquals(2f, block.fb.get(4));
+
+            st.boundProgramObj = scalar;
+            applier.putUniformFv(st, 0, FloatBuffer.wrap(new float[]{9}));
+            assertEquals(3f, block.fb.get(0));
+            assertEquals(9f, block.fb.get(4));
+
+            block.dirty = false;
+            applier.putUniformFv(st, 0, FloatBuffer.wrap(new float[]{9}));
+            assertFalse(block.dirty);
+        } finally {
+            st.releaseUniformStaging(array);
+            st.releaseUniformStaging(scalar);
+            block.free();
+        }
+    }
+
+    @Test
+    void conflictingUniformDeclarationsFailLinkAndRelinkRebuildsTheLayout() {
+        final ShaderManager manager = new ShaderManager(new Device());
+        final int program = manager.createProgram();
+        final int vertex = manager.createShader(GL20.GL_VERTEX_SHADER);
+        final int fragment = manager.createShader(GL20.GL_FRAGMENT_SHADER);
+        final String vertexSource = """
+            #version 330 core
+            uniform float weights%s;
+            void main() { gl_Position = vec4(weights%s); }
+            """;
+        final String fragmentSource = """
+            #version 330 core
+            uniform float weights%s;
+            out vec4 color;
+            void main() { color = vec4(weights%s); }
+            """;
+        manager.attachShader(program, vertex);
+        manager.attachShader(program, fragment);
+        try {
+            compile(manager, vertex, vertexSource.formatted("", ""));
+            compile(manager, fragment, fragmentSource.formatted("", ""));
+            manager.linkProgram(program);
+            assertTrue(manager.isLinked(program), manager.getProgramInfoLog(program));
+            assertEquals(-1, manager.getUniformLocation(program, "weights[0]"));
+
+            compile(manager, fragment, fragmentSource.formatted("[1]", "[0]"));
+            manager.linkProgram(program);
+            assertFalse(manager.isLinked(program));
+            final String failure = manager.getProgramInfoLog(program);
+            assertTrue(failure.contains("weights"), failure);
+            assertTrue(failure.contains("array[1]"), failure);
+            assertEquals(-1, manager.getUniformLocation(program, "weights"));
+
+            compile(manager, vertex, vertexSource.formatted("[1]", "[0]"));
+            manager.linkProgram(program);
+            assertTrue(manager.isLinked(program), manager.getProgramInfoLog(program));
+            final int base = manager.getUniformLocation(program, "weights");
+            assertTrue(base >= 0);
+            assertEquals(base, manager.getUniformLocation(program, "weights[0]"));
+
+            compile(manager, vertex, vertexSource.formatted("[2]", "[1]"));
+            manager.linkProgram(program);
+            assertFalse(manager.isLinked(program));
+            assertTrue(manager.getProgramInfoLog(program).contains("array[2]"));
+
+            compile(manager, fragment, fragmentSource.formatted("[2]", "[1]"));
+            manager.linkProgram(program);
+            assertTrue(manager.isLinked(program), manager.getProgramInfoLog(program));
+            final int relinkedBase = manager.getUniformLocation(program, "weights");
+            assertTrue(relinkedBase >= 0);
+            assertEquals(relinkedBase + 1, manager.getUniformLocation(program, "weights[1]"));
+            assertTrue(manager.getProgramInfoLog(program).isEmpty());
+        } finally {
+            manager.releaseProgramFinal(program);
+            manager.deleteShader(vertex);
+            manager.deleteShader(fragment);
+        }
+    }
+
+    private static void compile(ShaderManager manager, int shader, String source) {
+        manager.shaderSource(shader, source);
+        manager.compileShader(shader);
+        assertTrue(manager.isCompiled(shader), manager.getShaderInfoLog(shader));
+    }
+
     private static ShaderManager.ProgramObject programWithSharedArray() {
+        return programWithSharedMember(new ShaderManager.UboMember(
+            "colors", 0, 32, 16, 4, 1, Spvc.SPVC_BASETYPE_FP32, 2));
+    }
+
+    private static ShaderManager.ProgramObject programWithSharedMember(ShaderManager.UboMember member) {
         final ShaderManager.ProgramObject program = new ShaderManager.ProgramObject();
         final ShaderManager.BlockReflection[] blocks = ShaderManager.BlockReflection.emptyBlocks();
-        final List<ShaderManager.UboMember> members = List.of(new ShaderManager.UboMember(
-            "colors", 0, 32, 16, 4, 1, Spvc.SPVC_BASETYPE_FP32, 2));
         blocks[ShaderManager.BLOCK_PER_PASS] = new ShaderManager.BlockReflection(32,
-            ShaderManager.BLOCK_BINDINGS[ShaderManager.BLOCK_PER_PASS], members, true);
+            ShaderManager.BLOCK_BINDINGS[ShaderManager.BLOCK_PER_PASS], List.of(member), true);
         ShaderManager.applyBlockMembers(program, reflection(0, List.of(), blocks));
         program.buildUniformSlotArrays();
         return program;

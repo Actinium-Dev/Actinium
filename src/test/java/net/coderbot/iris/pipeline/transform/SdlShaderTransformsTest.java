@@ -263,8 +263,9 @@ class SdlShaderTransformsTest {
         assertCompiles(compute, GL43.GL_COMPUTE_SHADER);
     }
 
-    @Test
-    void nativeClipDistancesInitializeBeforePackWritesAndApplyEnabledPlanesAfterwards() {
+    @ParameterizedTest
+    @ValueSource(strings = {"if (iris_Vertex.y > 0.0) return;", "while (iris_Vertex.y > 0.0) return;"})
+    void nativeClipDistancesApplyEachEnabledPlaneAfterPackWritesOnBothExitPaths(String earlyExit) {
         Transformer vertex = parse("""
             #version 460 core
             uniform mat4 iris_ModelViewMatrix;
@@ -272,20 +273,26 @@ class SdlShaderTransformsTest {
             void main() {
                 gl_Position = iris_Vertex;
                 gl_ClipDistance[2] = iris_Vertex.x;
+                %s
             }
-            """);
+            """.formatted(earlyExit));
         CommonTransformer.injectNativeClipPlanes(vertex, true);
 
         vertex.mutateTree(tree -> {
             List<GLSLParser.Assignment_expressionContext> writes = GlslAstHelpers.collectAll(tree, GLSLParser.Assignment_expressionContext.class)
                 .stream().filter(expression -> expression.getText().startsWith("gl_ClipDistance[2]=")).toList();
-            assertEquals(3, writes.size());
-            assertEquals("gl_ClipDistance[2]=0.0", writes.get(0).getText());
-            assertEquals("gl_ClipDistance[2]=iris_Vertex.x", writes.get(1).getText());
-            assertEquals("gl_ClipDistance[2]=dot(actinium_ClipPlane[2],_cp_ep)", writes.get(2).getText());
-            assertNull(GlslAstHelpers.enclosingOfType(writes.get(0), GLSLParser.Selection_statementContext.class));
-            assertEquals("actinium_ClipPlanesEnabled",
-                GlslAstHelpers.enclosingOfType(writes.get(2), GLSLParser.Selection_statementContext.class).getChild(2).getText());
+            assertEquals(List.of("gl_ClipDistance[2]=0.0", "gl_ClipDistance[2]=iris_Vertex.x",
+                    "gl_ClipDistance[2]=dot(actinium_ClipPlane[2],_cp_ep)", "gl_ClipDistance[2]=dot(actinium_ClipPlane[2],_cp_ep)"),
+                writes.stream().map(expression -> expression.getText()).toList());
+            assertNull(GlslAstHelpers.enclosingOfType(writes.getFirst(), GLSLParser.Selection_statementContext.class));
+            for (var write : writes.subList(2, 4)) {
+                assertEquals("(actinium_ClipPlaneMask&4)!=0",
+                    GlslAstHelpers.enclosingOfType(write, GLSLParser.Selection_statementContext.class).getChild(2).getText());
+            }
+            var earlyReturn = GlslAstHelpers.collectAll(tree, GLSLParser.Jump_statementContext.class).stream()
+                .filter(jump -> jump.RETURN() != null).findFirst().orElseThrow();
+            var earlyExitBlock = earlyReturn.getParent().getParent().getParent().getParent();
+            assertTrue(GlslAstHelpers.collectAll(earlyExitBlock, GLSLParser.Assignment_expressionContext.class).contains(writes.get(2)));
         });
         assertCompiles(format(vertex), GL20.GL_VERTEX_SHADER);
     }

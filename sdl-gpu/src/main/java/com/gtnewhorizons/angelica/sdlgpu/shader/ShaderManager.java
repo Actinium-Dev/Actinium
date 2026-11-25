@@ -568,6 +568,15 @@ public final class ShaderManager {
 
         releaseProgramGpuResources(prog);
         prog.resetUniformLayout();
+        try {
+            applyUboMembers(prog, vs.reflection, true);
+            applyUboMembers(prog, fs.reflection, false);
+            applyBlockMembers(prog, vs.reflection);
+            applyBlockMembers(prog, fs.reflection);
+        } catch (UniformDeclarationConflict conflict) {
+            failUniformLink(program, prog, conflict);
+            return;
+        }
 
         prog.vertexSpirv = copyBuffer(vs.spirv);
         prog.fragmentSpirv = copyBuffer(fs.spirv);
@@ -621,13 +630,6 @@ public final class ShaderManager {
             return;
         }
 
-        prog.linked = true;
-        prog.infoLog = "";
-
-        applyUboMembers(prog, vs.reflection, true);
-        applyUboMembers(prog, fs.reflection, false);
-        applyBlockMembers(prog, vs.reflection);
-        applyBlockMembers(prog, fs.reflection);
         registerExtraNames(prog, vs.reflection);
         registerExtraNames(prog, fs.reflection);
 
@@ -637,7 +639,8 @@ public final class ShaderManager {
         registerMovedSamplerLocations(prog, prog.fragmentImageNames, prog.fragmentMovedSamplerRead);
 
         prog.buildUniformSlotArrays();
-
+        prog.linked = true;
+        prog.infoLog = "";
     }
 
     private static void applyStageImages(ProgramObject prog, StageReflection stage, boolean vertex) {
@@ -728,7 +731,13 @@ public final class ShaderManager {
         prog.boolUniforms.clear();
         prog.boolUniforms.addAll(cs.boolUniforms);
 
-        applyUboMembers(prog, refl, false);
+        try {
+            applyUboMembers(prog, refl, false);
+        } catch (UniformDeclarationConflict conflict) {
+            releaseProgramGpuResources(prog);
+            failUniformLink(program, prog, conflict);
+            return;
+        }
         registerExtraNames(prog, refl);
         registerSamplerLocations(prog, refl);
         for (final String name : prog.allImageNames) ensureLocation(prog, name);
@@ -773,13 +782,35 @@ public final class ShaderManager {
         prog.infoLog = "";
     }
 
+    private static void failUniformLink(int program, ProgramObject prog, UniformDeclarationConflict conflict) {
+        prog.resetUniformLayout();
+        prog.linked = false;
+        prog.infoLog = conflict.getMessage();
+        LOG.error("Program {}: {}. Rejecting link.", program, prog.infoLog);
+    }
+
+    private static final class UniformDeclarationConflict extends RuntimeException {
+        private UniformDeclarationConflict(String name, UniformMemberInfo previous, UboMember member) {
+            super("Uniform '" + name + "' has conflicting declarations: "
+                + describe(previous.baseType(), previous.vectorSize(), previous.columns(),
+                    previous.arrayStride() > 0 ? previous.arrayLen() : 0)
+                + " versus " + describe(member.baseType(), member.vectorSize(), member.columns(),
+                    member.arrayStride() > 0 ? member.arrayLen() : 0));
+        }
+
+        private static String describe(int baseType, int rows, int columns, int arrayLen) {
+            return "base type " + baseType + ", " + rows + "x" + columns
+                + (arrayLen > 0 ? " array[" + arrayLen + "]" : " non-array");
+        }
+    }
+
     static void applyUboMembers(ProgramObject prog, StageReflection refl, boolean isVertex) {
         if (refl.uboSize() > 0) {
             if (isVertex) prog.vertexUboSize = refl.uboSize();
             else prog.fragmentUboSize = refl.uboSize();
         }
         for (UboMember m : refl.uboMembers()) {
-            final int loc = ensureLocation(prog, m.name(), m.arrayStride() > 0 ? m.arrayLen() : 0);
+            final int loc = ensureLocation(prog, m);
             final UniformMemberInfo info = new UniformMemberInfo(
                 m.offset(), m.size(), m.arrayStride(), isVertex,
                 m.vectorSize(), m.columns(), m.baseType(), m.arrayLen()
@@ -797,7 +828,7 @@ public final class ShaderManager {
             prog.blockSize[b] = Math.max(prog.blockSize[b], block.size());
             prog.blockBinding[b] = block.binding();
             for (UboMember m : block.members()) {
-                final int loc = ensureLocation(prog, m.name(), m.arrayStride() > 0 ? m.arrayLen() : 0);
+                final int loc = ensureLocation(prog, m);
                 if (prog.blockMemberInfo[b].containsKey(loc)) continue;
                 prog.blockMemberInfo[b].put(loc, new UniformMemberInfo(
                     m.offset(), m.size(), m.arrayStride(), false,
@@ -812,16 +843,24 @@ public final class ShaderManager {
 
     private static int ensureLocation(ProgramObject prog, String name) {
         final int existing = prog.nameToLocation.getInt(name);
-        return existing == -1 ? ensureLocation(prog, name, 0) : existing;
+        return existing == -1 ? allocateLocations(prog, name, 0) : existing;
     }
 
-    private static int ensureLocation(ProgramObject prog, String name, int arrayLen) {
-        final int existing = prog.nameToLocation.getInt(name);
-        if (existing != -1) {
-            final int registered = prog.arrayLenByLocation.get(existing);
-            if (registered == arrayLen) return existing;
-            retireLocations(prog, existing, Math.max(1, registered));
+    private static int ensureLocation(ProgramObject prog, UboMember member) {
+        final int arrayLen = member.arrayStride() > 0 ? member.arrayLen() : 0;
+        final int existing = prog.nameToLocation.getInt(member.name());
+        if (existing == -1) return allocateLocations(prog, member.name(), arrayLen);
+
+        UniformMemberInfo previous = prog.locationToMemberInfo.get(existing);
+        if (previous == null) previous = prog.anyBlockMemberInfo(existing);
+        if (prog.arrayLenByLocation.get(existing) != arrayLen || previous.baseType() != member.baseType()
+            || previous.vectorSize() != member.vectorSize() || previous.columns() != member.columns()) {
+            throw new UniformDeclarationConflict(member.name(), previous, member);
         }
+        return existing;
+    }
+
+    private static int allocateLocations(ProgramObject prog, String name, int arrayLen) {
         final int loc = prog.nextUniformLocation;
         prog.nextUniformLocation += Math.max(1, arrayLen);
         prog.nameToLocation.put(name, loc);
@@ -829,15 +868,6 @@ public final class ShaderManager {
         for (int i = 1; i < arrayLen; i++) prog.locationToName.put(loc + i, name + "[" + i + "]");
         if (arrayLen > 0) prog.arrayLenByLocation.put(loc, arrayLen);
         return loc;
-    }
-
-    private static void retireLocations(ProgramObject prog, int base, int len) {
-        prog.arrayLenByLocation.remove(base);
-        for (int i = 0; i < len; i++) prog.locationToName.remove(base + i);
-        prog.locationToMemberInfo.remove(base);
-        prog.vertexMemberInfo.remove(base);
-        prog.fragmentMemberInfo.remove(base);
-        for (int b = 0; b < BLOCK_COUNT; b++) prog.blockMemberInfo[b].remove(base);
     }
 
     private static void applyVaryingMatch(ByteBuffer fragmentSpirv, StageReflection vs, StageReflection fs) {

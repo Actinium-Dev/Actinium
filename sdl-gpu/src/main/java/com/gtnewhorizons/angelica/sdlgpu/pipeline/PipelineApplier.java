@@ -773,10 +773,11 @@ public final class PipelineApplier {
         }
         final float[] existing = st.uniformStaging(prog).uniformDataBySlot[location];
         if (existing != null && existing.length == n) {
-            if (contentEquals(existing, value, pos, n)) {
+            if (!contentEquals(existing, value, pos, n)) {
+                value.get(pos, existing);
+            } else if (prog.anyBlockMemberInfo(location) == null) {
                 return;
             }
-            value.get(pos, existing);
             putUniform(st, location, existing);
             return;
         }
@@ -859,40 +860,35 @@ public final class PipelineApplier {
             valueKey = Hashing.hashFloats(data);
         }
         if (Tracy.ENABLED) st.slotWrites++;
-        if (us.uniformValueHashBySlot[location] == valueKey) {
-            final float[] existing = us.uniformDataBySlot[location];
-            if (existing == data) {
-                if (Tracy.ENABLED) st.slotWritesElided++;
-                return;
-            }
-            if (existing != null && existing.length == len && Arrays.equals(existing, data)) {
-                us.uniformDataBySlot[location] = data;
-                if (Tracy.ENABLED) st.slotWritesElided++;
-                return;
-            }
-        }
+        final float[] existing = us.uniformDataBySlot[location];
+        final boolean unchanged = us.uniformValueHashBySlot[location] == valueKey
+            && (existing == data || Arrays.equals(existing, data));
         us.uniformDataBySlot[location] = data;
         us.uniformValueHashBySlot[location] = valueKey;
         for (int b = 0; b < ShaderManager.BLOCK_COUNT; b++) {
             final ShaderManager.UniformMemberInfo info = prog.blockInfoBySlot[b][location];
             if (info == null) continue;
+            final int words = info.wordsPerElement();
+            if (words <= 0 || len < words) return;
             final ContextState.UniformBlockState block = st.uniformBlocks[b];
             if (prog.blockSize[b] > block.size) block.size = prog.blockSize[b];
             final FloatBuffer blockFb = block.staging(prog.blockSize[b]);
 
-            final int hashSlot = block.hashSlot(info.offset());
-            if (hashSlot >= 0) {
-                if (block.hash(hashSlot) == valueKey) {
-                    if (Tracy.ENABLED) st.slotWritesElided++;
-                    return;
-                }
-                block.setHash(hashSlot, valueKey);
+            final long blockKey = sharedUniformKey(info, valueKey);
+            if (block.matches(info.offset(), info.size(), blockKey)) {
+                if (Tracy.ENABLED) st.slotWritesElided++;
+                return;
             }
             writeMember(st, prog, blockFb, prog.blockSize[b], info, data, location, false);
+            block.cacheWrite(info.offset(), info.size(), blockKey);
             block.dirty = true;
             if (GLSMDebug.isEnabled() && b == ShaderManager.BLOCK_PER_FRAME && block.flushedThisFrame) {
                 notePerFrameBlockDrift(prog, location);
             }
+            return;
+        }
+        if (unchanged) {
+            if (Tracy.ENABLED) st.slotWritesElided++;
             return;
         }
         writeStages(st, prog, us, location, data);
@@ -937,18 +933,17 @@ public final class PipelineApplier {
             final ContextState.UniformBlockState block = st.uniformBlocks[b];
             if (prog.blockSize[b] > block.size) block.size = prog.blockSize[b];
             final FloatBuffer blockFb = block.staging(prog.blockSize[b]);
-            final int hashSlot = block.hashSlot(blockBase.offset());
-            final long layoutKey = Hashing.fmix64(blockBase.arrayStride(),
-                Hashing.packHiLo(blockBase.vectorSize(), blockBase.columns()));
-            final long valueKey = Hashing.fmix64(layoutKey, storageHash);
-            if (hashSlot >= 0 && block.hash(hashSlot) == valueKey) continue;
-            if (!fresh && hashSlot >= 0 && block.hash(hashSlot) == Hashing.fmix64(layoutKey, previousHash)) {
+            final int offset = blockBase.offset();
+            final int size = blockBase.size();
+            final long valueKey = sharedUniformKey(blockBase, storageHash);
+            if (block.matches(offset, size, valueKey)) continue;
+            if (!fresh && block.matches(offset, size, sharedUniformKey(blockBase, previousHash))) {
                 writeMember(st, prog, blockFb, prog.blockSize[b], prog.blockInfoBySlot[b][location], data, location, false);
             } else {
                 // Another program may have overwritten other elements in the shared block.
                 writeMember(st, prog, blockFb, prog.blockSize[b], blockBase, storage, base, false);
             }
-            if (hashSlot >= 0) block.setHash(hashSlot, valueKey);
+            block.cacheWrite(offset, size, valueKey);
             sharedBlockChanged = true;
             block.dirty = true;
             if (GLSMDebug.isEnabled() && b == ShaderManager.BLOCK_PER_FRAME && block.flushedThisFrame) {
@@ -973,6 +968,12 @@ public final class PipelineApplier {
             writeMember(st, prog, us.fsUniformFb, prog.fragmentUboSize, fs, data, location, false);
             us.fsUniformDirty = true;
         }
+    }
+
+    private static long sharedUniformKey(ShaderManager.UniformMemberInfo info, long valueHash) {
+        final long layout = Hashing.fmix64(Hashing.packHiLo(info.arrayStride(), info.baseType()),
+            Hashing.packHiLo(info.vectorSize(), info.columns()));
+        return Hashing.fmix64(layout, valueHash);
     }
 
     private static long arrayHashTerm(int index, int bits) {

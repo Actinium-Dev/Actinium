@@ -257,7 +257,13 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
 
     private void releaseUniformStagingAllThreads(ShaderManager.ProgramObject prog) {
-        for (ContextState st : registeredStates.snapshot()) st.releaseUniformStaging(prog);
+        for (ContextState st : registeredStates.snapshot()) {
+            st.releaseUniformStaging(prog);
+            if (st.boundProgramObj == prog) {
+                st.lastPushedCbVs = 0;
+                st.lastPushedCbFs = 0;
+            }
+        }
     }
 
 
@@ -2876,6 +2882,7 @@ public class SDLGPURenderBackend extends RenderBackend {
     @Override public void uniform4(int location, FloatBuffer value) {
         pipelineApplier.putUniformFv(s(), location, value);
     }
+    @Override public void uniform1fv(int location, float[] values) { storeFloatUniform(location, values); }
     @Override public void uniform3fv(int location, float[] values) { storeFloatUniform(location, values); }
     @Override public void uniform4fv(int location, float[] values) { storeFloatUniform(location, values); }
     private void storeFloatUniform(int location, float[] values) {
