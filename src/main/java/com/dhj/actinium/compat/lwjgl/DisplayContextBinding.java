@@ -8,6 +8,7 @@ import com.gtnewhorizons.angelica.glsm.context.NativeContextHandle;
 import com.gtnewhorizons.angelica.lwjgl3.Lwjgl3Context;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.ContextGL;
+import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DrawableGL;
 
 /** Binds LWJGL native context lifetime events to GLSM's per-drawable state. */
@@ -64,7 +65,12 @@ public final class DisplayContextBinding {
             return;
         }
         bindGlesContext(contextToken);
-        GLStateManager.bindDrawableContext(contextToken, nativeCurrent);
+        // ContextGL.makeCurrent can run before the Display.create return callback.
+        if (Display.getDrawable() instanceof DrawableGL display && display.getContext() == contextToken) {
+            GLStateManager.bindDisplayContext(contextToken, nativeCurrent);
+        } else {
+            GLStateManager.bindDrawableContext(contextToken, nativeCurrent);
+        }
     }
 
     public static void releaseIfNativeUnbound() {
