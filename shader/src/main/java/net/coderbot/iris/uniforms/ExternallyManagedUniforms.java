@@ -19,6 +19,7 @@ public class ExternallyManagedUniforms {
 		addMat3(uniformHolder, "iris_NormalMatrix");
 		uniformHolder.externallyManagedUniform("heavyFog", UniformType.BOOL);
 		uniformHolder.externallyManagedUniform("actinium_ClipPlanesEnabled", UniformType.BOOL);
+		uniformHolder.externallyManagedUniform("actinium_ClipPlaneMask", UniformType.INT);
 		uniformHolder.externallyManagedUniform("actinium_ClipPlane[0]", UniformType.VEC4);
 	}
 

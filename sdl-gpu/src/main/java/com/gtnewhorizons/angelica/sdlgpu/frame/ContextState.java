@@ -32,6 +32,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.Arrays;
+import java.util.BitSet;
 
 /**
  * Per-thread (per-GL-context) client state for {@link SDLGPURenderBackend}.
@@ -228,31 +229,38 @@ public final class ContextState {
         public int size;
         public boolean flushedThisFrame;
 
-        private long[] valueHash;
+        private final BitSet cachedStarts = new BitSet();
+        private long[] valueHashes;
+        private int[] valueEnds;
 
         public FloatBuffer staging(int sizeBytes) {
             if (buf == null || buf.capacity() < sizeBytes) {
                 if (buf != null) MemoryUtil.memFree(buf);
                 buf = MemoryUtil.memCalloc(sizeBytes);
                 fb = buf.asFloatBuffer();
-                valueHash = new long[(sizeBytes >> 2) + 1];
+                cachedStarts.clear();
+                valueHashes = new long[fb.capacity()];
+                valueEnds = new int[fb.capacity()];
             }
             return fb;
         }
 
-        public int hashSlot(int byteOffset) {
-            final long[] h = valueHash;
-            if (h == null) return -1;
-            final int i = byteOffset >> 2;
-            return (i >= 0 && i < h.length) ? i : -1;
+        public boolean matches(int byteOffset, int byteSize, long hash) {
+            final int start = byteOffset >> 2;
+            final int end = (byteOffset + byteSize + 3) >> 2;
+            return cachedStarts.get(start) && valueEnds[start] == end && valueHashes[start] == hash;
         }
 
-        public long hash(int slot) {
-            return valueHash[slot];
-        }
-
-        public void setHash(int slot, long value) {
-            valueHash[slot] = value;
+        public void cacheWrite(int byteOffset, int byteSize, long hash) {
+            final int start = byteOffset >> 2;
+            final int end = (byteOffset + byteSize + 3) >> 2;
+            // Cached ranges are disjoint, so only the closest earlier start can overlap.
+            final int previous = cachedStarts.previousSetBit(start - 1);
+            if (previous >= 0 && valueEnds[previous] > start) cachedStarts.clear(previous);
+            cachedStarts.clear(start, end);
+            valueEnds[start] = end;
+            valueHashes[start] = hash;
+            cachedStarts.set(start);
         }
 
         public ByteBuffer bytes() {

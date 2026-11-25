@@ -2,9 +2,12 @@ package net.coderbot.iris.pipeline.transform;
 
 import com.gtnewhorizons.angelica.glsm.GlslTransformUtils;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
+import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
 import net.coderbot.iris.gl.shader.ShaderType;
 import net.coderbot.iris.pipeline.transform.parameter.Parameters;
+import org.taumc.glsl.ShaderParser;
 import org.taumc.glsl.Transformer;
+import org.taumc.glsl.grammar.GLSLParser;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -85,24 +88,55 @@ public class CommonTransformer {
 		root.renameAndWrapShadow("shadow2DLod", "textureLod");
 		AdaptiveShadowBoundsTransformer.transform(root, parameters.type);
 
-		// FFP clip planes are realized through gl_ClipDistance writes. Only inject when the driver
-		// can compile them: ES and desktop-masquerading translation layers (MobileGlues) need
-		// GL_EXT_clip_cull_distance, otherwise every gbuffers/shadow vertex shader fails (issue #214).
 		if (parameters.patch == Patch.ATTRIBUTES && parameters.type == ShaderType.VERTEX
 				&& RenderSystem.hasClipCullDistance()) {
-			root.injectVariable("uniform bool actinium_ClipPlanesEnabled;");
-			root.injectVariable("uniform vec4 actinium_ClipPlane[8];");
-			root.appendMain(
-				"{ if (actinium_ClipPlanesEnabled) { vec4 _cp_ep = iris_ModelViewMatrix * iris_Vertex; "
-				+ "gl_ClipDistance[0] = dot(actinium_ClipPlane[0], _cp_ep); "
-				+ "gl_ClipDistance[1] = dot(actinium_ClipPlane[1], _cp_ep); "
-				+ "gl_ClipDistance[2] = dot(actinium_ClipPlane[2], _cp_ep); "
-				+ "gl_ClipDistance[3] = dot(actinium_ClipPlane[3], _cp_ep); "
-				+ "gl_ClipDistance[4] = dot(actinium_ClipPlane[4], _cp_ep); "
-				+ "gl_ClipDistance[5] = dot(actinium_ClipPlane[5], _cp_ep); "
-				+ "gl_ClipDistance[6] = dot(actinium_ClipPlane[6], _cp_ep); "
-				+ "gl_ClipDistance[7] = dot(actinium_ClipPlane[7], _cp_ep); } }"
-			);
+			injectNativeClipPlanes(root, BackendManager.RENDER_BACKEND.isSDLGPU());
 		}
+	}
+
+	static void injectNativeClipPlanes(Transformer root, boolean sdlGpu) {
+		root.injectVariable("uniform vec4 actinium_ClipPlane[8];");
+		if (sdlGpu) {
+			root.injectVariable("uniform int actinium_ClipPlaneMask;");
+			// SDL GPU consumes declared clip distances even when no user clip plane is enabled.
+			StringBuilder defaults = new StringBuilder("{ ");
+			StringBuilder clip = new StringBuilder("{ if (actinium_ClipPlaneMask != 0) { vec4 _cp_ep = iris_ModelViewMatrix * iris_Vertex; ");
+			for (int plane = 0; plane < 8; plane++) {
+				defaults.append("gl_ClipDistance[").append(plane).append("] = 0.0; ");
+				clip.append("if ((actinium_ClipPlaneMask & ").append(1 << plane).append(") != 0) ")
+					.append("gl_ClipDistance[").append(plane).append("] = dot(actinium_ClipPlane[").append(plane).append("], _cp_ep); ");
+			}
+			final String applyPlanes = clip.append("} }").toString();
+			root.prependMain(defaults.append('}').toString());
+			root.mutateTree(tree -> {
+				for (var function : GlslAstHelpers.collectAll(tree, GLSLParser.Function_definitionContext.class)) {
+					if (!"main".equals(function.function_prototype().IDENTIFIER().getText())) continue;
+					for (var jump : GlslAstHelpers.collectAll(function, GLSLParser.Jump_statementContext.class)) {
+						if (jump.RETURN() == null) continue;
+						var statement = jump.getParent().getParent();
+						final String replacement = "{ " + applyPlanes + " return; }";
+						if (statement instanceof GLSLParser.Statement_no_new_scopeContext) {
+							GlslAstHelpers.replaceNode(statement, ShaderParser.parseSnippet(replacement, GLSLParser::statement_no_new_scope));
+						} else {
+							GlslAstHelpers.replaceNode(statement, ShaderParser.parseSnippet(replacement, GLSLParser::statement));
+						}
+					}
+				}
+			});
+			root.appendMain(applyPlanes);
+			return;
+		}
+		root.injectVariable("uniform bool actinium_ClipPlanesEnabled;");
+		root.appendMain(
+			"{ if (actinium_ClipPlanesEnabled) { vec4 _cp_ep = iris_ModelViewMatrix * iris_Vertex; "
+			+ "gl_ClipDistance[0] = dot(actinium_ClipPlane[0], _cp_ep); "
+			+ "gl_ClipDistance[1] = dot(actinium_ClipPlane[1], _cp_ep); "
+			+ "gl_ClipDistance[2] = dot(actinium_ClipPlane[2], _cp_ep); "
+			+ "gl_ClipDistance[3] = dot(actinium_ClipPlane[3], _cp_ep); "
+			+ "gl_ClipDistance[4] = dot(actinium_ClipPlane[4], _cp_ep); "
+			+ "gl_ClipDistance[5] = dot(actinium_ClipPlane[5], _cp_ep); "
+			+ "gl_ClipDistance[6] = dot(actinium_ClipPlane[6], _cp_ep); "
+			+ "gl_ClipDistance[7] = dot(actinium_ClipPlane[7], _cp_ep); } }"
+		);
 	}
 }

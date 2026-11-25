@@ -37,7 +37,6 @@ import com.gtnewhorizons.angelica.sdlgpu.util.MemoryAccess;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.util.spvc.Spvc;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -755,6 +754,7 @@ public final class PipelineApplier {
     public float[] reuseOrAlloc(ContextState st, int location, int length) {
         final ShaderManager.ProgramObject prog = st.boundProgramObj;
         if (prog == null || location < 0 || location >= prog.uniformSlotCount) return null;
+        if (prog.arrayLenBySlot[location] > 0) return st.uniformStaging(prog).arrayScratch(location, length);
         final float[] existing = st.uniformStaging(prog).uniformDataBySlot[location];
         if (existing != null && existing.length == length) return existing;
         return new float[length];
@@ -765,12 +765,19 @@ public final class PipelineApplier {
         if (prog == null || location < 0 || location >= prog.uniformSlotCount) return;
         final int n = value.remaining();
         final int pos = value.position();
+        if (prog.arrayLenBySlot[location] > 0) {
+            final float[] v = st.uniformStaging(prog).arrayScratch(location, n);
+            value.get(pos, v);
+            putUniform(st, location, v);
+            return;
+        }
         final float[] existing = st.uniformStaging(prog).uniformDataBySlot[location];
         if (existing != null && existing.length == n) {
-            if (contentEquals(existing, value, pos, n)) {
+            if (!contentEquals(existing, value, pos, n)) {
+                value.get(pos, existing);
+            } else if (prog.anyBlockMemberInfo(location) == null) {
                 return;
             }
-            value.get(pos, existing);
             putUniform(st, location, existing);
             return;
         }
@@ -825,6 +832,7 @@ public final class PipelineApplier {
         if (Tracy.ENABLED) frameManager.noteUniformBlockFlush(b, size);
     }
 
+    private static final long ARRAY_HASH_SEED = 0x9E3779B97F4A7C15L;
     private final HashSet<String> perFrameBlockDriftWarned = new HashSet<>();
 
     private void notePerFrameBlockDrift(ShaderManager.ProgramObject prog, int location) {
@@ -837,6 +845,10 @@ public final class PipelineApplier {
     public void putUniform(ContextState st, int location, float[] data) {
         final ShaderManager.ProgramObject prog = st.boundProgramObj;
         if (prog == null || location < 0 || location >= prog.uniformSlotCount) return;
+        if (prog.arrayLenBySlot[location] > 0) {
+            putArrayElements(st, prog, location, data);
+            return;
+        }
         final UniformStaging us = st.uniformStaging(prog);
         final int len = data.length;
         final long valueKey;
@@ -848,42 +860,104 @@ public final class PipelineApplier {
             valueKey = Hashing.hashFloats(data);
         }
         if (Tracy.ENABLED) st.slotWrites++;
-        if (us.uniformValueHashBySlot[location] == valueKey) {
-            final float[] existing = us.uniformDataBySlot[location];
-            if (existing == data) {
-                if (Tracy.ENABLED) st.slotWritesElided++;
-                return;
-            }
-            if (existing != null && existing.length == len && Arrays.equals(existing, data)) {
-                us.uniformDataBySlot[location] = data;
-                if (Tracy.ENABLED) st.slotWritesElided++;
-                return;
-            }
-        }
+        final float[] existing = us.uniformDataBySlot[location];
+        final boolean unchanged = us.uniformValueHashBySlot[location] == valueKey
+            && (existing == data || Arrays.equals(existing, data));
         us.uniformDataBySlot[location] = data;
         us.uniformValueHashBySlot[location] = valueKey;
         for (int b = 0; b < ShaderManager.BLOCK_COUNT; b++) {
             final ShaderManager.UniformMemberInfo info = prog.blockInfoBySlot[b][location];
             if (info == null) continue;
+            final int words = info.wordsPerElement();
+            if (words <= 0 || len < words) return;
             final ContextState.UniformBlockState block = st.uniformBlocks[b];
             if (prog.blockSize[b] > block.size) block.size = prog.blockSize[b];
             final FloatBuffer blockFb = block.staging(prog.blockSize[b]);
 
-            final int hashSlot = block.hashSlot(info.offset());
-            if (hashSlot >= 0) {
-                if (block.hash(hashSlot) == valueKey) {
-                    if (Tracy.ENABLED) st.slotWritesElided++;
-                    return;
-                }
-                block.setHash(hashSlot, valueKey);
+            final long blockKey = sharedUniformKey(info, valueKey);
+            if (block.matches(info.offset(), info.size(), blockKey)) {
+                if (Tracy.ENABLED) st.slotWritesElided++;
+                return;
             }
             writeMember(st, prog, blockFb, prog.blockSize[b], info, data, location, false);
+            block.cacheWrite(info.offset(), info.size(), blockKey);
             block.dirty = true;
             if (GLSMDebug.isEnabled() && b == ShaderManager.BLOCK_PER_FRAME && block.flushedThisFrame) {
                 notePerFrameBlockDrift(prog, location);
             }
             return;
         }
+        if (unchanged) {
+            if (Tracy.ENABLED) st.slotWritesElided++;
+            return;
+        }
+        writeStages(st, prog, us, location, data);
+    }
+
+    private void putArrayElements(ContextState st, ShaderManager.ProgramObject prog, int location, float[] data) {
+        final int len = prog.arrayLenBySlot[location];
+        final int index = prog.arrayIndexBySlot[location];
+        final int base = location - index;
+        final ShaderManager.UniformMemberInfo baseInfo = prog.memberInfo(base);
+        final int floatsPerElement = baseInfo.wordsPerElement();
+        final int count = Math.min(data.length / floatsPerElement, len - index);
+        if (count <= 0) return;
+        if (Tracy.ENABLED) st.slotWrites++;
+        final UniformStaging us = st.uniformStaging(prog);
+        final int start = index * floatsPerElement;
+        final int floats = count * floatsPerElement;
+        float[] storage = us.uniformDataBySlot[base];
+        final boolean fresh = storage == null;
+        long storageHash;
+        if (fresh) {
+            storage = us.uniformDataBySlot[base] = new float[len * floatsPerElement];
+            storageHash = Hashing.fmix64(ARRAY_HASH_SEED, len);
+        } else {
+            storageHash = us.uniformValueHashBySlot[base];
+        }
+        boolean changed = fresh;
+        for (int i = 0; i < floats; i++) {
+            final int oldBits = Float.floatToRawIntBits(storage[start + i]);
+            final int newBits = Float.floatToRawIntBits(data[i]);
+            if (oldBits == newBits) continue;
+            storageHash ^= arrayHashTerm(start + i, oldBits) ^ arrayHashTerm(start + i, newBits);
+            storage[start + i] = data[i];
+            changed = true;
+        }
+        final long previousHash = us.uniformValueHashBySlot[base];
+        us.uniformValueHashBySlot[base] = storageHash;
+        boolean sharedBlockChanged = false;
+        for (int b = 0; b < ShaderManager.BLOCK_COUNT; b++) {
+            final ShaderManager.UniformMemberInfo blockBase = prog.blockInfoBySlot[b][base];
+            if (blockBase == null) continue;
+            final ContextState.UniformBlockState block = st.uniformBlocks[b];
+            if (prog.blockSize[b] > block.size) block.size = prog.blockSize[b];
+            final FloatBuffer blockFb = block.staging(prog.blockSize[b]);
+            final int offset = blockBase.offset();
+            final int size = blockBase.size();
+            final long valueKey = sharedUniformKey(blockBase, storageHash);
+            if (block.matches(offset, size, valueKey)) continue;
+            if (!fresh && block.matches(offset, size, sharedUniformKey(blockBase, previousHash))) {
+                writeMember(st, prog, blockFb, prog.blockSize[b], prog.blockInfoBySlot[b][location], data, location, false);
+            } else {
+                // Another program may have overwritten other elements in the shared block.
+                writeMember(st, prog, blockFb, prog.blockSize[b], blockBase, storage, base, false);
+            }
+            block.cacheWrite(offset, size, valueKey);
+            sharedBlockChanged = true;
+            block.dirty = true;
+            if (GLSMDebug.isEnabled() && b == ShaderManager.BLOCK_PER_FRAME && block.flushedThisFrame) {
+                notePerFrameBlockDrift(prog, base);
+            }
+        }
+        if (changed) {
+            writeStages(st, prog, us, location, data);
+        } else if (!sharedBlockChanged && Tracy.ENABLED) {
+            st.slotWritesElided++;
+        }
+    }
+
+    private void writeStages(ContextState st, ShaderManager.ProgramObject prog, UniformStaging us, int location, float[] data) {
         final ShaderManager.UniformMemberInfo vs = prog.vsInfoBySlot[location];
         if (vs != null && us.vsUniformFb != null) {
             writeMember(st, prog, us.vsUniformFb, prog.vertexUboSize, vs, data, location, true);
@@ -894,6 +968,16 @@ public final class PipelineApplier {
             writeMember(st, prog, us.fsUniformFb, prog.fragmentUboSize, fs, data, location, false);
             us.fsUniformDirty = true;
         }
+    }
+
+    private static long sharedUniformKey(ShaderManager.UniformMemberInfo info, long valueHash) {
+        final long layout = Hashing.fmix64(Hashing.packHiLo(info.arrayStride(), info.baseType()),
+            Hashing.packHiLo(info.vectorSize(), info.columns()));
+        return Hashing.fmix64(layout, valueHash);
+    }
+
+    private static long arrayHashTerm(int index, int bits) {
+        return bits == 0 ? 0L : Hashing.fmix64(ARRAY_HASH_SEED, Hashing.packHiLo(index, bits));
     }
 
     public void storeMatrix(ContextState st, int location, boolean transpose, FloatBuffer value, int size) {
@@ -915,9 +999,11 @@ public final class PipelineApplier {
     }
 
     private void writeMember(ContextState st, ShaderManager.ProgramObject prog, FloatBuffer ubo, int uboSize, ShaderManager.UniformMemberInfo info, float[] data, int loc, boolean isVs) {
-        final int floatsPerElement = info.vectorSize() * info.columns() * (info.baseType() == Spvc.SPVC_BASETYPE_FP64 ? 2 : 1);
+        final int floatsPerElement = info.wordsPerElement();
         if (floatsPerElement <= 0) return;
-        final int srcCount = data.length / floatsPerElement;
+        final int srcCount = info.arrayStride() > 0
+            ? Math.min(data.length / floatsPerElement, info.arrayLen())
+            : data.length / floatsPerElement;
         if (srcCount <= 0) return;
         final int dataBytes = srcCount * floatsPerElement * 4;
         final int avail = uboSize - info.offset();

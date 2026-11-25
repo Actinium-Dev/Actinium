@@ -263,6 +263,40 @@ class SdlShaderTransformsTest {
         assertCompiles(compute, GL43.GL_COMPUTE_SHADER);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"if (iris_Vertex.y > 0.0) return;", "while (iris_Vertex.y > 0.0) return;"})
+    void nativeClipDistancesApplyEachEnabledPlaneAfterPackWritesOnBothExitPaths(String earlyExit) {
+        Transformer vertex = parse("""
+            #version 460 core
+            uniform mat4 iris_ModelViewMatrix;
+            layout(location = 0) in vec4 iris_Vertex;
+            void main() {
+                gl_Position = iris_Vertex;
+                gl_ClipDistance[2] = iris_Vertex.x;
+                %s
+            }
+            """.formatted(earlyExit));
+        CommonTransformer.injectNativeClipPlanes(vertex, true);
+
+        vertex.mutateTree(tree -> {
+            List<GLSLParser.Assignment_expressionContext> writes = GlslAstHelpers.collectAll(tree, GLSLParser.Assignment_expressionContext.class)
+                .stream().filter(expression -> expression.getText().startsWith("gl_ClipDistance[2]=")).toList();
+            assertEquals(List.of("gl_ClipDistance[2]=0.0", "gl_ClipDistance[2]=iris_Vertex.x",
+                    "gl_ClipDistance[2]=dot(actinium_ClipPlane[2],_cp_ep)", "gl_ClipDistance[2]=dot(actinium_ClipPlane[2],_cp_ep)"),
+                writes.stream().map(expression -> expression.getText()).toList());
+            assertNull(GlslAstHelpers.enclosingOfType(writes.getFirst(), GLSLParser.Selection_statementContext.class));
+            for (var write : writes.subList(2, 4)) {
+                assertEquals("(actinium_ClipPlaneMask&4)!=0",
+                    GlslAstHelpers.enclosingOfType(write, GLSLParser.Selection_statementContext.class).getChild(2).getText());
+            }
+            var earlyReturn = GlslAstHelpers.collectAll(tree, GLSLParser.Jump_statementContext.class).stream()
+                .filter(jump -> jump.RETURN() != null).findFirst().orElseThrow();
+            var earlyExitBlock = earlyReturn.getParent().getParent().getParent().getParent();
+            assertTrue(GlslAstHelpers.collectAll(earlyExitBlock, GLSLParser.Assignment_expressionContext.class).contains(writes.get(2)));
+        });
+        assertCompiles(format(vertex), GL20.GL_VERTEX_SHADER);
+    }
+
     private static GLSLParser.Typeless_declarationContext declarator(GLSLParser.Translation_unitContext tree, String name) {
         return GlslAstHelpers.collectAll(tree, GLSLParser.Typeless_declarationContext.class).stream()
             .filter(declaration -> declaration.IDENTIFIER() != null && declaration.IDENTIFIER().getText().equals(name))
