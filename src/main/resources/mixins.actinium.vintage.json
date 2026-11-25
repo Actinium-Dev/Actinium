@@ -66,6 +66,7 @@
     "fontrenderer.MixinFontRenderer",
     "fpsreducer.MixinGameSettingsFpsReducer",
     "fpsreducer.MixinGuiScreenFpsReducerInput",
+    "fpsreducer.MixinMinecraftFpsReducerInput",
     "guisupersampling.MixinEntityRendererGuiSupersampling",
     "guisupersampling.MixinRenderItemGuiSupersampling",
     "guisupersampling.MixinTileEntityItemStackRendererGuiSupersampling",
