@@ -1292,11 +1292,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		CommonUniforms.addDynamicUniforms(builder, FogMode.PER_VERTEX);
 		this.customUniforms.assignTo(builder);
 
-		builder.bindAttributeLocation(11, "mc_Entity");
-		builder.bindAttributeLocation(12, "mc_midTexCoord");
-		builder.bindAttributeLocation(13, "at_tangent");
-		builder.bindAttributeLocation(14, "at_midBlock");
-
         wireGbufferResources(builder, builder, availability, shadow);
     }
 

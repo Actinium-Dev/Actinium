@@ -355,6 +355,8 @@ MakeUp Ultra Fast 9.4c 的雨雪与体积云都写入 `colortex1`。Minecraft 1.
 
 启用光影包时，主视图在晚期云层之后、最终合成之前绘制雨雪，继续遵循光影包的 `rain.depth` 与天气开关。实例化和原版绘制共用这一阶段。2026 年 11 月 24 日，用户在 Forge 1.12.2 实例中确认雨滴遮挡修复通过。BSL 与 Complementary 的画面回归待单独记录。
 
+2026 年 11 月 25 日，Forge 1.12.2 实例在 SDL GPU（Vulkan）下完成 `BSL_v10.1p1.zip` 的主世界加载，日志未出现顶点属性槽位耗尽或着色器链接失败。此前实例化输入 `iris_InstEntity` 和 `iris_CubeTangent` 缺少显式绑定，SDL 会尝试为它们另行分配槽位。现于链接前将它们分别绑定到 `mc_Entity` 和 `at_tangent` 使用的位置，程序二进制缓存键也记录同一组绑定。
+
 ### 天空前的染色玻璃
 
 Derivative Main d24.4.14 和 Revelation dev 在合成时用 `depthtex0` 判断像素是否属于天空。
