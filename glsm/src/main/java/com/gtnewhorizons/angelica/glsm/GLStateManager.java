@@ -1050,8 +1050,11 @@ public class GLStateManager {
         if (Float.isNaN(maxPointSize)) {
             final FloatBuffer range = ctx().queryScratch;
             range.clear();
-            RENDER_BACKEND.getFloat(GL11.GL_POINT_SIZE_RANGE, range);
-            final float smooth = range.get(1);
+            float smooth = 0.0f;
+            if (!RenderSystem.isGLES()) {
+                RENDER_BACKEND.getFloat(GL11.GL_POINT_SIZE_RANGE, range);
+                smooth = range.get(1);
+            }
             RENDER_BACKEND.getFloat(GL12.GL_ALIASED_POINT_SIZE_RANGE, range);
             maxPointSize = Math.max(smooth, range.get(1));
         }
@@ -3262,10 +3265,6 @@ public class GLStateManager {
     public static void glShaderSource(int shader, CharSequence[] sources) { GLSMPrograms.glShaderSource(shader, sources); }
 
     /** Check shader type to determine if fragment output transformation is needed. */
-    static boolean isFragmentShader(int shader) {
-        return RENDER_BACKEND.getShaderi(shader, GL20.GL_SHADER_TYPE) == GL20.GL_FRAGMENT_SHADER;
-    }
-
     public static void glTexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, ByteBuffer pixels) { GLSMTextures.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels); }
 
     public static void glTexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, IntBuffer pixels) { GLSMTextures.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels); }
@@ -4076,7 +4075,8 @@ public class GLStateManager {
 
         // Fragment-only program — generate a passthrough vertex shader
         final String fragSource = RENDER_BACKEND.getShaderSource(fragmentShader, 65536);
-        final String vertSource = CompatShaderTransformer.generatePassthroughVertexShader(fragSource);
+        final String vertSource = GLSMPrograms.prepareShaderSource(CompatShaderTransformer.generatePassthroughVertexShader(fragSource),
+            GL20.GL_VERTEX_SHADER, "compat_passthrough_" + program);
 
         final int vertShader = RENDER_BACKEND.createShader(GL20.GL_VERTEX_SHADER);
         RENDER_BACKEND.shaderSource(vertShader, vertSource);

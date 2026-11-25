@@ -53,8 +53,8 @@ Actinium 以 `modCompileOnly` 声明 JBredwards Fluidlogged API `3.0.6`。启用
 
 ## 前序待处理项
 
-- **GLES，#2346 `38762184`。** 点大小查询可单独处理。本地 `GLStateManager.maxPointSize()` 已查询 `GL_ALIASED_POINT_SIZE_RANGE`，但此前仍会查询 `GL_POINT_SIZE_RANGE`。需在 GLES 路径去掉这次桌面查询，并在真实 ES 上下文验证。完整原生 GLES 另行跟进，覆盖 LWJGL3 的 ES 函数入口、proxy texture 与 shader 转译。SDL 已有的 proxy texture 查询继续复用。[本地点大小查询](../glsm/src/main/java/com/gtnewhorizons/angelica/glsm/GLStateManager.java#L1048) · [上游 #2346](https://github.com/GTNewHorizons/Angelica/pull/2346)
-- **Clip distance，#2348 `9493d630`。** 已移植。定向 OpenGL 和 SDL GPU 测试通过，Minecraft 客户端、HBM 滑动防爆门和实际光影包尚未实测。[裁剪能力与实机验证方法](mobileglues-clip-cull-distance.md) · [上游 #2348](https://github.com/GTNewHorizons/Angelica/pull/2348)
+- **GLES，#2346 `38762184`。** 已适配 LWJGL3 的 GLES 函数入口、proxy 纹理探测与 ESSL 转译。真实 GLES 3.2 集成测试通过，完整客户端待实测。[验证记录](compat/gles.md) · [上游 #2346](https://github.com/GTNewHorizons/Angelica/pull/2346)
+- **Clip distance，#2348 `9493d630`。** GLES 分支已移植固定管线和 Iris 的模拟裁剪，以及 SDL Vulkan 裁剪能力协商。HBM 滑动防爆门和实际光影包待实测。[验证方法](mobileglues-clip-cull-distance.md) · [上游 #2348](https://github.com/GTNewHorizons/Angelica/pull/2348)
 - **帧图捕获和调试标记，#2326 `e46eb463`、#2351 `d69fd20a`。** Tracy 帧图等待原生采集后端接入。`CaptureGate` 已能通过环境变量和 Linux 进程映射识别部分工具。`GL_EXT_debug_tool` 探测与帧标记版本信息可独立评估。[本地工具探测](../glsm/src/main/java/com/gtnewhorizons/angelica/glsm/CaptureGate.java) · [上游 #2326](https://github.com/GTNewHorizons/Angelica/pull/2326) · [上游 #2351](https://github.com/GTNewHorizons/Angelica/pull/2351)
 - **SDL 读回，#2326 `e46eb463`。** `ReadbackShadows` 已有 transfer buffer、`serve` 和失效入口，槽内记录容量与有效标志。独立评估上游的逐槽 fence、有效字节长度以及写入和释放时的失效处理。验证同一槽从大范围改为小范围读回、改写和重分配，以及提交完成前后的读取行为。[本地 SDL 读回](../sdl-gpu/src/main/java/com/gtnewhorizons/angelica/sdlgpu/resource/ReadbackShadows.java) · [上游 #2326](https://github.com/GTNewHorizons/Angelica/pull/2326)
 

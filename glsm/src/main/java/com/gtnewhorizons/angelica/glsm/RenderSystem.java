@@ -117,21 +117,20 @@ public class RenderSystem {
         BackendManager.init();
 
         supportsCompute = supportsCompute();
-        supportsTesselation = GLStateManager.capabilities.GL_ARB_tessellation_shader || GLStateManager.capabilities.OpenGL40;
+        supportsTesselation = isGLES ? glesVersion >= 320
+            : GLStateManager.capabilities.GL_ARB_tessellation_shader || GLStateManager.capabilities.OpenGL40;
 
-        supportsImageLoadStore = GLStateManager.capabilities.OpenGL42
+        supportsImageLoadStore = isGLES ? glesVersion >= 310 : GLStateManager.capabilities.OpenGL42
                 || GLStateManager.capabilities.GL_ARB_shader_image_load_store
                 || GLStateManager.capabilities.GL_EXT_shader_image_load_store;
-        supportsSSBO = GLStateManager.capabilities.OpenGL43 || GLStateManager.capabilities.GL_ARB_shader_storage_buffer_object;
+        supportsSSBO = isGLES ? glesVersion >= 310
+            : GLStateManager.capabilities.OpenGL43 || GLStateManager.capabilities.GL_ARB_shader_storage_buffer_object;
         supportsBufferStorage = !isGLES && (GLStateManager.capabilities.OpenGL44 || GLStateManager.capabilities.GL_ARB_buffer_storage);
         supportsClearTexture = GLStateManager.capabilities.OpenGL44 || GLStateManager.capabilities.GL_ARB_clear_texture;
         supportsStencilTexturing = GLStateManager.capabilities.OpenGL43 || GLStateManager.capabilities.GL_ARB_stencil_texturing;
         supportsTextureStorage = isGLES ? glesVersion >= 300
             : GLStateManager.capabilities.OpenGL42 || GLStateManager.capabilities.GL_ARB_texture_storage;
-        // MobileGlues masquerades as desktop GL but compiles shaders through ESSL translation,
-        // where gl_ClipDistance needs GL_EXT_clip_cull_distance (issue #214). MobileGlues advertises
-        // that extension only when the real ES backend supports it, so the plain extension query
-        // stays authoritative; without the MobileGlues check it would be overruled by !isGLES.
+        // MobileGlues reports a desktop version but its clip support depends on the advertised extension.
         final String glVersion = RENDER_BACKEND.getString(GL11.GL_VERSION);
         isMobileGlues = (glVersion != null && glVersion.contains("MobileGlues")) || hasExtension("GL_MG_mobileglues");
         final boolean clipDistanceAvailable = resolveClipCullDistanceSupport(hasExtension("GL_EXT_clip_cull_distance"), isGLES, isMobileGlues);
@@ -141,8 +140,12 @@ public class RenderSystem {
             GLStateManager.LOGGER.info("Emulating clip distances (native clip distances: {}, required: {})", maxClipDistances, GLStateManager.MAX_CLIP_PLANES);
         }
 
+        if (isMobileGlues) {
+            GLStateManager.LOGGER.info("MobileGlues detected, clip distance support: {}", hasClipCullDistance);
+        }
+
         if (supportsImageLoadStore) {
-            if (GLStateManager.capabilities.OpenGL42) {
+            if (isGLES || GLStateManager.capabilities.OpenGL42) {
                 maxImageUnits = RENDER_BACKEND.getInteger(GL42.GL_MAX_IMAGE_UNITS);
             } else if (GLStateManager.capabilities.GL_ARB_shader_image_load_store) {
                 maxImageUnits = RENDER_BACKEND.getInteger(ARBShaderImageLoadStore.GL_MAX_IMAGE_UNITS);
@@ -154,7 +157,7 @@ public class RenderSystem {
         }
 
         if (supportsSSBO) {
-            if (GLStateManager.capabilities.OpenGL43) {
+            if (isGLES || GLStateManager.capabilities.OpenGL43) {
                 maxSSBOBindings = RENDER_BACKEND.getInteger(GL43.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS);
             } else {
                 maxSSBOBindings = RENDER_BACKEND.getInteger(ARBShaderStorageBufferObject.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS);
@@ -163,7 +166,8 @@ public class RenderSystem {
             maxSSBOBindings = 0;
         }
 
-        supportsSamplerObjects = GLStateManager.capabilities.OpenGL33 || GLStateManager.capabilities.GL_ARB_sampler_objects;
+        supportsSamplerObjects = isGLES ? glesVersion >= 300
+            : GLStateManager.capabilities.OpenGL33 || GLStateManager.capabilities.GL_ARB_sampler_objects;
         if (supportsSamplerObjects) {
             samplers = new int[RENDER_BACKEND.getInteger(GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS)];
         }
@@ -454,10 +458,11 @@ public class RenderSystem {
     }
 
     private static synchronized void detectGLES() {
-        if (glesDetected) return;
+        if (glesDetected || !RENDER_BACKEND.hasContextOnThread()) return;
         try {
             final String v = RENDER_BACKEND.getString(GL11.GL_VERSION);
-            if (v != null && v.startsWith("OpenGL ES ")) {
+            if (v == null) return;
+            if (v.startsWith("OpenGL ES ")) {
                 isGLES = true;
                 glesVersion = Integer.parseInt(parseGlVersionString(v));
             }
@@ -621,6 +626,7 @@ public class RenderSystem {
      * exposes them on a 4.2 context.
      */
     public static boolean supportsCompute() {
+        if (isGLES()) return glesVersion >= 310;
         final ContextCapabilities capabilities = GLStateManager.capabilities;
         if (capabilities != null) {
             return capabilities.GL_ARB_compute_shader;
@@ -821,9 +827,9 @@ public class RenderSystem {
         }
         final String major = matcher.group("major");
         final String minor = matcher.group("minor");
-        String bugfix = matcher.group("bugfix");
-        if (bugfix == null || bugfix.isEmpty()) bugfix = "0";
-        return major + minor + bugfix;
+        final String bugfix = matcher.group("bugfix");
+        if (!bugfix.isEmpty()) return major + minor + bugfix;
+        return minor.length() == 2 ? major + minor : major + minor + "0";
     }
 
     /** Lowest core profile version Actinium can run on, packed as {@code major * 10 + minor}. */

@@ -12,6 +12,8 @@ import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
+import org.objectweb.asm.tree.JumpInsnNode;
+import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.VarInsnNode;
@@ -148,6 +150,8 @@ public final class LwjglContextLifecycleTransformer implements ExplicitClassTran
             throw transformationFailure(DISPLAY, "destroy()V has no available local slot for its context token");
         }
 
+        makeCurrent.instructions.insert(glesDisplayContextChange(true));
+        releaseContext.instructions.insert(glesDisplayContextChange(false));
         injectBeforeReturns(DISPLAY, create, Opcodes.RETURN, LwjglContextLifecycleTransformer::bindDisplayContext);
         injectBeforeReturns(DISPLAY, makeCurrent, Opcodes.RETURN, LwjglContextLifecycleTransformer::bindDisplayContext);
         injectBeforeReturns(DISPLAY, releaseContext, Opcodes.RETURN, LwjglContextLifecycleTransformer::releaseContext);
@@ -156,6 +160,19 @@ public final class LwjglContextLifecycleTransformer implements ExplicitClassTran
         destroy.instructions.insert(displayDestroyCapture(contextLocal));
         injectBeforeReturns(DISPLAY, destroy, Opcodes.RETURN, () -> retireDisplayContext(contextLocal));
         return true;
+    }
+
+    private static InsnList glesDisplayContextChange(boolean bind) {
+        final InsnList instructions = new InsnList();
+        final LabelNode hostPath = new LabelNode();
+        instructions.add(new FieldInsnNode(Opcodes.GETSTATIC, "org/lwjgl/opengl/Display", "drawable", DRAWABLE_DESCRIPTOR));
+        instructions.add(new InsnNode(bind ? Opcodes.ICONST_1 : Opcodes.ICONST_0));
+        instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, DISPLAY_BINDING, "changeGlesDisplayContext",
+            "(" + DRAWABLE_DESCRIPTOR + "Z)Z", false));
+        instructions.add(new JumpInsnNode(Opcodes.IFEQ, hostPath));
+        instructions.add(new InsnNode(Opcodes.RETURN));
+        instructions.add(hostPath);
+        return instructions;
     }
 
     private static boolean transformDrawable(ClassNode classNode) {

@@ -23,7 +23,7 @@ public final class SystemProperties {
     /** Identifies the OpenGL version override in startup diagnostics and video settings. */
     public static final String KEY_GL_PROFILE = "angelica.glProfile";
 
-    /** Core profile version override, written as {@code major.minor}. */
+    /** Context override, written as {@code major.minor} for desktop GL or {@code es} for OpenGL ES 3.2. */
     public static final String GL_PROFILE = System.getProperty(KEY_GL_PROFILE, "");
 
     /** Identifies the backend override in early window selection and video settings. */

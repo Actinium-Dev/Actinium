@@ -1,9 +1,7 @@
 package com.gtnewhorizons.angelica.config;
 
 /**
- * Core profile versions the client may request, plus the resolution rule that snaps a requested
- * version down to a supported one. {@link #AUTO} hands the probe back to the descending scan over
- * the platform ceiling.
+ * Context profiles the client can request. Desktop requests are capped at the platform maximum.
  */
 public enum GLVersionChoice {
     AUTO(0),
@@ -14,7 +12,8 @@ public enum GLVersionChoice {
     GL43(43),
     GL44(44),
     GL45(45),
-    GL46(46);
+    GL46(46),
+    GLES32(-2);
 
     private final int version;
 
@@ -25,13 +24,15 @@ public enum GLVersionChoice {
     public int version() { return version; }
 
     public String label() {
+        if (this == GLES32) return "OpenGL ES 3.2";
         return version / 10 + "." + version % 10;
     }
 
     public static GLVersionChoice of(int version, int ceiling) {
+        if (version == GLES32.version) return GLES32;
         GLVersionChoice best = AUTO;
         for (final GLVersionChoice choice : values()) {
-            if (choice.version != 0 && choice.version <= version && choice.version <= ceiling) best = choice;
+            if (choice.version > 0 && choice.version <= version && choice.version <= ceiling) best = choice;
         }
         return best;
     }

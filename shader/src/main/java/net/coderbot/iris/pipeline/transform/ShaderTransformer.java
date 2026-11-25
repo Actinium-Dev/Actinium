@@ -36,7 +36,7 @@ public class ShaderTransformer {
     private static final Set<String> loggedNegotiations = new HashSet<>();
 
     static boolean canEmitImageOps() {
-        return RenderSystem.supportsImageLoadStore() && RenderSystem.getMaxGlslVersion() >= 420;
+        return RenderSystem.supportsImageLoadStore() && (RenderSystem.isGLES() || RenderSystem.getMaxGlslVersion() >= 420);
     }
 
     static void clearSessionState() {
@@ -84,7 +84,8 @@ public class ShaderTransformer {
     }
 
     static NegotiationResult negotiateVersion(int effectiveVersion, PatchShaderType stage) {
-        final int maxGlsl = RenderSystem.getMaxGlslVersion();
+        // The GLES backend translates desktop source before submitting it to the driver.
+        final int maxGlsl = RenderSystem.isGLES() ? 460 : RenderSystem.getMaxGlslVersion();
 
         if (effectiveVersion <= maxGlsl) {
             return NegotiationResult.noop(effectiveVersion, effectiveVersion >= 150 ? "core" : "");

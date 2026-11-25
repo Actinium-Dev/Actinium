@@ -18,6 +18,13 @@ class OpenGlVersionTest {
     }
 
     @Test
+    void distinguishesNativeGlesFromDesktopAndChecksTheMinimumVersion() {
+        assertTrue(OpenGlVersion.parseEs("OpenGL ES 3.2 NVIDIA 566.26").isAtLeast(3, 2));
+        assertFalse(OpenGlVersion.parseEs("OpenGL ES 3.1 Mesa").isAtLeast(3, 2));
+        assertThrows(IllegalArgumentException.class, () -> OpenGlVersion.parseEs("4.3.0 MobileGlues"));
+    }
+
+    @Test
     void comparesMajorAndMinorVersions() {
         assertTrue(new OpenGlVersion(4, 0).isAtLeast(3, 3));
         assertTrue(new OpenGlVersion(3, 3).isAtLeast(3, 3));

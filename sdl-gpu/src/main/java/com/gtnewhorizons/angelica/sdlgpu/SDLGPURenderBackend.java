@@ -1525,52 +1525,12 @@ public class SDLGPURenderBackend extends RenderBackend {
         return TextureInfoCache.isProxyTarget(target);
     }
 
-    private static boolean proxyLayersInHeight(int target) {
-        return target == GL30.GL_PROXY_TEXTURE_1D_ARRAY;
-    }
-
-    private static boolean proxyLayersInDepth(int target) {
-        return isProxyArrayTarget(target) && !proxyLayersInHeight(target);
-    }
-
-    private static boolean isProxyArrayTarget(int target) {
-        return target == GL30.GL_PROXY_TEXTURE_1D_ARRAY || target == GL30.GL_PROXY_TEXTURE_2D_ARRAY || target == GL32.GL_PROXY_TEXTURE_2D_MULTISAMPLE_ARRAY || target == GL40.GL_PROXY_TEXTURE_CUBE_MAP_ARRAY;
-    }
-
     public static int proxyLevelSize(int base, int level) {
         return PixelOps.mipLevelSize(base, level);
     }
 
-    static int proxyDimensionLimit(int target) {
-        return switch (target) {
-            case GL12.GL_PROXY_TEXTURE_3D -> MAX_3D_TEXTURE_SIZE;
-            case GL13.GL_PROXY_TEXTURE_CUBE_MAP, GL40.GL_PROXY_TEXTURE_CUBE_MAP_ARRAY -> MAX_CUBE_MAP_TEXTURE_SIZE;
-            default -> MAX_TEXTURE_SIZE;
-        };
-    }
-
-    static int levelZeroEquivalentSize(int size, int level) {
-        if (size <= 0 || level < 0 || level >= Integer.SIZE - 1) return 0;
-        final long scaled = (long) size << level;
-        return scaled > Integer.MAX_VALUE ? 0 : (int) scaled;
-    }
-
     private void recordProxyTexImage(ContextState st, int target, int level, int internalFormat, int width, int height, int depth) {
-        final boolean layersInHeight = proxyLayersInHeight(target);
-        final boolean layersInDepth = proxyLayersInDepth(target);
-        final int dimLimit = proxyDimensionLimit(target);
-        final int w = levelZeroEquivalentSize(width, level);
-        final int h = layersInHeight ? height : levelZeroEquivalentSize(height, level);
-        final int d = layersInDepth ? depth : levelZeroEquivalentSize(depth, level);
-        final int hLimit = layersInHeight ? MAX_ARRAY_TEXTURE_LAYERS : dimLimit;
-        final int dLimit = layersInDepth ? MAX_ARRAY_TEXTURE_LAYERS : dimLimit;
-        final boolean fits = w >= 1 && w <= dimLimit && h >= 1 && h <= hLimit && d >= 1 && d <= dLimit
-            && resourceManager.isMappableTextureFormat(internalFormat);
-        if (fits) {
-            st.proxyTexture.accept(target, w, h, d, internalFormat);
-        } else {
-            st.proxyTexture.reject(target);
-        }
+        st.proxyTexture.record(target, level, internalFormat, width, height, depth, resourceManager.isMappableTextureFormat(internalFormat));
     }
 
     private static int boundTextureFor(ContextState st, int target) {
@@ -1844,17 +1804,7 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
     @Override public int getTexLevelParameteri(int target, int level, int pname) {
         final ContextState cs = s();
-        if (isProxyTarget(target)) {
-            final ContextState.ProxyTextureState proxy = cs.proxyTexture;
-            if (proxy.target != target) return 0;
-            return switch (pname) {
-                case GL11.GL_TEXTURE_WIDTH -> proxyLevelSize(proxy.width, level);
-                case GL11.GL_TEXTURE_HEIGHT -> proxyLayersInHeight(target) ? proxy.height : proxyLevelSize(proxy.height, level);
-                case GL12.GL_TEXTURE_DEPTH -> proxyLayersInDepth(target) ? proxy.depth : proxyLevelSize(proxy.depth, level);
-                case GL11.GL_TEXTURE_INTERNAL_FORMAT -> proxy.internalFormat;
-                default -> 0;
-            };
-        }
+        if (isProxyTarget(target)) return cs.proxyTexture.levelParameter(target, level, pname);
         return getTextureLevelParameteri(cs.boundTextures[cs.activeTextureUnit], level, pname);
     }
     @Override public void generateMipmap(int target) {
@@ -4374,10 +4324,10 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
 
     static final int MAX_UNIFORM_COMPONENTS_PER_STAGE = 4096 / Float.BYTES;
-    static final int MAX_ARRAY_TEXTURE_LAYERS = 256;
-    static final int MAX_TEXTURE_SIZE = 16384;
-    static final int MAX_CUBE_MAP_TEXTURE_SIZE = 16384;
-    static final int MAX_3D_TEXTURE_SIZE = 2048;
+    public static final int MAX_ARRAY_TEXTURE_LAYERS = 256;
+    public static final int MAX_TEXTURE_SIZE = 16384;
+    public static final int MAX_CUBE_MAP_TEXTURE_SIZE = 16384;
+    public static final int MAX_3D_TEXTURE_SIZE = 2048;
     /** D3D12 and Metal both cap anisotropy at 16, and every desktop Vulkan driver reports 16. */
     static final float MAX_ANISOTROPY = 16.0f;
 

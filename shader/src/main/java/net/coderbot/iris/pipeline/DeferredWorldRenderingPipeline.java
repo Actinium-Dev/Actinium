@@ -241,7 +241,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 	private boolean matchingBlend;
 	private boolean drivingProgram;
 	private boolean linkingVariant;
-	private boolean clipRebindPending;
+	private boolean switchingClipProgram;
 
 	private boolean shouldBindPBR;
 	private int currentNormalTexture;
@@ -844,6 +844,11 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		return isRenderingWorld && !isRenderingFullScreenPass && !isPostChain && isMainBound;
 	}
 
+	/** Identifies the program binds internal to a variant build or a clip-only switch. */
+	public boolean isBindingProgramVariant() {
+		return linkingVariant || switchingClipProgram;
+	}
+
 	public int getActivePassProgramId() {
 		if (current == null) return -1;
 		final Program p = current.boundBaseProgram;
@@ -872,7 +877,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 			getActivePassProgramId()
 		);
 		current = null;
-		clipRebindPending = false;
 		programMatch.clear();
 	}
 
@@ -889,7 +893,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 	/** Reapplies the active Iris pass after a renderer that may have changed raw GL state. */
 	public void restorePassAfterForeignDraw() {
-		if (refreshingPass || drivingProgram
+		if (refreshingPass || drivingProgram || isBindingProgramVariant()
 			|| !isRenderingWorld
 			|| isRenderingFullScreenPass
 			|| isPostChain
@@ -1076,30 +1080,26 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 	@Override
 	public void resolvePendingProgram() {
+		if (drivingProgram || isBindingProgramVariant()) return;
 		programMatch.resolve();
-		if (!clipRebindPending || GLStateManager.isForeignDraw() || linkingVariant || drivingProgram) return;
-		clipRebindPending = false;
-		if (!programMatch.isPending() && GLSMHooks.pendingProgramSelection == this) {
-			GLSMHooks.pendingProgramSelection = null;
-		}
 		final Pass pass = current;
-		if (pass != null && pass.liveProgram != null && GLSMPrograms.getActiveProgram() == pass.liveProgram.getProgramId()) {
-			programMatch.runUnrecorded(() -> {
-				final boolean suspended = GLStateManager.suspendExitCapture();
-				try {
-					final Program selected = pass.selectProgram(activeInstancing);
-					if (selected != pass.liveProgram) pass.bind(selected);
-				} finally {
-					GLStateManager.resumeExitCapture(suspended);
-				}
-			});
-		}
+		final boolean canRebind = pass != null && pass.liveProgram != null
+			&& isRenderingWorld && !isRenderingFullScreenPass && !isPostChain && (isMainBound || isRenderingShadow);
+		// ForeignDraw defers pass matching, but the renderer can draw using the current Iris pass.
+		programMatch.resolveProgramRebind(canRebind ? pass.liveProgram.getProgramId() : 0, () -> {
+			switchingClipProgram = true;
+			try {
+				final Program selected = pass.selectProgram(activeInstancing);
+				if (selected != pass.liveProgram) pass.bind(selected);
+			} finally {
+				switchingClipProgram = false;
+			}
+		});
 	}
 
 	public void onClipPlanesInUseChanged() {
 		if (current == null) return;
-		clipRebindPending = true;
-		GLSMHooks.pendingProgramSelection = this;
+		programMatch.requestProgramRebind();
 	}
 
 	@Override
@@ -1747,7 +1747,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 	@Override
 	public void destroy() {
-		clipRebindPending = false;
 		programMatch.clear();
         vertexWriteReplays.destroy();
         if (shadowVoxelizationCompute != null) {
@@ -2268,7 +2267,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
         IrisGlDebug.markStage("level:begin");
 		isRenderingFullScreenPass = false;
 		hasRenderedPreparePass = false;
-		clipRebindPending = false;
 		programMatch.clear();
 		isRenderingWorld = true;
 		isBeforeTranslucent = true;
@@ -2342,7 +2340,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		isRenderingWorld = false;
 		phase = WorldRenderingPhase.NONE;
 		overridePhase = null;
-		clipRebindPending = false;
 		programMatch.clear();
 
 		isRenderingFullScreenPass = true;
