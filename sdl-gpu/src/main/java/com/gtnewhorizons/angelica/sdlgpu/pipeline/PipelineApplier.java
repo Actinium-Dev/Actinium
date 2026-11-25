@@ -754,7 +754,7 @@ public final class PipelineApplier {
     public float[] reuseOrAlloc(ContextState st, int location, int length) {
         final ShaderManager.ProgramObject prog = st.boundProgramObj;
         if (prog == null || location < 0 || location >= prog.uniformSlotCount) return null;
-        if (prog.floatLimitBySlot[location] < 0) return st.uniformStaging(prog).arrayScratch(location, length);
+        if (prog.arrayLenBySlot[location] > 0) return st.uniformStaging(prog).arrayScratch(location, length);
         final float[] existing = st.uniformStaging(prog).uniformDataBySlot[location];
         if (existing != null && existing.length == length) return existing;
         return new float[length];
@@ -765,7 +765,7 @@ public final class PipelineApplier {
         if (prog == null || location < 0 || location >= prog.uniformSlotCount) return;
         final int n = value.remaining();
         final int pos = value.position();
-        if (prog.floatLimitBySlot[location] < 0) {
+        if (prog.arrayLenBySlot[location] > 0) {
             final float[] v = st.uniformStaging(prog).arrayScratch(location, n);
             value.get(pos, v);
             putUniform(st, location, v);
@@ -844,12 +844,10 @@ public final class PipelineApplier {
     public void putUniform(ContextState st, int location, float[] data) {
         final ShaderManager.ProgramObject prog = st.boundProgramObj;
         if (prog == null || location < 0 || location >= prog.uniformSlotCount) return;
-        final int limit = prog.floatLimitBySlot[location];
-        if (limit < 0) {
-            putArrayElement(st, prog, st.uniformStaging(prog), location - prog.arrayIndexBySlot[location], location, data);
+        if (prog.arrayLenBySlot[location] > 0) {
+            putArrayElements(st, prog, location, data);
             return;
         }
-        if (data.length > limit) return;
         final UniformStaging us = st.uniformStaging(prog);
         final int len = data.length;
         final long valueKey;
@@ -900,15 +898,16 @@ public final class PipelineApplier {
         writeStages(st, prog, us, location, data);
     }
 
-    private void putArrayElement(ContextState st, ShaderManager.ProgramObject prog, UniformStaging us, int base, int location, float[] data) {
-        final ShaderManager.UniformMemberInfo baseInfo = prog.memberInfo(base);
-        if (baseInfo == null) return;
+    private void putArrayElements(ContextState st, ShaderManager.ProgramObject prog, int location, float[] data) {
         final int len = prog.arrayLenBySlot[location];
         final int index = prog.arrayIndexBySlot[location];
+        final int base = location - index;
+        final ShaderManager.UniformMemberInfo baseInfo = prog.memberInfo(base);
         final int floatsPerElement = baseInfo.wordsPerElement();
         final int count = Math.min(data.length / floatsPerElement, len - index);
         if (count <= 0) return;
         if (Tracy.ENABLED) st.slotWrites++;
+        final UniformStaging us = st.uniformStaging(prog);
         final int start = index * floatsPerElement;
         final int floats = count * floatsPerElement;
         float[] storage = us.uniformDataBySlot[base];
@@ -916,7 +915,7 @@ public final class PipelineApplier {
         long storageHash;
         if (fresh) {
             storage = us.uniformDataBySlot[base] = new float[len * floatsPerElement];
-            storageHash = ARRAY_HASH_SEED;
+            storageHash = Hashing.fmix64(ARRAY_HASH_SEED, len);
         } else {
             storageHash = us.uniformValueHashBySlot[base];
         }
@@ -931,6 +930,7 @@ public final class PipelineApplier {
         }
         final long previousHash = us.uniformValueHashBySlot[base];
         us.uniformValueHashBySlot[base] = storageHash;
+        boolean sharedBlockChanged = false;
         for (int b = 0; b < ShaderManager.BLOCK_COUNT; b++) {
             final ShaderManager.UniformMemberInfo blockBase = prog.blockInfoBySlot[b][base];
             if (blockBase == null) continue;
@@ -938,28 +938,28 @@ public final class PipelineApplier {
             if (prog.blockSize[b] > block.size) block.size = prog.blockSize[b];
             final FloatBuffer blockFb = block.staging(prog.blockSize[b]);
             final int hashSlot = block.hashSlot(blockBase.offset());
-            if (hashSlot >= 0 && block.hash(hashSlot) == storageHash) {
-                if (Tracy.ENABLED) st.slotWritesElided++;
-                return;
-            }
-            if (!fresh && hashSlot >= 0 && block.hash(hashSlot) == previousHash) {
+            final long layoutKey = Hashing.fmix64(blockBase.arrayStride(),
+                Hashing.packHiLo(blockBase.vectorSize(), blockBase.columns()));
+            final long valueKey = Hashing.fmix64(layoutKey, storageHash);
+            if (hashSlot >= 0 && block.hash(hashSlot) == valueKey) continue;
+            if (!fresh && hashSlot >= 0 && block.hash(hashSlot) == Hashing.fmix64(layoutKey, previousHash)) {
                 writeMember(st, prog, blockFb, prog.blockSize[b], prog.blockInfoBySlot[b][location], data, location, false);
             } else {
                 // Another program may have overwritten other elements in the shared block.
                 writeMember(st, prog, blockFb, prog.blockSize[b], blockBase, storage, base, false);
             }
-            if (hashSlot >= 0) block.setHash(hashSlot, storageHash);
+            if (hashSlot >= 0) block.setHash(hashSlot, valueKey);
+            sharedBlockChanged = true;
             block.dirty = true;
             if (GLSMDebug.isEnabled() && b == ShaderManager.BLOCK_PER_FRAME && block.flushedThisFrame) {
                 notePerFrameBlockDrift(prog, base);
             }
-            return;
         }
-        if (!changed) {
-            if (Tracy.ENABLED) st.slotWritesElided++;
-            return;
+        if (changed) {
+            writeStages(st, prog, us, location, data);
+        } else if (!sharedBlockChanged && Tracy.ENABLED) {
+            st.slotWritesElided++;
         }
-        writeStages(st, prog, us, location, data);
     }
 
     private void writeStages(ContextState st, ShaderManager.ProgramObject prog, UniformStaging us, int location, float[] data) {
@@ -1000,7 +1000,9 @@ public final class PipelineApplier {
     private void writeMember(ContextState st, ShaderManager.ProgramObject prog, FloatBuffer ubo, int uboSize, ShaderManager.UniformMemberInfo info, float[] data, int loc, boolean isVs) {
         final int floatsPerElement = info.wordsPerElement();
         if (floatsPerElement <= 0) return;
-        final int srcCount = Math.min(data.length / floatsPerElement, info.arrayLen());
+        final int srcCount = info.arrayStride() > 0
+            ? Math.min(data.length / floatsPerElement, info.arrayLen())
+            : data.length / floatsPerElement;
         if (srcCount <= 0) return;
         final int dataBytes = srcCount * floatsPerElement * 4;
         final int avail = uboSize - info.offset();

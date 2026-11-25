@@ -20,8 +20,7 @@ public class AttributeParameters extends Parameters {
 	 * layout instead of returning the same shader for {@code NONE}, {@code TEMPLATE} and {@code CUBE}.
 	 */
 	public final Instancing instancing;
-	/** Selects a vertex/fragment pair that clips fragments against the enabled planes. */
-	public final boolean clipDiscard;
+	// WARNING: adding new fields requires updating hashCode and equals methods!
 
 	public AttributeParameters(Patch patch, boolean hasGeometry, InputAvailability inputs) {
 		this(patch, hasGeometry, false, inputs, Instancing.NONE);
@@ -32,16 +31,11 @@ public class AttributeParameters extends Parameters {
 	}
 
 	public AttributeParameters(Patch patch, boolean hasGeometry, boolean hasTesselation, InputAvailability inputs, Instancing instancing) {
-		this(patch, hasGeometry, hasTesselation, inputs, instancing, false);
-	}
-
-	public AttributeParameters(Patch patch, boolean hasGeometry, boolean hasTesselation, InputAvailability inputs, Instancing instancing, boolean clipDiscard) {
 		super(patch, null);
 		this.hasGeometry = hasGeometry;
 		this.hasTesselation = hasTesselation;
 		this.inputs = inputs;
 		this.instancing = instancing;
-		this.clipDiscard = clipDiscard;
 	}
 
 	@Override
@@ -56,7 +50,6 @@ public class AttributeParameters extends Parameters {
 		result = prime * result + (hasGeometry ? 1231 : 1237);
 		result = prime * result + (hasTesselation ? 1231 : 1237);
 		result = prime * result + instancing.ordinal();
-		result = prime * result + Boolean.hashCode(clipDiscard);
 		result = prime * result + ((inputs == null) ? 0 : inputs.hashCode());
 		return result;
 	}
@@ -74,7 +67,7 @@ public class AttributeParameters extends Parameters {
 			return false;
 		if (hasTesselation != other.hasTesselation)
 			return false;
-		if (instancing != other.instancing || clipDiscard != other.clipDiscard)
+		if (instancing != other.instancing)
 			return false;
 		if (inputs == null) {
 			if (other.inputs != null)

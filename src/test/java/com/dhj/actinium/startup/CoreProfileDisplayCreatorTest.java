@@ -1,7 +1,6 @@
 package com.dhj.actinium.startup;
 
 import com.dhj.actinium.debug.OpenGlVersion;
-import com.gtnewhorizons.angelica.config.GLVersionChoice;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.LWJGLException;
@@ -113,14 +112,6 @@ class CoreProfileDisplayCreatorTest {
         assertEquals(-1, CoreProfileDisplayCreator.parseGlProfile(""));
         assertEquals(-1, CoreProfileDisplayCreator.parseGlProfile("OpenGL 4.5"));
         assertEquals(-1, CoreProfileDisplayCreator.parseGlProfile("4.5.1"), "the minor part must be a single number");
-    }
-
-    @Test
-    void distinguishesAnExplicitEsProfileFromDesktopVersionProbing() {
-        int override = CoreProfileDisplayCreator.parseGlProfile("es");
-        assertEquals(GLVersionChoice.GLES32, GLVersionChoice.of(override, 46));
-        int desktop = CoreProfileDisplayCreator.parseGlProfile("3.2");
-        assertEquals(GLVersionChoice.AUTO, GLVersionChoice.of(desktop, 46));
     }
 
     private static int capAfter(int requested, String driverVersion) {

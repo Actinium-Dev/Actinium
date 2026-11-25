@@ -7,29 +7,21 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.FrameNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
-import org.objectweb.asm.tree.LabelNode;
-import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** Extends the LWJGL context attributes to accept desktop GL 4.6 and GLES 3.2. */
+/** Extends the legacy OpenGL 4 context attribute version check to include 4.6. */
 public final class LwjglContextVersionTransformer implements ExplicitClassTransformer {
     private static final Logger LOGGER = LogManager.getLogger("Actinium");
     private static final String CONTEXT_ATTRIBS = "org.lwjgl.opengl.ContextAttribs";
     private static final String CONTEXT_ATTRIBS_INTERNAL = "org/lwjgl/opengl/ContextAttribs";
     private static final int GL45 = 5;
     private static final int GL46 = 6;
-    private static final String LEGACY_ES_REJECTION = "The OpenGL ES profile is only supported on OpenGL version 2.0.";
-    private static final String ES_REJECTION = "The OpenGL ES profile requires version 2.0 or 3.2.";
 
     @Override
     public int getPriority() {
@@ -60,9 +52,7 @@ public final class LwjglContextVersionTransformer implements ExplicitClassTransf
             if (!CONTEXT_ATTRIBS_INTERNAL.equals(classNode.name)) {
                 throw transformationFailure("unexpected class node " + classNode.name);
             }
-            final boolean desktopChanged = extendVersionCheck(classNode);
-            final boolean esChanged = extendEsProfileCheck(classNode);
-            if (!desktopChanged && !esChanged) {
+            if (!extendVersionCheck(classNode)) {
                 return basicClass;
             }
             final ClassWriter writer = new ClassWriter(reader, 0);
@@ -72,55 +62,6 @@ public final class LwjglContextVersionTransformer implements ExplicitClassTransf
             LOGGER.error("Failed to extend LWJGL context attribute version validation", failure);
             throw failure;
         }
-    }
-
-    private static boolean extendEsProfileCheck(ClassNode classNode) {
-        final MethodNode method = classNode.methods.stream()
-            .filter(candidate -> "withProfileES".equals(candidate.name)
-                && ("(Z)L" + CONTEXT_ATTRIBS_INTERNAL + ";").equals(candidate.desc))
-            .findFirst().orElse(null);
-        if (method == null) return false;
-        LdcInsnNode rejection = null;
-        for (AbstractInsnNode instruction : method.instructions) {
-            if (instruction instanceof LdcInsnNode constant && LEGACY_ES_REJECTION.equals(constant.cst)) {
-                rejection = constant;
-                break;
-            }
-        }
-        if (rejection == null) return false;
-
-        final AbstractInsnNode first = firstInstruction(method);
-        final AbstractInsnNode major = nextInstruction(first);
-        final AbstractInsnNode majorComparison = nextInstruction(nextInstruction(major));
-        final AbstractInsnNode minor = nextInstruction(nextInstruction(majorComparison));
-        final AbstractInsnNode minorComparison = nextInstruction(minor);
-        if (!(major instanceof FieldInsnNode majorField) || !"majorVersion".equals(majorField.name)
-            || !(minor instanceof FieldInsnNode minorField) || !"minorVersion".equals(minorField.name)
-            || !(majorComparison instanceof JumpInsnNode rejectMajor) || rejectMajor.getOpcode() != Opcodes.IF_ICMPNE
-            || !(minorComparison instanceof JumpInsnNode acceptEs2) || acceptEs2.getOpcode() != Opcodes.IFEQ) {
-            throw transformationFailure("unexpected GLES 2.0 profile check");
-        }
-
-        final LabelNode rejectEs = new LabelNode();
-        final InsnList es32 = new InsnList();
-        es32.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        es32.add(new FieldInsnNode(Opcodes.GETFIELD, CONTEXT_ATTRIBS_INTERNAL, "majorVersion", "I"));
-        es32.add(new InsnNode(Opcodes.ICONST_3));
-        es32.add(new JumpInsnNode(Opcodes.IF_ICMPNE, rejectEs));
-        es32.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        es32.add(new FieldInsnNode(Opcodes.GETFIELD, CONTEXT_ATTRIBS_INTERNAL, "minorVersion", "I"));
-        es32.add(new InsnNode(Opcodes.ICONST_2));
-        es32.add(new JumpInsnNode(Opcodes.IF_ICMPEQ, acceptEs2.label));
-        es32.add(rejectEs);
-        es32.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
-        method.instructions.insertBefore(nextInstruction(rejectMajor.label), es32);
-        rejection.cst = ES_REJECTION;
-        return true;
-    }
-
-    private static AbstractInsnNode firstInstruction(MethodNode method) {
-        final AbstractInsnNode first = method.instructions.getFirst();
-        return first.getOpcode() < 0 ? nextInstruction(first) : first;
     }
 
     private static boolean extendVersionCheck(ClassNode classNode) {

@@ -271,17 +271,15 @@ public final class GLSMRasterizer {
 
     public static void glClipPlane(int plane, DoubleBuffer equation) {
         rejectExitCapture();
-        final RecordMode mode = DisplayListManager.getRecordMode();
-        if (mode != RecordMode.NONE) {
+        if (DisplayListManager.isRecording()) {
             final int pos = equation.position();
             DisplayListManager.recordClipPlane(plane, equation.get(pos), equation.get(pos + 1), equation.get(pos + 2), equation.get(pos + 3));
-            if (mode == RecordMode.COMPILE) return;
+            return;
         }
         final int index = plane - GL11.GL_CLIP_PLANE0;
         if (index < 0 || index >= MAX_CLIP_PLANES) return;
         final int pos = equation.position();
         beforeUncapturedStateChange();
-        ctx().clipPlaneState.beforeModify();
         ctx().clipPlaneState.setPlane(index, equation.get(pos), equation.get(pos + 1), equation.get(pos + 2), equation.get(pos + 3), ctx().modelViewMatrix);
         ctx().clipPlaneGeneration++;
     }
@@ -367,10 +365,6 @@ public final class GLSMRasterizer {
 
     public static boolean anyClipPlaneEnabled(GLContextState glCtx) {
         return glCtx.clipPlaneEnabledMask != 0;
-    }
-
-    public static boolean clipEmulationActive() {
-        return RenderSystem.isClipDistanceEmulated() && anyClipPlaneEnabled();
     }
 
     public static void glSampleCoverage(float value, boolean invert) {

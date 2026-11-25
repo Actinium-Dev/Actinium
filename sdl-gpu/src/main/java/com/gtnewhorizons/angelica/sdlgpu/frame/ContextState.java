@@ -1,7 +1,6 @@
 package com.gtnewhorizons.angelica.sdlgpu.frame;
 
 import com.gtnewhorizons.angelica.glsm.GLContextState;
-import com.gtnewhorizons.angelica.glsm.texture.ProxyTexture;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPURenderBackend;
 import com.gtnewhorizons.angelica.sdlgpu.pipeline.PipelineCache;
 import com.gtnewhorizons.angelica.sdlgpu.resource.MappedRange;
@@ -66,9 +65,27 @@ public final class ContextState {
     public final PixelStoreState pixelStore = new PixelStoreState();
     public final PackState packState = new PackState();
 
-    public final ProxyTexture proxyTexture = new ProxyTexture(SDLGPURenderBackend.MAX_TEXTURE_SIZE,
-        SDLGPURenderBackend.MAX_3D_TEXTURE_SIZE, SDLGPURenderBackend.MAX_CUBE_MAP_TEXTURE_SIZE,
-        SDLGPURenderBackend.MAX_ARRAY_TEXTURE_LAYERS);
+    public static final class ProxyTextureState {
+        public int target;
+        public int width;
+        public int height;
+        public int depth;
+        public int internalFormat;
+
+        public void accept(int target, int width, int height, int depth, int internalFormat) {
+            this.target = target;
+            this.width = width;
+            this.height = height;
+            this.depth = depth;
+            this.internalFormat = internalFormat;
+        }
+
+        public void reject(int target) {
+            accept(target, 0, 0, 0, 0);
+        }
+    }
+
+    public final ProxyTextureState proxyTexture = new ProxyTextureState();
 
     public static final class VAOState {
         public final boolean[] attribEnabled = new boolean[MAX_VERTEX_ATTRIBS];

@@ -15,7 +15,6 @@ import net.coderbot.iris.uniforms.VanillaBiomeList;
 import net.minecraft.init.Biomes;
 import net.minecraft.world.biome.Biome;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
-import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import net.minecraftforge.fml.common.Loader;
 import org.lwjgl.LWJGLUtil;
 import org.lwjgl.opengl.GL11;
@@ -36,6 +35,7 @@ import java.util.stream.Collectors;
 import com.gtnewhorizons.angelica.glsm.GLSMQueries;
 
 public class StandardMacros {
+	private static final Pattern SEMVER_PATTERN = Pattern.compile("(?<major>\\d+)\\.(?<minor>\\d+)\\.*(?<bugfix>\\d*)(.*)");
 
 	private static void define(List<StringPair> defines, String key) {
 		defines.add(new StringPair(key, ""));
@@ -206,7 +206,28 @@ public class StandardMacros {
 	 * @see <a href="https://github.com/sp614x/optifine/blob/9c6a5b5326558ccc57c6490b66b3be3b2dc8cbef/OptiFineDoc/doc/shaders.txt#L705-L707">Optifine Doc for GLSL Version</a>
 	 */
 	public static String getGlVersion(int name) {
-		return RenderSystem.parseGlVersionString(GLSMQueries.glGetString(name));
+		final String info = GLSMQueries.glGetString(name);
+
+		Matcher matcher = SEMVER_PATTERN.matcher(Objects.requireNonNull(info));
+
+		if (!matcher.matches()) {
+			throw new IllegalStateException("Could not parse GL version from \"" + info + "\"");
+		}
+
+		String major = group(matcher, "major");
+		String minor = group(matcher, "minor");
+		String bugfix = group(matcher, "bugfix");
+
+		if (bugfix == null) {
+			// if bugfix is not there, it is 0
+			bugfix = "0";
+		}
+
+		if (major == null || minor == null) {
+			throw new IllegalStateException("Could not parse GL version from \"" + info + "\"");
+		}
+
+		return major + minor + bugfix;
 	}
 
 	/**

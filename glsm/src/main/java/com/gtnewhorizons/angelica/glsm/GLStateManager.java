@@ -235,7 +235,7 @@ public class GLStateManager {
         if (cap == GL11.GL_FOG || cap == GL11.GL_SCISSOR_TEST || cap == GL11.GL_STENCIL_TEST
             || cap == GL11.GL_COLOR_LOGIC_OP || cap == GL14.GL_COLOR_SUM || cap == GL30.GL_RASTERIZER_DISCARD
             || cap == GL13.GL_SAMPLE_ALPHA_TO_COVERAGE || cap == GL13.GL_SAMPLE_ALPHA_TO_ONE || cap == GL13.GL_SAMPLE_COVERAGE
-            || ClipPlaneBooleanState.isClipPlane(cap)) {
+            || (cap >= GL11.GL_CLIP_PLANE0 && cap < GL11.GL_CLIP_PLANE0 + MAX_CLIP_PLANES)) {
             beforeUncapturedStateChange();
         }
     }
@@ -888,7 +888,6 @@ public class GLStateManager {
      * way, so the glGet* variants answer from tracked state instead of forwarding.
      */
     static boolean isEnableCap(int pname) {
-        if (ClipPlaneBooleanState.isClipPlane(pname)) return true;
         return switch (pname) {
             case GL11.GL_ALPHA_TEST, GL11.GL_AUTO_NORMAL, GL11.GL_BLEND, GL11.GL_COLOR_MATERIAL,
                     GL11.GL_COLOR_LOGIC_OP, GL14.GL_COLOR_SUM, GL11.GL_CULL_FACE, GL11.GL_DEPTH_TEST, GL11.GL_DITHER,
@@ -3265,6 +3264,10 @@ public class GLStateManager {
     public static void glShaderSource(int shader, CharSequence[] sources) { GLSMPrograms.glShaderSource(shader, sources); }
 
     /** Check shader type to determine if fragment output transformation is needed. */
+    static boolean isFragmentShader(int shader) {
+        return RENDER_BACKEND.getShaderi(shader, GL20.GL_SHADER_TYPE) == GL20.GL_FRAGMENT_SHADER;
+    }
+
     public static void glTexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, ByteBuffer pixels) { GLSMTextures.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels); }
 
     public static void glTexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, IntBuffer pixels) { GLSMTextures.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels); }
@@ -4075,8 +4078,7 @@ public class GLStateManager {
 
         // Fragment-only program — generate a passthrough vertex shader
         final String fragSource = RENDER_BACKEND.getShaderSource(fragmentShader, 65536);
-        final String vertSource = GLSMPrograms.prepareShaderSource(CompatShaderTransformer.generatePassthroughVertexShader(fragSource),
-            GL20.GL_VERTEX_SHADER, "compat_passthrough_" + program);
+        final String vertSource = CompatShaderTransformer.generatePassthroughVertexShader(fragSource);
 
         final int vertShader = RENDER_BACKEND.createShader(GL20.GL_VERTEX_SHADER);
         RENDER_BACKEND.shaderSource(vertShader, vertSource);

@@ -2,7 +2,6 @@ package com.gtnewhorizons.angelica.glsm.ffp;
 
 import com.gtnewhorizons.angelica.glsm.GLDebug;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
-import com.gtnewhorizons.angelica.glsm.GLSMPrograms;
 import com.gtnewhorizons.angelica.glsm.backend.RenderBackend;
 import lombok.Getter;
 import org.lwjgl.opengl.GL11;
@@ -287,9 +286,8 @@ public class Program {
 
     private static int compileShader(int type, String src, String name) {
         final RenderBackend backend = RENDER_BACKEND;
-        final String backendSource = GLSMPrograms.prepareShaderSource(src, type, name);
         final int shader = backend.createShader(type);
-        backend.shaderSource(shader, backendSource);
+        backend.shaderSource(shader, src);
         backend.compileShader(shader);
 
         final String typeName = switch (type) {
@@ -310,7 +308,7 @@ public class Program {
 
         final int result = backend.getShaderi(shader, GL20.GL_COMPILE_STATUS);
         if (result != GL11.GL_TRUE) {
-            GLStateManager.LOGGER.error("FFP {} shader source:\n{}", typeName, backendSource);
+            GLStateManager.LOGGER.error("FFP {} shader source:\n{}", typeName, src);
             backend.deleteShader(shader);
             throw new RuntimeException("FFP " + typeName + " shader compilation failed for " + name + ": " + log);
         }

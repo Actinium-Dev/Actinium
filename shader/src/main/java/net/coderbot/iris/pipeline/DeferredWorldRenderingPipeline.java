@@ -240,8 +240,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 	private int programBeforeModOverride = -1;
 	private boolean matchingBlend;
 	private boolean drivingProgram;
-	private boolean linkingVariant;
-	private boolean switchingClipProgram;
 
 	private boolean shouldBindPBR;
 	private int currentNormalTexture;
@@ -844,14 +842,9 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		return isRenderingWorld && !isRenderingFullScreenPass && !isPostChain && isMainBound;
 	}
 
-	/** Identifies the program binds internal to a variant build or a clip-only switch. */
-	public boolean isBindingProgramVariant() {
-		return linkingVariant || switchingClipProgram;
-	}
-
 	public int getActivePassProgramId() {
 		if (current == null) return -1;
-		final Program p = current.boundBaseProgram;
+		final Program p = current.getProgram();
 		return p != null ? p.getProgramId() : -1;
 	}
 
@@ -859,10 +852,9 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 	 * Called when a mod overrides the GL program away from the active Iris pass
 	 */
 	public void onModProgramOverride() {
-		if (linkingVariant) return;
 		if (current != null) {
 			modProgramOverrode = true;
-			programBeforeModOverride = current.liveProgram != null ? current.liveProgram.getProgramId() : getActivePassProgramId();
+			programBeforeModOverride = getActivePassProgramId();
 		}
 		IrisGlDebug.logModProgramOverride(
 			"on-mod-program-override",
@@ -882,7 +874,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 	/** Restores the current Iris pass after a foreign renderer has returned control. */
 	public void restorePassAfterModProgram(int newProgram) {
-		if (refreshingPass || drivingProgram || linkingVariant || !modProgramOverrode) {
+		if (refreshingPass || drivingProgram || !modProgramOverrode) {
 			return;
 		}
 		if (newProgram != 0 && newProgram != programBeforeModOverride) {
@@ -893,7 +885,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 	/** Reapplies the active Iris pass after a renderer that may have changed raw GL state. */
 	public void restorePassAfterForeignDraw() {
-		if (refreshingPass || drivingProgram || isBindingProgramVariant()
+		if (refreshingPass || drivingProgram
 			|| !isRenderingWorld
 			|| isRenderingFullScreenPass
 			|| isPostChain
@@ -1080,26 +1072,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 	@Override
 	public void resolvePendingProgram() {
-		if (drivingProgram || isBindingProgramVariant()) return;
 		programMatch.resolve();
-		final Pass pass = current;
-		final boolean canRebind = pass != null && pass.liveProgram != null
-			&& isRenderingWorld && !isRenderingFullScreenPass && !isPostChain && (isMainBound || isRenderingShadow);
-		// ForeignDraw defers pass matching, but the renderer can draw using the current Iris pass.
-		programMatch.resolveProgramRebind(canRebind ? pass.liveProgram.getProgramId() : 0, () -> {
-			switchingClipProgram = true;
-			try {
-				final Program selected = pass.selectProgram(activeInstancing);
-				if (selected != pass.liveProgram) pass.bind(selected);
-			} finally {
-				switchingClipProgram = false;
-			}
-		});
-	}
-
-	public void onClipPlanesInUseChanged() {
-		if (current == null) return;
-		programMatch.requestProgramRebind();
 	}
 
 	@Override
@@ -1113,7 +1086,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 			}
 			return;
 		}
-		final Program program = pass.selectProgram(Instancing.NONE);
+		final Program program = pass.getProgram();
 		final GlFramebuffer expected = isBeforeTranslucent ? pass.framebufferBeforeTranslucents : pass.framebufferAfterTranslucents;
 		if (program != null && GLSMPrograms.getActiveProgram() == program.getProgramId() && GLSMFramebuffer.getDrawFramebuffer() == expected.getId()) {
 			return;
@@ -1160,16 +1133,49 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 	@Override
 	public void bindInstancedVariant(Instancing kind) {
-		if (current == null || current.instancedVariant(kind) == null) {
+		final Program variant = current != null ? current.instancedVariant(kind) : null;
+		if (variant == null) {
 			throw new IllegalStateException("No " + kind + " variant is available for the active pass");
 		}
 		activeInstancing = kind;
-		current.bind(current.selectProgram(kind));
+		variant.use();
+		this.customUniforms.push(variant);
 	}
 
+	/**
+	 * @return the program {@code pass} would bind right now, which is its instanced variant while a
+	 * batch draws from one and its own program otherwise
+	 */
 	private int expectedProgramId(@Nullable Pass pass) {
-		final Program selected = pass != null ? pass.selectProgram(activeInstancing) : null;
-		return selected != null ? selected.getProgramId() : 0;
+		if (pass == null) {
+			return 0;
+		}
+		if (activeInstancing != Instancing.NONE) {
+			final Program variant = pass.instancedVariant(activeInstancing);
+			if (variant != null) {
+				return variant.getProgramId();
+			}
+		}
+		return pass.getProgram() != null ? pass.getProgram().getProgramId() : 0;
+	}
+
+	/**
+	 * Binds the active layout's variant of {@code pass} when that pass has one.
+	 *
+	 * @return whether the variant replaced the pass's own program; a pass without one keeps its
+	 * program so a variant that failed to build cannot break drawing for the rest of the batch
+	 */
+	private boolean applyInstancing(Pass pass) {
+		if (activeInstancing == Instancing.NONE || pass.program == null) {
+			return false;
+		}
+		final Program variant = pass.instancedVariant(activeInstancing);
+		if (variant == null) {
+			return false;
+		}
+		variant.use();
+		this.customUniforms.push(variant);
+		return true;
 	}
 
 	private Pass createDefaultPass() {
@@ -1243,7 +1249,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		if (shared != null) {
 			final Pass pass = createPassInner(shared.program(), source.getDirectives(), shadow, id);
 			this.customUniforms.mapPassLike(shared.firstPass(), pass);
-			pass.setVariantSource(source, availability, transformAvailability, shadow);
+			pass.setInstancingKey(source.getName(), availability, shadow);
 			return pass;
 		}
 
@@ -1275,7 +1281,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 		final Pass pass = createPassInner(program, source.getDirectives(), shadow, id);
 		this.customUniforms.mapholderToPass(builder, pass);
-		pass.setVariantSource(source, availability, transformAvailability, shadow);
+		pass.setInstancingKey(source.getName(), availability, shadow);
 		if (shareKey != null) {
 			builtPrograms.put(shareKey, new BuiltProgram(program, pass));
 		}
@@ -1502,21 +1508,20 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		private final List<BufferBlendOverride> bufferBlendOverrides;
 		private final boolean shadowViewport;
 
-		private ProgramSource variantSource;
-		private InputAvailability variantAvailability;
-		private InputAvailability baseTransformAvailability;
-		private boolean variantShadow;
+		/**
+		 * Source and availability this pass was created from. A pass that did not come from the
+		 * attribute transform map (a default or shadow-only pass) leaves the name null and has no
+		 * variants.
+		 */
+		private String instancingSourceName;
+		private InputAvailability instancingAvailability;
+		private boolean instancingShadow;
 		private final Program[] instancedVariants = new Program[Instancing.VALUES.length];
 		private final boolean[] instancedVariantAttempted = new boolean[Instancing.VALUES.length];
-		private final Program[] clippedVariants = new Program[Instancing.VALUES.length];
-		private final boolean[] clippedVariantAttempted = new boolean[Instancing.VALUES.length];
-		private Program boundBaseProgram;
-		private Program liveProgram;
 
 		private Pass(@Nullable Program program, GlFramebuffer framebufferBeforeTranslucents, GlFramebuffer framebufferAfterTranslucents,
 					 @Nullable AlphaTestOverride alphaTestOverride, @Nullable BlendModeOverride blendModeOverride, @Nullable List<BufferBlendOverride> bufferBlendOverrides, boolean shadowViewport) {
 			this.program = program;
-			this.boundBaseProgram = program;
 			this.framebufferBeforeTranslucents = framebufferBeforeTranslucents;
 			this.framebufferAfterTranslucents = framebufferAfterTranslucents;
 			this.alphaTestOverride = alphaTestOverride;
@@ -1561,20 +1566,14 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 				bufferBlendOverrides.forEach(BufferBlendOverride::apply);
 			}
 
-			bind(selectProgram(activeInstancing));
-		}
-
-		private void bind(@Nullable Program selected) {
-			liveProgram = selected;
-			if (activeInstancing == Instancing.NONE) {
-				boundBaseProgram = selected;
+			if (!DeferredWorldRenderingPipeline.this.applyInstancing(this)) {
+				if (program != null) {
+					program.use();
+				} else {
+					Program.unbind();
+				}
+				DeferredWorldRenderingPipeline.this.customUniforms.push(this);
 			}
-			if (selected != null) {
-				selected.use();
-			} else {
-				Program.unbind();
-			}
-			customUniforms.push(selected == null || selected == program ? this : selected);
 		}
 
 		public void stopUsing() {
@@ -1594,42 +1593,26 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 			return program;
 		}
 
-		void setVariantSource(ProgramSource source, InputAvailability availability, InputAvailability baseAvailability, boolean shadow) {
-			variantSource = source;
-			variantAvailability = availability;
-			baseTransformAvailability = baseAvailability;
-			variantShadow = shadow;
+		void setInstancingKey(String sourceName, InputAvailability availability, boolean shadow) {
+			this.instancingSourceName = sourceName;
+			this.instancingAvailability = availability;
+			this.instancingShadow = shadow;
 		}
 
+		/**
+		 * @return this pass's variant for the given layout, building it on first use; null when the
+		 * layout is unsupported, the pack has no transformed source for it, or the link failed
+		 */
 		@Nullable
 		Program instancedVariant(Instancing kind) {
 			final int index = kind.ordinal();
 			if (!instancedVariantAttempted[index]) {
 				instancedVariantAttempted[index] = true;
-				if (variantSource != null && supportsInstancing[index]) {
-					final InstancedVariantKey key = new InstancedVariantKey(variantSource.getName(), variantAvailability, variantAvailability, variantShadow, kind, false);
-					instancedVariants[index] = instancedVariantPrograms.get(key, DeferredWorldRenderingPipeline.this::buildInstancedVariant);
+				if (instancingSourceName != null && supportsInstancing[index]) {
+					instancedVariants[index] = sharedInstancedVariant(instancingSourceName, instancingAvailability, instancingShadow, kind);
 				}
 			}
 			return instancedVariants[index];
-		}
-
-		@Nullable
-		Program selectProgram(Instancing kind) {
-			Program plain = kind != Instancing.NONE ? instancedVariant(kind) : program;
-			if (plain == null) {
-				kind = Instancing.NONE;
-				plain = program;
-			}
-			if (plain == null || variantSource == null || !GLSMRasterizer.clipEmulationActive()) return plain;
-			final int index = kind.ordinal();
-			if (!clippedVariantAttempted[index]) {
-				clippedVariantAttempted[index] = true;
-				final InputAvailability transformAvailability = kind == Instancing.NONE ? baseTransformAvailability : variantAvailability;
-				final InstancedVariantKey key = new InstancedVariantKey(variantSource.getName(), variantAvailability, transformAvailability, variantShadow, kind, true);
-				clippedVariants[index] = instancedVariantPrograms.get(key, k -> buildClipVariant(variantSource, k));
-			}
-			return clippedVariants[index] != null ? clippedVariants[index] : plain;
 		}
 
 		public void destroy() {
@@ -1639,7 +1622,7 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		}
 	}
 
-	private record InstancedVariantKey(String sourceName, InputAvailability availability, InputAvailability transformAvailability, boolean shadow, Instancing kind, boolean clipped) {}
+	private record InstancedVariantKey(String sourceName, InputAvailability availability, boolean shadow, Instancing kind) {}
 
 	/**
 	 * Variants keyed by source and layout. Passes that share a program also share the variant built
@@ -1650,55 +1633,47 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 		new InstancedVariantCache<>(Program::destroy);
 
 	@Nullable
-	private Program buildClipVariant(ProgramSource source, InstancedVariantKey key) {
-		if (source.getGeometrySource().isPresent() || source.getTessControlSource().isPresent() || source.getTessEvalSource().isPresent()) {
-			return null;
-		}
-		final String name = source.getName() + key.kind().variantSuffix + "_clipped";
-		try {
-			final Map<PatchShaderType, String> transformed = TransformPatcher.patchAttributesInstanced(
-				source.getVertexSource().orElseThrow(), null, null, null, source.getFragmentSource().orElseThrow(),
-				key.transformAvailability(), key.kind(), true);
-			return linkVariant(name, transformed, key.availability(), key.shadow());
-		} catch (RuntimeException e) {
-			Iris.logger.warn("Clip plane variant failed for {}; using the unclipped program", name, e);
-			return null;
-		}
+	private Program sharedInstancedVariant(String sourceName, InputAvailability availability, boolean shadow, Instancing kind) {
+		return instancedVariantPrograms.get(new InstancedVariantKey(sourceName, availability, shadow, kind), this::buildInstancedVariant);
 	}
 
+	/**
+	 * Links one variant from the pre-computed instanced transform. A failed link only disables this
+	 * kind, so the batcher falls back to per-instance draws for it and keeps the other kinds working.
+	 */
 	@Nullable
 	private Program buildInstancedVariant(InstancedVariantKey key) {
 		final Map<Pair<String, InputAvailability>, Map<PatchShaderType, String>> transforms = instancedAttributeTransforms.get(key.kind());
-		final Map<PatchShaderType, String> transformed = transforms != null ? transforms.get(Pair.of(key.sourceName(), key.transformAvailability())) : null;
-		if (transformed == null) return null;
-		try {
-			return linkVariant(key.sourceName() + key.kind().variantSuffix, transformed, key.availability(), key.shadow());
-		} catch (RuntimeException e) {
-			Iris.logger.warn("{} instanced variant link failed for {}; disabling it", key.kind(), key.sourceName(), e);
-			supportsInstancing[key.kind().ordinal()] = false;
+		final Map<PatchShaderType, String> transformed = transforms != null ? transforms.get(Pair.of(key.sourceName(), key.availability())) : null;
+		if (transformed == null) {
 			return null;
 		}
-	}
 
-	private Program linkVariant(String name, Map<PatchShaderType, String> transformed, InputAvailability availability, boolean shadow) {
-		final String vertex = transformed.get(PatchShaderType.VERTEX);
-		final String geometry = transformed.get(PatchShaderType.GEOMETRY);
-		final String tessControl = transformed.get(PatchShaderType.TESS_CONTROL);
-		final String tessEval = transformed.get(PatchShaderType.TESS_EVAL);
-		final String fragment = transformed.get(PatchShaderType.FRAGMENT);
-		PatchedShaderPrinter.debugPatchedShaders(name, vertex, geometry, tessControl, tessEval, fragment);
-		linkingVariant = true;
+		final Instancing kind = key.kind();
+		final InputAvailability availability = key.availability();
+		final boolean shadow = key.shadow();
+		final String name = key.sourceName() + kind.variantSuffix;
 		try {
+			final String vertex = transformed.get(PatchShaderType.VERTEX);
+			final String geometry = transformed.get(PatchShaderType.GEOMETRY);
+			final String tessControl = transformed.get(PatchShaderType.TESS_CONTROL);
+			final String tessEval = transformed.get(PatchShaderType.TESS_EVAL);
+			final String fragment = transformed.get(PatchShaderType.FRAGMENT);
+
+			PatchedShaderPrinter.debugPatchedShaders(name, vertex, geometry, tessControl, tessEval, fragment);
+
 			final ProgramBuilder builder = ProgramBuilder.begin(name, vertex, geometry, tessControl, tessEval, fragment,
 				IrisSamplers.WORLD_RESERVED_TEXTURE_UNITS);
 			wireGbufferProgram(builder, availability, shadow);
 			final Program variant = builder.build();
 			vertexWriteReplays.attach(name, variant, transformed,
 				(samplers, images) -> wireGbufferResources(samplers, images, availability, shadow));
-			customUniforms.mapholderToPass(builder, variant);
+			this.customUniforms.mapholderToPass(builder, variant);
 			return variant;
-		} finally {
-			linkingVariant = false;
+		} catch (Exception e) {
+			Iris.logger.warn("{} instanced variant link failed for {}; disabling it", kind, key.sourceName(), e);
+			supportsInstancing[kind.ordinal()] = false;
+			return null;
 		}
 	}
 
@@ -1747,7 +1722,6 @@ public class DeferredWorldRenderingPipeline implements WorldRenderingPipeline, R
 
 	@Override
 	public void destroy() {
-		programMatch.clear();
         vertexWriteReplays.destroy();
         if (shadowVoxelizationCompute != null) {
             shadowVoxelizationCompute.destroy();

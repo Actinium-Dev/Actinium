@@ -86,14 +86,10 @@ dependencies {
     compileOnly "org.lwjgl:lwjgl-glfw:${lwjglVersion}"
     compileOnly "org.lwjgl:lwjgl-opengl:${lwjglVersion}"
 
-    // Keep the shader tool bindings available during splash initialization. The launcher supplies their natives.
+    // Outlands/FCL supplies the platform native libraries. Actinium only embeds the Java bindings so the
+    // backend can load on hosts that provide the matching LWJGL native toolchain.
     ['lwjgl-shaderc', 'lwjgl-spvc'].each { module ->
         shadowBundle("org.lwjgl:${module}:${lwjglVersion}") { transitive = false }
-    }
-    // The host supplies the GLES driver. LWJGL's GLES JNI library is packaged with its bindings.
-    shadowBundle("org.lwjgl:lwjgl-opengles:${lwjglVersion}") { transitive = false }
-    ['natives-windows', 'natives-windows-arm64', 'natives-linux', 'natives-linux-arm64'].each { classifier ->
-        shadowBundle("org.lwjgl:lwjgl-opengles:${lwjglVersion}:${classifier}") { transitive = false }
     }
     if (propertyBool('enable_lwjglx')) {
         compileOnly 'com.cleanroommc:lwjglx:1.0.0'

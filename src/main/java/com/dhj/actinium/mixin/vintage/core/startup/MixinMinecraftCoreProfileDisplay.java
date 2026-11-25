@@ -11,6 +11,12 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 /** Keeps Minecraft's display startup flow intact while replacing its context creation call. */
 @Mixin(Minecraft.class)
 public abstract class MixinMinecraftCoreProfileDisplay {
+    /**
+     * Creates Actinium's core-profile context without bypassing other mixins on {@code createDisplay}.
+     *
+     * @param format pixel format requested by Minecraft
+     * @throws LWJGLException if no supported core-profile context can be created
+     */
     @Redirect(
         method = "createDisplay",
         at = @At(

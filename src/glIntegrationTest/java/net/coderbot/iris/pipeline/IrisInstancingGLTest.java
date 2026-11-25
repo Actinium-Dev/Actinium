@@ -4,7 +4,6 @@ import com.gtnewhorizons.angelica.glsm.GLSMBlend;
 import com.gtnewhorizons.angelica.glsm.GLSMBuffers;
 import com.gtnewhorizons.angelica.glsm.GLSMDepthStencilAlpha;
 import com.gtnewhorizons.angelica.glsm.GLSMDraws;
-import com.gtnewhorizons.angelica.glsm.GLSMEnable;
 import com.gtnewhorizons.angelica.glsm.GLSMFramebuffer;
 import com.gtnewhorizons.angelica.glsm.GLSMPrograms;
 import com.gtnewhorizons.angelica.glsm.GLSMRasterizer;
@@ -16,8 +15,6 @@ import com.gtnewhorizons.angelica.glsm.backend.WindowBackends;
 import com.gtnewhorizons.angelica.glsm.ffp.InstancedAttribs;
 import com.gtnewhorizons.angelica.glsm.ffp.Instancing;
 import com.gtnewhorizons.angelica.glsm.ffp.ShaderManager;
-import com.gtnewhorizons.angelica.glsm.hooks.GLSMHooks;
-import com.gtnewhorizons.angelica.glsm.hooks.PendingProgramSelection;
 import net.coderbot.batchedentityrendering.impl.AngelicaBufferSource;
 import net.coderbot.iris.gbuffer_overrides.matching.InputAvailability;
 import net.coderbot.iris.gl.shader.GlShader;
@@ -42,7 +39,6 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 
 import java.nio.ByteBuffer;
-import java.nio.DoubleBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -52,7 +48,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -468,149 +463,6 @@ class IrisInstancingGLTest extends GLStateManagerIntegrationFixture {
 
     private static void linkAndDiscard(String name, Map<PatchShaderType, String> result) {
         GLSMPrograms.glDeleteProgram(linkProgram(name, result));
-    }
-
-    @Test
-    void indexedForeignDrawSwitchesClipVariantAndRestoresItWithinTheScope() {
-        boolean previousClipSupport = RenderSystem.hasClipCullDistance();
-        RenderSystem.initializeClipCullDistanceSupportForTesting(false);
-        int plain = 0;
-        int clipped = 0;
-        int foreign = 0;
-        int indices = GLSMBuffers.glGenBuffers();
-        try {
-            String vertex = "#version 120\nvoid main() { gl_Position = gl_Vertex; }";
-            String fragment = "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }";
-            var plainStages = TransformPatcher.patchAttributesInstanced(
-                vertex, null, null, null, fragment, TEX_LM, Instancing.NONE);
-            plain = linkProgram("unclipped", plainStages);
-            clipped = linkProgram("clipped", TransformPatcher.patchAttributesInstanced(
-                vertex, null, null, null, fragment, TEX_LM, Instancing.NONE, true));
-            foreign = linkProgram("foreign", plainStages);
-            int plainProgram = plain;
-            int clippedProgram = clipped;
-
-            GLSMBuffers.glBufferData(GL15.GL_ARRAY_BUFFER, new float[] {-1, -1, 3, -1, -1, 3}, GL15.GL_STATIC_DRAW);
-            GLSMVertexInput.glEnableVertexAttribArray(0);
-            GLSMVertexInput.glVertexAttribPointer(0, 2, GL11.GL_FLOAT, false, 0, 0L);
-            GLSMBuffers.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, indices);
-            GLSMBuffers.glBufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, new int[] {0, 1, 2}, GL15.GL_STATIC_DRAW);
-
-            class Selection implements PendingProgramSelection {
-                int program = plainProgram;
-                int passMatches;
-                final DeferredProgramMatch match = DeferredProgramMatch.forDisplayLists(this,
-                    GLStateManager::isForeignDraw, () -> passMatches++);
-
-                @Override
-                public void resolvePendingProgram() {
-                    match.resolve();
-                    match.resolveProgramRebind(program, () -> {
-                        int selected = GLSMRasterizer.clipEmulationActive() ? clippedProgram : plainProgram;
-                        GLSMPrograms.glUseProgram(selected);
-                        program = selected;
-                    });
-                }
-            }
-            Selection selection = new Selection();
-            GLSMHooks.CLIP_PLANES_IN_USE.addListener(event -> {
-                if (GLStateManager.isForeignDraw()) selection.match.requestProgramRebind();
-            });
-            GLSMPrograms.glUseProgram(plain);
-
-            GLStateManager.beginForeignDraw();
-            try {
-                selection.match.request();
-                DoubleBuffer equation = BufferUtils.createDoubleBuffer(4).put(new double[] {1, 0, 0, 0}).flip();
-                GLSMRasterizer.glClipPlane(GL11.GL_CLIP_PLANE0, equation);
-                GLSMEnable.glEnable(GL11.GL_CLIP_PLANE0);
-
-                GL20.glUseProgram(foreign);
-                assertIndexedDraw(foreign, true);
-                GL20.glUseProgram(plain);
-                assertIndexedDraw(clipped, false);
-                GLSMEnable.glDisable(GL11.GL_CLIP_PLANE0);
-                assertIndexedDraw(plain, true);
-                assertEquals(0, selection.passMatches);
-            } finally {
-                GLStateManager.endForeignDraw();
-            }
-            assertEquals(1, selection.passMatches);
-            assertNull(GLSMHooks.pendingProgramSelection);
-        } finally {
-            GLSMEnable.glDisable(GL11.GL_CLIP_PLANE0);
-            GLSMPrograms.glUseProgram(0);
-            GLSMBuffers.glDeleteBuffers(indices);
-            GLSMPrograms.glDeleteProgram(foreign);
-            GLSMPrograms.glDeleteProgram(clipped);
-            GLSMPrograms.glDeleteProgram(plain);
-            RenderSystem.initializeClipCullDistanceSupportForTesting(previousClipSupport);
-        }
-    }
-
-    private void assertIndexedDraw(int expectedProgram, boolean leftVisible) {
-        clear();
-        GLSMDraws.glDrawElements(GL11.GL_TRIANGLES, 3, GL11.GL_UNSIGNED_INT, 0L);
-        assertEquals(expectedProgram, GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM));
-        pixels.clear();
-        GLSMFramebuffer.glReadPixels(0, SIZE / 2, SIZE, 1, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
-        assertEquals(leftVisible, pixels.get((SIZE / 4) * 4) != 0);
-        assertTrue(pixels.get((3 * SIZE / 4) * 4) != 0);
-    }
-
-    @ParameterizedTest
-    @EnumSource(Instancing.class)
-    void emulatedClipPlanesAreLiveOnlyInTheClippedProgram(Instancing kind) {
-        boolean previous = RenderSystem.hasClipCullDistance();
-        RenderSystem.initializeClipCullDistanceSupportForTesting(false);
-        try {
-            for (boolean clipped : new boolean[] {false, true, false}) {
-                Map<PatchShaderType, String> stages = TransformPatcher.patchAttributesInstanced(
-                    TEMPLATE_VERTEX, null, null, null, TEMPLATE_FRAGMENT, TEX_LM, kind, clipped);
-                int program = linkProgram("clipDistance", stages);
-                try {
-                    assertEquals(clipped, GL20.glGetUniformLocation(program, "actinium_ClipPlane[7]") >= 0);
-                } finally {
-                    GLSMPrograms.glDeleteProgram(program);
-                }
-            }
-        } finally {
-            RenderSystem.initializeClipCullDistanceSupportForTesting(previous);
-        }
-    }
-
-    @Test
-    void emulatedPlaneClipsThePackDrawInEyeSpace() {
-        boolean previous = RenderSystem.hasClipCullDistance();
-        RenderSystem.initializeClipCullDistanceSupportForTesting(false);
-        try {
-            Map<PatchShaderType, String> stages = TransformPatcher.patchAttributesInstanced(
-                "#version 120\nvoid main() { gl_Position = gl_Vertex; }", null, null, null,
-                "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }",
-                TEX_LM, Instancing.NONE, true);
-            int program = linkProgram("clipEyeSpace", stages);
-            try {
-                GLSMPrograms.glUseProgram(program);
-                GL20.glUniformMatrix4fv(GL20.glGetUniformLocation(program, "iris_ModelViewMatrix"), false,
-                    new float[] {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.5f, 0, 0, 1});
-                GL20.glUniform4f(GL20.glGetUniformLocation(program, "actinium_ClipPlane[7]"), 1, 0, 0, 0);
-                GL15.glBufferData(GL15.GL_ARRAY_BUFFER, new float[] {-1, -1, 3, -1, -1, 3}, GL15.GL_STATIC_DRAW);
-                GL20.glEnableVertexAttribArray(0);
-                GL20.glVertexAttribPointer(0, 2, GL11.GL_FLOAT, false, 0, 0L);
-                clear();
-                GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
-                ByteBuffer row = BufferUtils.createByteBuffer(SIZE * 4);
-                GL11.glReadPixels(0, SIZE / 2, SIZE, 1, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, row);
-                for (int x = 0; x < SIZE; x++) {
-                    assertEquals(x >= SIZE / 4, row.get(x * 4) != 0, "x = " + x);
-                }
-            } finally {
-                GLSMPrograms.glUseProgram(0);
-                GLSMPrograms.glDeleteProgram(program);
-            }
-        } finally {
-            RenderSystem.initializeClipCullDistanceSupportForTesting(previous);
-        }
     }
 
     private static int linkProgram(String name, Map<PatchShaderType, String> result) {

@@ -66,7 +66,7 @@ public final class GraphicsOptionPage {
         int glCeiling = CoreProfileDisplayCreator.glVersionCeiling();
         boolean backendEditable = sdlAvailable && backendOverride == null;
         boolean driverEditable = sdlAvailable && driverOverride == null;
-        boolean glEditable = glOverride == -1;
+        boolean glEditable = glOverride < 0;
 
         OptionGroup settings = OptionGroup.createBuilder()
                 .setId(OptionIdentifier.create("actinium", "render_backend"))
@@ -179,9 +179,7 @@ public final class GraphicsOptionPage {
 
     private static CyclingControl<GLVersionChoice> glVersionControl(Option<GLVersionChoice> option, int ceiling) {
         GLVersionChoice[] values = Arrays.stream(GLVersionChoice.values())
-                .filter(version -> version == GLVersionChoice.GLES32
-                        ? CoreProfileDisplayCreator.isGlesProfileSupported() || option.getAppliedValue() == version
-                        : version.version() <= ceiling)
+                .filter(version -> version.version() <= ceiling)
                 .toArray(GLVersionChoice[]::new);
         TextComponent[] names = Arrays.stream(values)
                 .map(version -> version == GLVersionChoice.AUTO

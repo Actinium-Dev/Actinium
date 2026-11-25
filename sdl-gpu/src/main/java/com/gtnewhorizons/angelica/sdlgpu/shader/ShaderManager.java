@@ -779,7 +779,7 @@ public final class ShaderManager {
             else prog.fragmentUboSize = refl.uboSize();
         }
         for (UboMember m : refl.uboMembers()) {
-            final int loc = ensureLocation(prog, m.name(), m.arrayLen());
+            final int loc = ensureLocation(prog, m.name(), m.arrayStride() > 0 ? m.arrayLen() : 0);
             final UniformMemberInfo info = new UniformMemberInfo(
                 m.offset(), m.size(), m.arrayStride(), isVertex,
                 m.vectorSize(), m.columns(), m.baseType(), m.arrayLen()
@@ -797,7 +797,7 @@ public final class ShaderManager {
             prog.blockSize[b] = Math.max(prog.blockSize[b], block.size());
             prog.blockBinding[b] = block.binding();
             for (UboMember m : block.members()) {
-                final int loc = ensureLocation(prog, m.name(), m.arrayLen());
+                final int loc = ensureLocation(prog, m.name(), m.arrayStride() > 0 ? m.arrayLen() : 0);
                 if (prog.blockMemberInfo[b].containsKey(loc)) continue;
                 prog.blockMemberInfo[b].put(loc, new UniformMemberInfo(
                     m.offset(), m.size(), m.arrayStride(), false,
@@ -812,22 +812,22 @@ public final class ShaderManager {
 
     private static int ensureLocation(ProgramObject prog, String name) {
         final int existing = prog.nameToLocation.getInt(name);
-        return existing == -1 ? ensureLocation(prog, name, 1) : existing;
+        return existing == -1 ? ensureLocation(prog, name, 0) : existing;
     }
 
     private static int ensureLocation(ProgramObject prog, String name, int arrayLen) {
         final int existing = prog.nameToLocation.getInt(name);
         if (existing != -1) {
-            final int registered = Math.max(1, prog.arrayLenByLocation.get(existing));
+            final int registered = prog.arrayLenByLocation.get(existing);
             if (registered == arrayLen) return existing;
-            retireLocations(prog, existing, registered);
+            retireLocations(prog, existing, Math.max(1, registered));
         }
         final int loc = prog.nextUniformLocation;
-        prog.nextUniformLocation += arrayLen;
+        prog.nextUniformLocation += Math.max(1, arrayLen);
         prog.nameToLocation.put(name, loc);
         prog.locationToName.put(loc, name);
         for (int i = 1; i < arrayLen; i++) prog.locationToName.put(loc + i, name + "[" + i + "]");
-        if (arrayLen > 1) prog.arrayLenByLocation.put(loc, arrayLen);
+        if (arrayLen > 0) prog.arrayLenByLocation.put(loc, arrayLen);
         return loc;
     }
 
@@ -1297,10 +1297,6 @@ public final class ShaderManager {
         if (index < 0) return -1;
         final int base = prog.nameToLocation.getInt(name.substring(0, name.lastIndexOf('[')));
         if (base < 0 || base >= prog.uniformSlotCount || index >= prog.arrayLenBySlot[base]) return -1;
-        if (prog.arrayLenBySlot[base] == 1) {
-            final UniformMemberInfo member = prog.memberInfo(base);
-            if (member == null || member.arrayStride() == 0) return -1;
-        }
         return base + index;
     }
 
@@ -2125,10 +2121,9 @@ public final class ShaderManager {
         public UniformMemberInfo[] vsInfoBySlot;
         public UniformMemberInfo[] fsInfoBySlot;
         public int uniformSlotCount;
-        public final Int2IntOpenHashMap arrayLenByLocation = new Int2IntOpenHashMap();
+        private final Int2IntOpenHashMap arrayLenByLocation = new Int2IntOpenHashMap();
         public int[] arrayIndexBySlot = EMPTY_UNITS;
         public int[] arrayLenBySlot = EMPTY_UNITS;
-        public int[] floatLimitBySlot = EMPTY_UNITS;
         public final int[] vertexInputBaseType = new int[16];
         public final int[] vertexInputVecSize = new int[16];
         public final String[] vertexInputName = new String[16];
@@ -2278,7 +2273,6 @@ public final class ShaderManager {
             }
             arrayIndexBySlot = new int[n];
             arrayLenBySlot = new int[n];
-            Arrays.fill(arrayLenBySlot, 1);
             for (var it = arrayLenByLocation.int2IntEntrySet().fastIterator(); it.hasNext(); ) {
                 final var e = it.next();
                 final int base = e.getIntKey();
@@ -2302,16 +2296,6 @@ public final class ShaderManager {
             for (var it = fragmentMemberInfo.int2ObjectEntrySet().fastIterator(); it.hasNext(); ) {
                 final var e = it.next();
                 fillSlots(fsInfoBySlot, e.getIntKey(), e.getValue());
-            }
-            floatLimitBySlot = new int[n];
-            for (int slot = 0; slot < n; slot++) {
-                if (arrayLenBySlot[slot] > 1) {
-                    floatLimitBySlot[slot] = -1;
-                    continue;
-                }
-                final UniformMemberInfo info = memberInfo(slot);
-                final int floats = info == null || info.arrayStride() > 0 ? 0 : info.wordsPerElement();
-                floatLimitBySlot[slot] = floats > 0 ? floats : Integer.MAX_VALUE;
             }
         }
 

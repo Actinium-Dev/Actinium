@@ -1,6 +1,5 @@
 package net.coderbot.iris.pipeline.transform;
 
-import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import com.gtnewhorizons.angelica.glsm.debug.GLSMPerfDebug;
 import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
 import com.gtnewhorizons.angelica.glsm.ffp.Instancing;
@@ -51,7 +50,6 @@ public class TransformPatcher {
 
     private static final class CacheKey {
         final Parameters parameters;
-        final boolean emulatedClipDistance = RenderSystem.isClipDistanceEmulated();
         final boolean sdlGpu = BackendManager.RENDER_BACKEND.isSDLGPU();
         final Set<SamplerToStorageImageRewriter.Candidate> imageSamplers = SamplerToStorageImageRewriter.activeCandidates();
         final Map<String, ImageInformation> customImages = RwImageStoreExtractor.activeCustomImages();
@@ -104,7 +102,6 @@ public class TransformPatcher {
             result = prime * result + ((compute == null) ? 0 : compute.hashCode());
             result = prime * result + (adaptiveShadowBoundsInstrumentation ? 1 : 0);
             result = prime * result + adaptiveShadowBoundsBinding;
-            result = prime * result + Boolean.hashCode(emulatedClipDistance);
             result = prime * result + Boolean.hashCode(sdlGpu);
             result = prime * result + imageSamplers.hashCode();
             result = prime * result + customImages.hashCode();
@@ -126,7 +123,6 @@ public class TransformPatcher {
                 && Objects.equals(compute, other.compute)
                 && adaptiveShadowBoundsInstrumentation == other.adaptiveShadowBoundsInstrumentation
                 && adaptiveShadowBoundsBinding == other.adaptiveShadowBoundsBinding
-                && emulatedClipDistance == other.emulatedClipDistance
                 && sdlGpu == other.sdlGpu
                 && imageSamplers.equals(other.imageSamplers)
                 && customImages.equals(other.customImages)
@@ -251,11 +247,7 @@ public class TransformPatcher {
      * own transformed source.
      */
     public static Map<PatchShaderType, String> patchAttributesInstanced(String vertex, String geometry, String tessControl, String tessEval, String fragment, InputAvailability inputs, Instancing instancing) {
-        return patchAttributesInstanced(vertex, geometry, tessControl, tessEval, fragment, inputs, instancing, false);
-    }
-
-    public static Map<PatchShaderType, String> patchAttributesInstanced(String vertex, String geometry, String tessControl, String tessEval, String fragment, InputAvailability inputs, Instancing instancing, boolean clipDiscard) {
-        return transform(vertex, geometry, tessControl, tessEval, fragment, new AttributeParameters(Patch.ATTRIBUTES, geometry != null, hasTesselation(tessControl, tessEval), inputs, instancing, clipDiscard));
+        return transform(vertex, geometry, tessControl, tessEval, fragment, new AttributeParameters(Patch.ATTRIBUTES, geometry != null, hasTesselation(tessControl, tessEval), inputs, instancing));
     }
 
     private static boolean hasTesselation(String tessControl, String tessEval) {

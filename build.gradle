@@ -31,7 +31,7 @@ setDefaultProperty 'extra_jvm_args', false, ''
 def cliProjectProperties = gradle.startParameter.projectProperties
 def outlandsLoaderVersion = cliProjectProperties.containsKey('outlands_loader_version')
     ? cliProjectProperties['outlands_loader_version']
-    : '2026.11.21'
+    : '2026.11.11'
 
 /**
  * Derives the build version from git: an exact tag on HEAD wins, otherwise the short commit sha.
@@ -750,15 +750,9 @@ def glIntegrationLwjglNatives = glIntegrationOsKey == null
 ext.lwjglNativesClassifier = glIntegrationLwjglNatives
 
 dependencies {
-    // The released Outlands dev loader predates launcher support for these shader tools.
-    if (glIntegrationLwjglNatives != null) {
-        runtimeOnly "org.lwjgl:lwjgl-shaderc:${lwjglVersion}:${glIntegrationLwjglNatives}"
-        runtimeOnly "org.lwjgl:lwjgl-spvc:${lwjglVersion}:${glIntegrationLwjglNatives}"
-    }
     glIntegrationTestImplementation "org.lwjgl:lwjgl:${lwjglVersion}"
     glIntegrationTestImplementation "org.lwjgl:lwjgl-sdl:${lwjglVersion}"
     glIntegrationTestImplementation "org.lwjgl:lwjgl-glfw:${lwjglVersion}"
-    glIntegrationTestImplementation 'org.junit.platform:junit-platform-launcher'
     glIntegrationTestRuntimeOnly 'org.apache.logging.log4j:log4j-core:2.24.3'
     if (glIntegrationLwjglNatives != null) {
         glIntegrationTestRuntimeOnly "org.lwjgl:lwjgl:${lwjglVersion}:${glIntegrationLwjglNatives}"
@@ -797,7 +791,6 @@ tasks.register('glIntegrationTest', Test) {
     useJUnitPlatform()
     maxParallelForks = 1
     forkEvery = 1
-    systemProperty 'junit.platform.launcher.interceptors.enabled', 'true'
     javaLauncher = javaToolchains.launcherFor {
         languageVersion = JavaLanguageVersion.of(25)
     }

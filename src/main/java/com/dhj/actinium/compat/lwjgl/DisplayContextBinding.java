@@ -1,32 +1,15 @@
 package com.dhj.actinium.compat.lwjgl;
 
-import com.dhj.actinium.startup.CoreProfileDisplayCreator;
 import com.dhj.actinium.startup.SdlGpuBootstrap;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.backend.WindowBackends;
 import com.gtnewhorizons.angelica.glsm.context.NativeContextHandle;
-import com.gtnewhorizons.angelica.lwjgl3.Lwjgl3Context;
-import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.ContextGL;
-import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DrawableGL;
 
 /** Binds LWJGL native context lifetime events to GLSM's per-drawable state. */
 public final class DisplayContextBinding {
     private DisplayContextBinding() {
-    }
-
-    /** Uses the drawable API so the GLES context and its function table stay on the calling thread. */
-    public static boolean changeGlesDisplayContext(DrawableGL drawable, boolean bind) {
-        if (!CoreProfileDisplayCreator.usesGlesDisplay()) return false;
-        if (drawable == null) return true;
-        try {
-            if (bind) drawable.makeCurrent();
-            else drawable.releaseContext();
-        } catch (LWJGLException failure) {
-            throw new IllegalStateException("Could not change the OpenGL ES display context", failure);
-        }
-        return true;
     }
 
     public static void bindDisplayContextIfNativeCurrent(DrawableGL drawable) {
@@ -37,14 +20,13 @@ public final class DisplayContextBinding {
             : ((NativeContextHandle) contextToken).actinium$nativeHandle();
         final long nativeCurrent = WindowBackends.get().currentContextHandle();
         if (nativeCurrent == 0L) {
-            releaseContext();
+            GLStateManager.releaseBoundContext();
             return;
         }
         if (contextToken == null || contextHandle != nativeCurrent) {
             assertCurrentBindingMatches(nativeCurrent);
             return;
         }
-        bindGlesContext(contextToken);
         GLStateManager.bindDisplayContext(contextToken, nativeCurrent);
     }
 
@@ -57,20 +39,14 @@ public final class DisplayContextBinding {
         if (SdlGpuBootstrap.isActive()) return;
         final long nativeCurrent = WindowBackends.get().currentContextHandle();
         if (nativeCurrent == 0L) {
-            releaseContext();
+            GLStateManager.releaseBoundContext();
             return;
         }
         if (contextToken == null || contextHandle != nativeCurrent) {
             assertCurrentBindingMatches(nativeCurrent);
             return;
         }
-        bindGlesContext(contextToken);
-        // ContextGL.makeCurrent can run before the Display.create return callback.
-        if (Display.getDrawable() instanceof DrawableGL display && display.getContext() == contextToken) {
-            GLStateManager.bindDisplayContext(contextToken, nativeCurrent);
-        } else {
-            GLStateManager.bindDrawableContext(contextToken, nativeCurrent);
-        }
+        GLStateManager.bindDrawableContext(contextToken, nativeCurrent);
     }
 
     public static void releaseIfNativeUnbound() {
@@ -80,15 +56,6 @@ public final class DisplayContextBinding {
             assertCurrentBindingMatches(nativeCurrent);
             return;
         }
-        releaseContext();
-    }
-
-    private static void bindGlesContext(Object contextToken) {
-        if (CoreProfileDisplayCreator.usesGlesDisplay()) Lwjgl3Context.bindGlesContext(contextToken);
-    }
-
-    private static void releaseContext() {
-        if (CoreProfileDisplayCreator.usesGlesDisplay()) Lwjgl3Context.releaseGlesContext();
         GLStateManager.releaseBoundContext();
     }
 

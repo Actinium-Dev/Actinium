@@ -26,17 +26,9 @@ public class BooleanState implements ISettableState<BooleanState> {
         stateUnknown = true;
     }
 
-    protected boolean tracksStateWhenCacheBypassed() {
-        return false;
-    }
-
-    protected boolean forwardsToBackend() {
-        return !ffpStateOnly;
-    }
-
     /** Re-applies the cached enable state to the backend; used when replaying state onto a fresh GL context. */
     public void applyToBackend() {
-        if (!forwardsToBackend()) return;
+        if (ffpStateOnly) return;
         if (enabled) {
             RENDER_BACKEND.enable(glCap);
         } else {
@@ -57,11 +49,11 @@ public class BooleanState implements ISettableState<BooleanState> {
         if (stateUnknown || bypass || enabled != this.enabled || (this.glCap == GL11.GL_BLEND && GLStateManager.vendorIsAMD() && GLStateManager.isPoppingAttributes())) {
             GLStateManager.beforeUncapturedCapabilityChange(glCap);
             stateUnknown = false;
-            if (!bypass || tracksStateWhenCacheBypassed()) {
+            if (!bypass) {
                 this.enabled = enabled;
                 onEnabledChanged();
             }
-            if (forwardsToBackend()) {
+            if (!ffpStateOnly) {
                 if (enabled) {
                     RENDER_BACKEND.enable(this.glCap);
                 } else {

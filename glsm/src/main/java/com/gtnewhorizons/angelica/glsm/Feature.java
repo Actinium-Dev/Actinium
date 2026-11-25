@@ -334,7 +334,6 @@ public class Feature {
               GLStateManager.getMatrixMode()
             , GLStateManager.getNormalizeState()
             , GLStateManager.getRescaleNormalState()
-            , GLStateManager.getClipPlaneState()
         ));
         for (int i = 0; i < GLStateManager.getClipPlaneStates().length; i++) {
             transformAttribs.add(GLStateManager.getClipPlaneStates()[i]);

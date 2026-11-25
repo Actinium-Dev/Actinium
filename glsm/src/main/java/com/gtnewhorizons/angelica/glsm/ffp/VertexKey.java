@@ -55,7 +55,6 @@ public final class VertexKey {
     private static final int BIT_HAS_VERTEX_TEX2     = BIT_LINE_STIPPLE + 1;
     private static final int BIT_HAS_VERTEX_TEX3     = BIT_HAS_VERTEX_TEX2 + 1;
     private static final int BIT_INSTANCING          = BIT_HAS_VERTEX_TEX3 + 1;
-    private static final int BIT_CLIP_EMULATED       = BIT_INSTANCING + 3;
     private static final long INSTANCING_MASK        = 0x7L;
 
     static {
@@ -121,7 +120,6 @@ public final class VertexKey {
     public int texGenModeR()              { return (int)((packed >> BIT_TEXGEN_R) & 0x7); }
     public int texGenModeQ()              { return (int)((packed >> BIT_TEXGEN_Q) & 0x7); }
     public boolean texGenEnabled()        { return texGenModeS() != TG_NONE || texGenModeT() != TG_NONE || texGenModeR() != TG_NONE || texGenModeQ() != TG_NONE; }
-    public boolean clipEmulated()        { return bit(BIT_CLIP_EMULATED); }
     public boolean clipPlanesEnabled()    { return bit(BIT_CLIP_PLANES); }
     public boolean lineStipple()          { return bit(BIT_LINE_STIPPLE); }
     public Instancing instancing()        { return Instancing.VALUES[(int) ((packed >> BIT_INSTANCING) & INSTANCING_MASK)]; }
@@ -256,9 +254,9 @@ public final class VertexKey {
             bits |= (1L << BIT_UNIT23_UV_FROM_UNIT0);
         }
 
-        if (GLStateManager.anyClipPlaneEnabled()) {
-            bits |= 1L << BIT_CLIP_PLANES;
-            if (RenderSystem.isClipDistanceEmulated()) bits |= 1L << BIT_CLIP_EMULATED;
+        // Clip planes — only when the driver can compile gl_ClipDistance (issue #214)
+        if (GLStateManager.anyClipPlaneEnabled() && RenderSystem.hasClipCullDistance()) {
+            bits |= (1L << BIT_CLIP_PLANES);
         }
 
         // Wide line emulation through line quads

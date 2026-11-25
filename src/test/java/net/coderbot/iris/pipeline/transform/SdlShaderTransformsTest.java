@@ -263,6 +263,33 @@ class SdlShaderTransformsTest {
         assertCompiles(compute, GL43.GL_COMPUTE_SHADER);
     }
 
+    @Test
+    void nativeClipDistancesInitializeBeforePackWritesAndApplyEnabledPlanesAfterwards() {
+        Transformer vertex = parse("""
+            #version 460 core
+            uniform mat4 iris_ModelViewMatrix;
+            layout(location = 0) in vec4 iris_Vertex;
+            void main() {
+                gl_Position = iris_Vertex;
+                gl_ClipDistance[2] = iris_Vertex.x;
+            }
+            """);
+        CommonTransformer.injectNativeClipPlanes(vertex, true);
+
+        vertex.mutateTree(tree -> {
+            List<GLSLParser.Assignment_expressionContext> writes = GlslAstHelpers.collectAll(tree, GLSLParser.Assignment_expressionContext.class)
+                .stream().filter(expression -> expression.getText().startsWith("gl_ClipDistance[2]=")).toList();
+            assertEquals(3, writes.size());
+            assertEquals("gl_ClipDistance[2]=0.0", writes.get(0).getText());
+            assertEquals("gl_ClipDistance[2]=iris_Vertex.x", writes.get(1).getText());
+            assertEquals("gl_ClipDistance[2]=dot(actinium_ClipPlane[2],_cp_ep)", writes.get(2).getText());
+            assertNull(GlslAstHelpers.enclosingOfType(writes.get(0), GLSLParser.Selection_statementContext.class));
+            assertEquals("actinium_ClipPlanesEnabled",
+                GlslAstHelpers.enclosingOfType(writes.get(2), GLSLParser.Selection_statementContext.class).getChild(2).getText());
+        });
+        assertCompiles(format(vertex), GL20.GL_VERTEX_SHADER);
+    }
+
     private static GLSLParser.Typeless_declarationContext declarator(GLSLParser.Translation_unitContext tree, String name) {
         return GlslAstHelpers.collectAll(tree, GLSLParser.Typeless_declarationContext.class).stream()
             .filter(declaration -> declaration.IDENTIFIER() != null && declaration.IDENTIFIER().getText().equals(name))

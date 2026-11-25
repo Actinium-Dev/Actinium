@@ -1,7 +1,6 @@
 package com.gtnewhorizons.angelica.glsm.stacks;
 
 import com.gtnewhorizons.angelica.glsm.ClipPlaneBooleanState;
-import com.gtnewhorizons.angelica.glsm.states.ClipPlaneState;
 import com.gtnewhorizons.angelica.glsm.states.TexEnvState;
 
 @SuppressWarnings("RedundantCast")
@@ -30,14 +29,12 @@ public final class CowDispatch {
     public static final byte TEXTURE_BINDING = 21;
     public static final byte TEX_ENV = 22;
     public static final byte SCISSOR = 23;
-    public static final byte CLIP_EQUATIONS = 24;
 
     private CowDispatch() {}
 
     public static byte kindOf(CowStateStack<?> stack) {
         final Class<?> type = stack.getClass();
         if (type == TextureUnitBooleanStateStack.class) return TEXTURE_UNIT_BOOLEAN;
-        if (type == ClipPlaneState.class) return CLIP_EQUATIONS;
         if (type == ClipPlaneBooleanState.class) return CLIP_PLANE_BOOLEAN;
         if (type == BooleanStateStack.class) return BOOLEAN;
         if (type == BlendStateStack.class) return BLEND;
@@ -68,7 +65,6 @@ public final class CowDispatch {
         return switch (kind) {
             case BLEND -> ((BlendStateStack) stack).topSlotChanged();
             case BOOLEAN -> ((BooleanStateStack) stack).topSlotChanged();
-            case CLIP_EQUATIONS -> ((ClipPlaneState) stack).topSlotChanged();
             case CLIP_PLANE_BOOLEAN -> ((ClipPlaneBooleanState) stack).topSlotChanged();
             case TEXTURE_UNIT_BOOLEAN -> ((TextureUnitBooleanStateStack) stack).topSlotChanged();
             case COLOR_MASK -> ((ColorMaskStack) stack).topSlotChanged();
@@ -99,7 +95,6 @@ public final class CowDispatch {
         return switch (kind) {
             case BLEND -> ((BlendStateStack) stack).slotChanged(slot);
             case BOOLEAN -> ((BooleanStateStack) stack).slotChanged(slot);
-            case CLIP_EQUATIONS -> ((ClipPlaneState) stack).slotChanged(slot);
             case CLIP_PLANE_BOOLEAN -> ((ClipPlaneBooleanState) stack).slotChanged(slot);
             case TEXTURE_UNIT_BOOLEAN -> ((TextureUnitBooleanStateStack) stack).slotChanged(slot);
             case COLOR_MASK -> ((ColorMaskStack) stack).slotChanged(slot);
@@ -130,7 +125,6 @@ public final class CowDispatch {
         switch (kind) {
             case BLEND -> ((BlendStateStack) stack).restoreSlot(slot);
             case BOOLEAN -> ((BooleanStateStack) stack).restoreSlot(slot);
-            case CLIP_EQUATIONS -> ((ClipPlaneState) stack).restoreSlot(slot);
             case CLIP_PLANE_BOOLEAN -> ((ClipPlaneBooleanState) stack).restoreSlot(slot);
             case TEXTURE_UNIT_BOOLEAN -> ((TextureUnitBooleanStateStack) stack).restoreSlot(slot);
             case COLOR_MASK -> ((ColorMaskStack) stack).restoreSlot(slot);
