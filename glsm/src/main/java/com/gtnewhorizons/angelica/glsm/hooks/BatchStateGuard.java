@@ -9,6 +9,8 @@ import java.util.function.BooleanSupplier;
 /** Drains deferred geometry before changing state that is not stored with each batch. */
 public final class BatchStateGuard {
     public static Runnable flush;
+    /** Drains deferred geometry before the host submits a blended immediate draw. */
+    public static Runnable drawFlush;
     /** Host predicate: whether the current draw may be batched, so a program change has to wait. */
     public static volatile BooleanSupplier batchingAllowed = () -> false;
     private static int suspended;
@@ -23,12 +25,21 @@ public final class BatchStateGuard {
     public static boolean isBatching() { return batchingAllowed.getAsBoolean(); }
 
     public static void beforeChange() {
-        if (flush == null || suspended != 0 || !GLStateManager.isMainThread()
+        run(flush);
+    }
+
+    /** Lets the host submit deferred geometry before an immediate draw. */
+    public static void beforeDraw() {
+        run(drawFlush);
+    }
+
+    private static void run(Runnable action) {
+        if (action == null || suspended != 0 || !GLStateManager.isMainThread()
             || DisplayListManager.getRecordMode() == DisplayListManager.RecordMode.COMPILE) return;
         final CommandRecorder recorder = DisplayListManager.isRecording() ? DisplayListManager.pauseRecording() : null;
         suspend();
         try {
-            flush.run();
+            action.run();
         } finally {
             resume();
             if (recorder != null) DisplayListManager.resumeRecording(recorder);

@@ -149,15 +149,19 @@ public final class DepthEcho {
 
     /** Submits a native OpenGL draw and manages temporary driver state without changing GLSM caches. */
     public static void submit(Runnable draw) {
+        submit(draw, draw);
+    }
+
+    static void submit(Runnable draw, Runnable echoDraw) {
         final Capture capture = current();
         if (capture == null || capture.target == 0) {
             draw.run();
         } else {
-            submitCaptured(capture, draw);
+            submitCaptured(capture, draw, echoDraw);
         }
     }
 
-    private static void submitCaptured(Capture capture, Runnable draw) {
+    private static void submitCaptured(Capture capture, Runnable draw, Runnable echoDraw) {
         if (capture.replaying) {
             if (replaySkips(capture)) return;
             if (GLSMDepthStencilAlpha.getDepthState().isMaskEnabled()) {
@@ -177,7 +181,7 @@ public final class DepthEcho {
         final int source = capture.source;
         try {
             RENDER_BACKEND.bindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, capture.target);
-            drawWithDepthWrite(() -> GLStateManager.ctx().ffp.withDepthEchoCoverage(draw));
+            drawWithDepthWrite(() -> GLStateManager.ctx().ffp.withDepthEchoCoverage(echoDraw));
             capture.echoed = true;
         } finally {
             RENDER_BACKEND.bindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, source);

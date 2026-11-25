@@ -2,12 +2,15 @@ package com.dhj.actinium.render.terrain;
 
 import com.dhj.actinium.debug.WorldRenderInventory;
 import com.dhj.actinium.render.RenderWorldRecursionGuard;
+import com.gtnewhorizons.angelica.glsm.DepthEcho;
 import com.gtnewhorizons.angelica.glsm.GLSMMatrices;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.rendering.tesr.AngelicaTesrMeshCache;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
+import com.gtnewhorizons.angelica.rendering.tesr.ImmediateDrawOrder;
 import com.gtnewhorizons.angelica.rendering.tesr.PendingTesrDraws;
 import com.gtnewhorizons.angelica.rendering.tesr.TesrBatchRenderer;
+import com.gtnewhorizons.angelica.rendering.tesr.TranslucentPeel;
 import com.gtnewhorizons.angelica.rendering.tesr.TesrGlowReplay;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.coderbot.iris.Iris;
@@ -355,6 +358,7 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
                 continue;
 
             PendingTesrDraws.beforeTileEntity(tileEntity);
+            TranslucentPeel.beforeBlockEntity();
             try {
                 TileEntityRendererDispatcher.instance.render(tileEntity, partialTicks, -1);
             } catch(RuntimeException e) {
@@ -459,7 +463,13 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
             GLSMMatrices.getModelViewMatrix(), TileEntityRendererDispatcher.staticPlayerX,
             TileEntityRendererDispatcher.staticPlayerY, TileEntityRendererDispatcher.staticPlayerZ);
         ModelPartBatcher.INSTANCE.begin(ModelPartBatcher.Mode.BLOCK_ENTITIES);
+        final boolean orderedPass = !RenderWorldRecursionGuard.isNested() && !ShaderProviderHolder.isShadowPass()
+                && !DepthEcho.replaying();
         PendingTesrDraws.beginPass();
+        if (orderedPass) {
+            TranslucentPeel.beginPass();
+            ImmediateDrawOrder.beginPass();
+        }
         try {
             TileEntityRendererDispatcher.instance.preDrawBatch();
             try {
@@ -474,10 +484,16 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
                 TileEntityRendererDispatcher.instance.drawBatch(pass);
             }
         } finally {
-            PendingTesrDraws.endPass();
-            ModelPartBatcher.INSTANCE.flush();
-            TesrBatchRenderer.INSTANCE.flush();
-            TileEntityGlStateGuard.pop();
+            if (orderedPass) ImmediateDrawOrder.endPass();
+            try {
+                PendingTesrDraws.endPass();
+                if (orderedPass) TranslucentPeel.flush();
+                ModelPartBatcher.INSTANCE.flush();
+                TesrBatchRenderer.INSTANCE.flush();
+            } finally {
+                if (orderedPass) TranslucentPeel.endPass();
+                TileEntityGlStateGuard.pop();
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 package com.gtnewhorizons.angelica.glsm.ffp;
 
 import com.gtnewhorizons.angelica.glsm.CoverageDiscard;
+import com.gtnewhorizons.angelica.glsm.DepthPeel;
 import org.lwjgl.opengl.GL11;
 
 import java.io.IOException;
@@ -42,6 +43,7 @@ public final class FragmentShaderGenerator {
         emitSpecularAdd(sb, key);
         emitAlphaTest(sb, key);
         emitFog(sb, key);
+        if (key.depthPeel()) sb.append("  peelTest();\n");
         if (key.coverageDiscard()) sb.append("  coverageTest(color);\n");
         sb.append("  fragColor = color;\n");
         sb.append("}\n");
@@ -122,6 +124,7 @@ public final class FragmentShaderGenerator {
             sb.append("uniform vec4 u_FogParams;\n");
             sb.append("uniform vec4 u_FogColor;\n");
         }
+        if (key.depthPeel()) sb.append(DepthPeel.GLSL);
         if (key.coverageDiscard()) sb.append(CoverageDiscard.GLSL);
         sb.append('\n');
     }

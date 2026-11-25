@@ -9,6 +9,8 @@ public final class TesrLifecycle {
     private TesrLifecycle() {}
 
     public static void reset() {
+        ImmediateDrawOrder.endPass();
+        TranslucentPeel.destroy();
         TesrBatchRenderer.INSTANCE.clearRetained();
         ModelPartBatcher.INSTANCE.clear();
         EntityTextureAtlas.INSTANCE.freePages();

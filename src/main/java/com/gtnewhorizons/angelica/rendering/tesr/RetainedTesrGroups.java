@@ -66,6 +66,13 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
     private final TemplateBuffer[] budgetSeen = new TemplateBuffer[PROMOTE_MAX_TEMPLATES];
     private double camX, camY, camZ;
     private long frameMark;
+    // Counts render passes for promotion limits across segment flushes.
+    private long passMark;
+    private int segment;
+    private boolean peelRecording;
+    private boolean peelReplaying;
+    private final ObjectArrayList<Group> deferredPromotions = new ObjectArrayList<>();
+    private final ObjectArrayList<DepthEqualSet> deferredSwitches = new ObjectArrayList<>();
     GlintCapture glintCapture;
 
     long rebakes;
@@ -437,6 +444,11 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
         }
     }
 
+    private static final class SegmentGroups {
+        final ObjectArrayList<Group> groups = new ObjectArrayList<>();
+        long frameMark = -1;
+    }
+
     static final class Group {
         final RenderLayer layer;
         final TesrMaterial material;
@@ -451,6 +463,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
         final Anchor anchor = new Anchor();
         boolean anchored;
         long frameMark = -1;
+        long passMark = -1;
         long lastUsedMs;
         final int entityColor;
         final int itemId;
@@ -623,6 +636,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
 
     private final Reference2ObjectOpenHashMap<RenderLayer, Reference2ObjectOpenHashMap<TesrMaterial, Object2ObjectOpenHashMap<DrawStateKey, Group>>> groups = new Reference2ObjectOpenHashMap<>();
     private final Reference2ObjectOpenHashMap<RenderLayer, ObjectArrayList<Group>> byLayer = new Reference2ObjectOpenHashMap<>();
+    private final Reference2ObjectOpenHashMap<RenderLayer, SegmentGroups> segmentGroups = new Reference2ObjectOpenHashMap<>();
 
     /** @return the groups queued for each layer in this pass, for the batch tests */
     Reference2ObjectOpenHashMap<RenderLayer, ObjectArrayList<Group>> groupsByLayer() {
@@ -654,6 +668,18 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
     }
 
     void beginPass(Matrix4f base, double camX, double camY, double camZ, InstancedTemplateRenderer instancedRenderer, TesrInstancingPipeline deferred) {
+        startSegment(base, camX, camY, camZ, instancedRenderer, deferred);
+        passMark++;
+        segment = 0;
+    }
+
+    void continuePass(Matrix4f base, double camX, double camY, double camZ, InstancedTemplateRenderer instancedRenderer, TesrInstancingPipeline deferred) {
+        startSegment(base, camX, camY, camZ, instancedRenderer, deferred);
+        // Baked groups are keyed by segment, so a group split by a flush keeps one mesh per side instead of rebaking
+        segment++;
+    }
+
+    private void startSegment(Matrix4f base, double camX, double camY, double camZ, InstancedTemplateRenderer instancedRenderer, TesrInstancingPipeline deferred) {
         if (glintCapture != null) glintCapture.invalidate();
         glintCapture = null;
         baseMV.set(base);
@@ -676,27 +702,28 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
 
     /** Mutable lookup avoids allocating a key for each queued model part. Stored keys are never mutated. */
     private static final class DrawStateKey {
-        int entity, block, item, color;
+        int entity, block, item, color, segment;
 
-        DrawStateKey set(int entity, int block, int item, int color) {
+        DrawStateKey set(int entity, int block, int item, int color, int segment) {
             this.entity = entity;
             this.block = block;
             this.item = item;
             this.color = color;
+            this.segment = segment;
             return this;
         }
 
-        boolean matches(int entity, int block, int item, int color) {
-            return this.entity == entity && this.block == block && this.item == item && this.color == color;
+        boolean matches(int entity, int block, int item, int color, int segment) {
+            return this.entity == entity && this.block == block && this.item == item && this.color == color && this.segment == segment;
         }
 
         @Override
         public boolean equals(Object other) {
-            return other instanceof DrawStateKey key && matches(key.entity, key.block, key.item, key.color);
+            return other instanceof DrawStateKey key && matches(key.entity, key.block, key.item, key.color, key.segment);
         }
 
         @Override
-        public int hashCode() { return ((entity * 31 + block) * 31 + item) * 31 + color; }
+        public int hashCode() { return (((entity * 31 + block) * 31 + item) * 31 + color) * 31 + segment; }
     }
 
     private final DrawStateKey lookupState = new DrawStateKey();
@@ -735,7 +762,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
             }
             group = byState.get(lookupState);
             if (group == null) {
-                final DrawStateKey key = new DrawStateKey().set(lookupState.entity, lookupState.block, lookupState.item, lookupState.color);
+                final DrawStateKey key = new DrawStateKey().set(lookupState.entity, lookupState.block, lookupState.item, lookupState.color, lookupState.segment);
                 group = new Group(layer, material, perInstance ? 0 : id, key);
                 group.lastUsedMs = nowMs;
                 byState.put(key, group);
@@ -752,13 +779,13 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
 
     private void keyLookup(boolean perInstance, int id) {
         if (perInstance) {
-            lookupState.set(0, 0, 0, 0);
+            lookupState.set(0, 0, 0, 0, 0);
             return;
         }
         final CapturedRenderingState captured = CapturedRenderingState.INSTANCE;
         final boolean entityKind = source.effectiveIdKind() == AngelicaBufferSource.GroupIdKind.ENTITY;
         lookupState.set(entityKind ? id : captured.getCurrentRenderedEntity(), entityKind ? captured.getCurrentRenderedBlockEntity() : id,
-            captured.getCurrentRenderedItem(), AngelicaBufferSource.packEntityColor(captured.getCurrentEntityColor()));
+            captured.getCurrentRenderedItem(), AngelicaBufferSource.packEntityColor(captured.getCurrentEntityColor()), segment);
     }
 
     void forceStreaming(RenderLayer layer, TesrMaterial material, int blockEntityId) {
@@ -872,6 +899,8 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
                     resetPromotion(group);
                 }
             }
+            // touch recorded this geometry as stream segments, but it draws with the baked columns
+            TranslucentPeel.queued(layer, this, group);
         }
         toAnchorRelative(group, currentMV);
         final Matrix4f bakedTexMatrix = atlasSlot != null ? atlasSlot.uvMatrix : texMatrix;
@@ -997,7 +1026,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
             adoptAnchor(group, set);
         } else if (set.anchorFrame < 0) {
             set.anchor.set(group.anchor);
-            set.anchorFrame = frameMark;
+            set.anchorFrame = passMark;
             for (int i = 0, n = set.members.size(); i < n; i++) {
                 final Group member = set.members.get(i);
                 if (member.frameMark == frameMark && !member.queuedThisFrame) adoptAnchor(member, set);
@@ -1029,13 +1058,13 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
     }
 
     private void refresh(DepthEqualSet set) {
-        if (set.checkedFrame == frameMark) return;
-        set.checkedFrame = frameMark;
-        if (set.anchorFrame != frameMark && set.anchor.stale(camX, camY, camZ)) set.anchor.moveTo(camX, camY, camZ);
-        set.anchorFrame = frameMark;
+        if (set.checkedFrame == passMark) return;
+        set.checkedFrame = passMark;
+        if (set.anchorFrame != passMark && set.anchor.stale(camX, camY, camZ)) set.anchor.moveTo(camX, camY, camZ);
+        set.anchorFrame = passMark;
         if ((set.streamMembers > 0 || set.instanced) && set.instanced != allCanInstance(set)) {
             set.instanced = !set.instanced;
-            set.effectiveFrame = frameMark - 1;
+            set.effectiveFrame = passMark - 1;
         }
     }
 
@@ -1158,7 +1187,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
         if (group.frameMark != frameMark) {
             final DepthEqualSet set = activeDepthEqualSet(group);
             if (set != null) refresh(set);
-            if (frameMark - group.frameMark > IDLE_RESET_FRAMES) {
+            if (passMark - group.passMark > IDLE_RESET_FRAMES) {
                 resetPromotion(group);
             } else if (promoted(group)) {
                 final boolean pinned = set != null && set.streamMembers > 0;
@@ -1177,12 +1206,14 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
                 }
             }
             if (set != null) {
-                if (frameMark > set.effectiveFrame) adopt(group, set.instanced);
+                if (passMark > set.effectiveFrame) adopt(group, set.instanced);
             } else if (group.stream && !group.streamPath) {
                 resetPromotion(group);
             }
             group.queuedThisFrame = false;
             group.frameMark = frameMark;
+            group.passMark = passMark;
+            addToSegment(group);
             group.lastUsedMs = nowMs;
             group.dirty = false;
             group.clearInstances();
@@ -1195,12 +1226,37 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
             }
             source.declareUse(layer);
         }
+        if (drawsInstanced(group)) {
+            TranslucentPeel.queuedUnordered(layer);
+        } else if (group.streamPath) {
+            TranslucentPeel.queued(layer, source, layer);
+        } else {
+            TranslucentPeel.queued(layer, this, group);
+        }
+    }
+
+    private void addToSegment(Group group) {
+        SegmentGroups entry = segmentGroups.get(group.layer);
+        if (entry == null) {
+            entry = new SegmentGroups();
+            segmentGroups.put(group.layer, entry);
+        }
+        if (entry.frameMark != frameMark) {
+            entry.groups.clear();
+            entry.frameMark = frameMark;
+        }
+        entry.groups.add(group);
+    }
+
+    private ObjectArrayList<Group> segmentGroups(RenderLayer layer) {
+        final SegmentGroups entry = segmentGroups.get(layer);
+        return entry != null && entry.frameMark == frameMark ? entry.groups : null;
     }
 
     private void switchSetNextFrame(DepthEqualSet set, boolean instanced) {
         if (set.instanced == instanced) return;
         set.instanced = instanced;
-        set.effectiveFrame = frameMark;
+        set.effectiveFrame = passMark;
     }
 
     private static DepthEqualSet activeDepthEqualSet(Group group) {
@@ -1211,7 +1267,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
     private boolean allStable(DepthEqualSet set) {
         for (int i = 0, n = set.members.size(); i < n; i++) {
             final Group member = set.members.get(i);
-            if (member.streamPath && frameMark - member.frameMark <= IDLE_RESET_FRAMES && (member.probe == null || member.probe.stableProbes < DEMOTE_AFTER_STABLE_PROBES)) return false;
+            if (member.streamPath && passMark - member.passMark <= IDLE_RESET_FRAMES && (member.probe == null || member.probe.stableProbes < DEMOTE_AFTER_STABLE_PROBES)) return false;
         }
         return true;
     }
@@ -1236,7 +1292,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
 
     @Override
     public boolean hasDraws(RenderLayer layer) {
-        final ObjectArrayList<Group> list = byLayer.get(layer);
+        final ObjectArrayList<Group> list = segmentGroups(layer);
         if (list == null) return false;
         for (int i = 0, n = list.size(); i < n; i++) {
             if (live(list.get(i))) return true;
@@ -1247,7 +1303,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
     @Override
     public void drawLayer(RenderLayer layer) {
         if (glintCapture != null) glintCapture.invalidate();
-        final ObjectArrayList<Group> list = byLayer.get(layer);
+        final ObjectArrayList<Group> list = segmentGroups(layer);
         if (list == null) return;
         boolean matrixAvailable = true;
         boolean cubeAvailable = true;
@@ -1380,6 +1436,10 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
     }
 
     private void drawRetained(Group group) {
+        if (peelReplaying) {
+            draw(group);
+            return;
+        }
         final InstanceColumns cols = group.templateColumns;
         final Snapshot snapshot = group.snapshot;
         boolean instanceChanged = false;
@@ -1400,9 +1460,13 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
         if (instanceChanged && !group.stream && !group.streamPath && rebakesTooOften(group) && withinTemplateBudget(cols.templates)) {
             final DepthEqualSet set = activeDepthEqualSet(group);
             if (set != null) {
-                if (set.streamMembers == 0 && allCanInstance(set)) switchSetNextFrame(set, true);
+                if (set.streamMembers == 0 && allCanInstance(set)) {
+                    if (peelRecording) deferredSwitches.add(set);
+                    else switchSetNextFrame(set, true);
+                }
             } else if (canInstance(group) || group.opaque && templatesMatchLayerDrawMode(group)) {
-                promote(group);
+                if (peelRecording) deferredPromotions.add(group);
+                else promote(group);
             }
         }
     }
@@ -1445,6 +1509,21 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
         return ++group.promoteWindowRebakes >= PROMOTE_AFTER_REBAKES;
     }
 
+    void setPeelReplay(boolean recording, boolean replaying) {
+        peelRecording = recording;
+        peelReplaying = replaying;
+        // Promoting deletes the mesh the peel replays draw, so promotions wait until the peel ends
+        if (recording || replaying) return;
+        for (int i = 0, n = deferredPromotions.size(); i < n; i++) promote(deferredPromotions.get(i));
+        for (int i = 0, n = deferredSwitches.size(); i < n; i++) switchSetNextFrame(deferredSwitches.get(i), true);
+        deferredPromotions.clear();
+        deferredSwitches.clear();
+    }
+
+    private boolean replays(TexRun run) {
+        return peelReplaying && run.uploadPass == frameMark && instanced.canRedraw(run.uploadRingEpoch, run.uploadBuffer);
+    }
+
     private void drawTemplateRuns(InstanceColumns cols, boolean combineGlint, boolean itemStencil) {
         for (int r = 0, n = cols.runs.size(); r < n; r++) {
             final TexRun run = cols.runs.get(r);
@@ -1463,9 +1542,13 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
                 if (canRedraw(run)) {
                     instancedDraws += instanced.redrawTemplates(run.sourceRun, run.color);
                     redrawnInstances += run.parts;
+                } else if (replays(run)) {
+                    instancedDraws += instanced.replayTemplates(run);
+                    redrawnInstances += run.parts;
                 } else {
-                    instancedDraws += instanced.drawTemplates(cols, run, nowMs, run.glintBase);
-                    if (run.glintBase) recordUpload(run);
+                    final boolean record = run.glintBase || peelRecording;
+                    instancedDraws += instanced.drawTemplates(cols, run, nowMs, record);
+                    if (record) recordUpload(run);
                 }
                 instancedInstances += run.parts;
             } finally {
@@ -1486,9 +1569,12 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
                 if (canRedraw(run)) {
                     instanced.redrawCubes(run.sourceRun.uploadOffset, run.instances, run.color);
                     redrawnInstances += run.instances;
+                } else if (replays(run)) {
+                    instanced.replayCubes(run.uploadOffset, run.instances);
+                    redrawnInstances += run.instances;
                 } else {
                     run.uploadOffset = instanced.drawCubes(cols, run);
-                    if (run.glintBase) recordUpload(run);
+                    if (run.glintBase || peelRecording) recordUpload(run);
                 }
                 instancedDraws++;
                 cubeInstances += run.instances;
@@ -1613,6 +1699,7 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
     }
 
     void sweep(long now) {
+        segmentGroups.values().removeIf(index -> index.frameMark != frameMark);
         Arrays.fill(recentGroups, null);
         for (final ObjectArrayList<Group> list : byLayer.values()) {
             for (int i = list.size() - 1; i >= 0; i--) {
@@ -1644,6 +1731,11 @@ final class RetainedTesrGroups implements AngelicaBufferSource.LayerDrawHook {
             }
         }
         byLayer.clear();
+        segmentGroups.clear();
+        deferredPromotions.clear();
+        deferredSwitches.clear();
+        peelRecording = false;
+        peelReplaying = false;
         groups.clear();
         openScope = 0;
         openDepthEqualSet = null;

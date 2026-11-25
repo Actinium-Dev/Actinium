@@ -3,6 +3,7 @@ package com.dhj.actinium.render;
 import com.gtnewhorizon.gtnhlib.client.renderer.TessellatorManager;
 import com.gtnewhorizons.angelica.client.rendering.DeferredDrawBatcher;
 import com.gtnewhorizons.angelica.glsm.ITessellatorData;
+import com.gtnewhorizons.angelica.glsm.hooks.BatchStateGuard;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
 import net.minecraft.client.renderer.BufferBuilder;
 
@@ -27,6 +28,7 @@ public final class TessellatorDrawRouter {
      */
     public static boolean draw(BufferBuilder buffer, ITessellatorData view) {
         if (VanillaBufferBuilderRenderer.shouldUseVanillaPositionDraw(buffer)) {
+            if (buffer.getVertexCount() > 0) BatchStateGuard.beforeDraw();
             return false;
         }
         if (DeferredDrawBatcher.capture(buffer)) {
@@ -41,6 +43,7 @@ public final class TessellatorDrawRouter {
             ModelPartBatcher.drawTessellator(view);
             return true;
         }
+        if (buffer.getVertexCount() > 0) BatchStateGuard.beforeDraw();
         buffer.finishDrawing();
         VanillaBufferBuilderRenderer.draw(buffer, "Tessellator");
         return true;
