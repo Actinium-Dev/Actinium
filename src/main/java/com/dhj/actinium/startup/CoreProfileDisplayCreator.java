@@ -8,10 +8,12 @@ import com.gtnewhorizons.angelica.config.GLVersionChoice;
 import com.gtnewhorizons.angelica.config.SystemProperties;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import com.gtnewhorizons.angelica.glsm.backend.BackendOptions;
+import com.gtnewhorizons.angelica.lwjgl3.Lwjgl3Context;
 import net.minecraft.util.Util;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.LWJGLException;
+import org.lwjgl.opengles.GLES20;
 import org.lwjgl.opengl.ContextAttribs;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
@@ -19,7 +21,7 @@ import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.PixelFormat;
 
 /**
- * Creates a core-profile display while leaving Minecraft's surrounding startup method intact.
+ * Creates the selected display context for Minecraft startup.
  */
 public final class CoreProfileDisplayCreator {
     private static final Logger LOGGER = LogManager.getLogger("Celeritas");
@@ -28,22 +30,31 @@ public final class CoreProfileDisplayCreator {
     private static final int REQUIRED_MAJOR = RenderSystem.MIN_CORE_VERSION / 10;
     private static final int REQUIRED_MINOR = RenderSystem.MIN_CORE_VERSION % 10;
     private static final String REQUIRED_VERSION = REQUIRED_MAJOR + "." + REQUIRED_MINOR;
+    private static final int ES_MAJOR = 3;
+    private static final int ES_MINOR = 2;
+    private static volatile boolean glesDisplay;
 
     private CoreProfileDisplayCreator() {
     }
 
     /**
-     * Tries supported core-profile versions until one creates a usable OpenGL context.
+     * Starts the selected renderer and probes desktop core versions when needed.
      *
-     * @throws LWJGLException if no attempted profile creates an OpenGL 3.3 or newer context
+     * @throws LWJGLException if the selected context cannot be created
      */
     public static void create(PixelFormat format) throws LWJGLException {
+        SdlGpuBootstrap.initialize();
+        final int requested = requestedGlVersion();
         if (SdlGpuBootstrap.createDisplay(format)) return;
+        if (requested == GLVersionChoice.GLES32.version()) {
+            createEsDisplay(format, ActiniumStartupDebugConfig.enableLwjglDebug());
+            return;
+        }
         ForgeEarlyConfigCompat.Snapshot original = ForgeEarlyConfigCompat.snapshot();
         boolean lwjglDebug = ActiniumStartupDebugConfig.enableLwjglDebug();
         Throwable creationFailure = null;
         try {
-            createWithFallback(format, lwjglDebug);
+            createWithFallback(format, lwjglDebug, requested);
         } catch (Throwable failure) {
             creationFailure = failure;
             throw failure;
@@ -60,9 +71,46 @@ public final class CoreProfileDisplayCreator {
         }
     }
 
-    private static void createWithFallback(PixelFormat format, boolean lwjglDebug) throws LWJGLException {
+    private static void createEsDisplay(PixelFormat format, boolean debug) throws LWJGLException {
+        if (!isGlesProfileSupported()) {
+            throw new LWJGLException("The OpenGL ES 3.2 profile requires compatible SDL window and context APIs on Windows or Linux");
+        }
+        glesDisplay = true;
+        try {
+            createDisplay(format, esContextAttributes(debug));
+            if (!Lwjgl3Context.isGlesContextCurrent()) {
+                throw new IllegalStateException("The host did not install the OpenGL ES function table");
+            }
+            final String version = GLES20.glGetString(GLES20.GL_VERSION);
+            if (!OpenGlVersion.parseEs(version).isAtLeast(ES_MAJOR, ES_MINOR)) {
+                throw new IllegalStateException("Expected OpenGL ES 3.2 or newer, driver returned: " + version);
+            }
+            LOGGER.info("Created native OpenGL ES context: {} ({})", version, GLES20.glGetString(GLES20.GL_RENDERER));
+        } catch (LWJGLException | RuntimeException failure) {
+            destroyDisplayAfterFailure();
+            glesDisplay = false;
+            throw new LWJGLException("Could not create a native OpenGL ES 3.2 context", failure);
+        }
+    }
+
+    static ContextAttribs esContextAttributes(boolean debug) {
+        return new ContextAttribs(ES_MAJOR, ES_MINOR).withProfileES(true).withDebug(debug);
+    }
+
+    public static boolean isGlesProfileSupported() {
+        final Util.EnumOS platform = Util.getOSType();
+        return (platform == Util.EnumOS.WINDOWS || platform == Util.EnumOS.LINUX)
+            && Display.class.getResource("/org/lwjgl/opengl/DisplayEvents.class") != null;
+    }
+
+    /** Indicates that the display and its shared contexts use the GLES profile. */
+    public static boolean usesGlesDisplay() {
+        return glesDisplay;
+    }
+
+    private static void createWithFallback(PixelFormat format, boolean lwjglDebug, int requestedVersion) throws LWJGLException {
         final int ceiling = glVersionCeiling();
-        final GLVersionChoice requested = GLVersionChoice.of(requestedGlVersion(), ceiling);
+        final GLVersionChoice requested = GLVersionChoice.of(requestedVersion, ceiling);
         int maxProbe = requested == GLVersionChoice.AUTO ? ceiling : requested.version();
         final int maxMajor = maxProbe / 10;
         final int maxMinor = maxProbe % 10;
@@ -212,14 +260,14 @@ public final class CoreProfileDisplayCreator {
         return Util.getOSType() == Util.EnumOS.OSX ? 41 : 46;
     }
 
-    /** Returns the packed JVM override, or -1 when the configuration decides the version. */
+    /** Returns the requested profile identifier, or -1 when the configuration decides the version. */
     public static int glVersionOverride() {
-        return Math.max(-1, parseGlProfile(SystemProperties.GL_PROFILE.trim()));
+        return parseGlProfile(SystemProperties.GL_PROFILE.trim());
     }
 
     private static int requestedGlVersion() {
         final int parsed = glVersionOverride();
-        if (parsed >= 0) {
+        if (parsed != -1) {
             return parsed;
         }
         if (!SystemProperties.GL_PROFILE.isBlank()) {
@@ -229,19 +277,20 @@ public final class CoreProfileDisplayCreator {
     }
 
     /**
-     * Parses an {@code angelica.glProfile} value into the packed version the probe expects.
+     * Parses the desktop version or the explicit ES profile from {@code angelica.glProfile}.
      *
-     * @return the packed version, or -1 when the value is not a number or {@code major.minor} pair
+     * @return the profile identifier, or -1 for an unrecognised value
      */
     static int parseGlProfile(String raw) {
+        if (raw.equalsIgnoreCase("es")) return GLVersionChoice.GLES32.version();
         final int dot = raw.indexOf('.');
         try {
             if (dot < 0) {
-                return Integer.parseInt(raw) * 10;
+                return Math.max(-1, Integer.parseInt(raw) * 10);
             }
             final int major = Integer.parseInt(raw.substring(0, dot));
             final String minorPart = raw.substring(dot + 1);
-            return major * 10 + (minorPart.isEmpty() ? 0 : Integer.parseInt(minorPart));
+            return Math.max(-1, major * 10 + (minorPart.isEmpty() ? 0 : Integer.parseInt(minorPart)));
         } catch (NumberFormatException e) {
             return -1;
         }

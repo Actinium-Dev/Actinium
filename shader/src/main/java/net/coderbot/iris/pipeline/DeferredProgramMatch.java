@@ -1,11 +1,15 @@
 package net.coderbot.iris.pipeline;
 
 import com.gtnewhorizons.angelica.glsm.DisplayListManager;
+import com.gtnewhorizons.angelica.glsm.GLSMPrograms;
+import com.gtnewhorizons.angelica.glsm.GLStateManager;
+import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
 import com.gtnewhorizons.angelica.glsm.hooks.BatchStateGuard;
 import com.gtnewhorizons.angelica.glsm.hooks.GLSMHooks;
 import com.gtnewhorizons.angelica.glsm.hooks.PendingProgramSelection;
 import com.gtnewhorizons.angelica.glsm.recording.CommandRecorder;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.opengl.GL20;
 
 import java.util.function.BooleanSupplier;
 
@@ -64,6 +68,7 @@ final class DeferredProgramMatch {
 	private final BooleanSupplier deferred;
 	private final Runnable match;
 	private boolean pending;
+	private boolean programRebindPending;
 
 	DeferredProgramMatch(DisplayListAccess displayLists, PendingProgramSelection owner, BooleanSupplier deferred, Runnable match) {
 		this.displayLists = displayLists;
@@ -117,12 +122,50 @@ final class DeferredProgramMatch {
 	/** Drops the pending request and its slot, e.g. when a mod takes over the GL program. */
 	void clear() {
 		this.pending = false;
+		this.programRebindPending = false;
 		clearSlot();
 	}
 
 	/** Returns whether a batch deferred a match that has not run yet. */
 	boolean isPending() {
 		return this.pending;
+	}
+
+	/** Schedules a variant change at the next draw that uses the current pass. */
+	void requestProgramRebind() {
+		this.programRebindPending = true;
+		GLSMHooks.pendingProgramSelection = this.owner;
+	}
+
+	/** Changes the variant without disturbing a foreign program or matching a different pass. */
+	void resolveProgramRebind(int program, Runnable transition) {
+		if (!this.programRebindPending) {
+			return;
+		}
+		if (program == 0) {
+			finishProgramRebind();
+			return;
+		}
+		if (displayLists.isCompiling() || GLSMPrograms.getActiveProgram() != program
+			|| BackendManager.RENDER_BACKEND.getInteger(GL20.GL_CURRENT_PROGRAM) != program) {
+			return;
+		}
+		runUnrecorded(() -> {
+			final boolean suspended = GLStateManager.suspendExitCapture();
+			try {
+				transition.run();
+			} finally {
+				GLStateManager.resumeExitCapture(suspended);
+			}
+		});
+		finishProgramRebind();
+	}
+
+	private void finishProgramRebind() {
+		this.programRebindPending = false;
+		if (!this.pending) {
+			clearSlot();
+		}
 	}
 
 	/**
@@ -157,7 +200,9 @@ final class DeferredProgramMatch {
 
 	private void runMatch() {
 		this.pending = false;
-		clearSlot();
+		if (!this.programRebindPending) {
+			clearSlot();
+		}
 		this.match.run();
 	}
 

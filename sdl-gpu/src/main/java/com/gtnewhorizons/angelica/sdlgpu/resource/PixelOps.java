@@ -1,5 +1,6 @@
 package com.gtnewhorizons.angelica.sdlgpu.resource;
 
+import com.gtnewhorizons.angelica.glsm.texture.TextureInfo;
 import com.gtnewhorizons.angelica.glsm.GLTypes;
 import com.gtnewhorizons.angelica.sdlgpu.frame.ContextState;
 import org.lwjgl.opengl.GL11;
@@ -15,9 +16,7 @@ public final class PixelOps {
     private PixelOps() {}
 
     public static int mipLevelSize(int base, int level) {
-        if (base <= 0 || level < 0) return 0;
-        if (level >= Integer.SIZE - 1) return 1;
-        return Math.max(1, base >> level);
+        return TextureInfo.mipLevelSize(base, level);
     }
 
     public static int defaultMipLevels(int width, int height) {

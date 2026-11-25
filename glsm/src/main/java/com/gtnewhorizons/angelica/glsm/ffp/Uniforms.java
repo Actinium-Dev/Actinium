@@ -452,9 +452,7 @@ public class Uniforms {
         if (program.locClipPlanes == -1) return;
         final ClipPlaneState cps = GLStateManager.getClipPlaneState();
         clipPlaneBuf.clear();
-        for (int i = 0; i < GLStateManager.MAX_CLIP_PLANES; i++) {
-            cps.putEyePlane(i, clipPlaneBuf);
-        }
+        cps.putEffectivePlanes(GLStateManager.ctx().clipPlaneEnabledMask, clipPlaneBuf);
         clipPlaneBuf.flip();
         RENDER_BACKEND.uniform4(program.locClipPlanes, clipPlaneBuf);
     }

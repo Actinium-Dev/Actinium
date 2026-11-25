@@ -122,17 +122,7 @@ public class CompatShaderTransformer {
         cache.clear();
     }
 
-    /**
-     * Transform a mod shader source for core profile compatibility.
-     *
-     * <p>Deliberate divergence from upstream Angelica: Angelica additionally re-emits the
-     * transformed 330-core GLSL as GLSL ES 320 on GLES contexts ({@code toGLES(...)} via
-     * {@code SpirvShaderTranslator.glslToGlslEs}, shaderc + SPIRV-Cross). That path is not wired
-     * here because the shaderc/spvc natives are compileOnly in glsm and are not shipped; the
-     * {@code GLES_IFDEF} handling below is a different, desktop-side concern (stripping ES
-     * precision guard blocks so ES-style mod shaders parse as desktop GLSL). GLES output
-     * re-emission remains a follow-up for the WP that ships the natives.
-     */
+    /** Transforms a mod shader source for core profile compatibility. */
     public static String transform(String source, boolean isFragment) {
         final boolean needsTransform = needsTransformation(source);
         String result;
@@ -1168,9 +1158,10 @@ public class CompatShaderTransformer {
     }
 
     // Patterns for parsing fragment shader in declarations to generate passthrough vertex shaders
-    private static final Pattern FRAG_IN_COLOR = Pattern.compile("\\bin\\s+vec4\\s+actinium_FrontColor\\b");
-    private static final Pattern FRAG_IN_TEXCOORD = Pattern.compile("\\bin\\s+vec4\\s+actinium_TexCoord(\\d+)\\b");
-    private static final Pattern FRAG_IN_FOGCOORD = Pattern.compile("\\bin\\s+float\\s+actinium_FogFragCoord\\b");
+    private static final String FRAG_INPUT = "\\bin\\s+(?:(?:lowp|mediump|highp)\\s+)?";
+    private static final Pattern FRAG_IN_COLOR = Pattern.compile(FRAG_INPUT + "vec4\\s+actinium_FrontColor\\b");
+    private static final Pattern FRAG_IN_TEXCOORD = Pattern.compile(FRAG_INPUT + "vec4\\s+actinium_TexCoord(\\d+)\\b");
+    private static final Pattern FRAG_IN_FOGCOORD = Pattern.compile(FRAG_INPUT + "float\\s+actinium_FogFragCoord\\b");
 
     /**
      * Generate a passthrough vertex shader for a fragment-only program.

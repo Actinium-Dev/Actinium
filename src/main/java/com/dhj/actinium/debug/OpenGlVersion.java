@@ -5,9 +5,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parses and compares the desktop OpenGL version reported by {@code GL_VERSION}.
+ * Parses and compares versions reported by {@code GL_VERSION}.
  */
 public record OpenGlVersion(int major, int minor) {
+    private static final String ES_PREFIX = "OpenGL ES ";
     private static final Pattern VERSION_PATTERN = Pattern.compile(
         "^(?<major>\\d+)\\.(?<minor>\\d+)(?:\\.\\d+)?(?:\\s.*)?$"
     );
@@ -35,6 +36,14 @@ public record OpenGlVersion(int major, int minor) {
             Integer.parseInt(matcher.group("major")),
             Integer.parseInt(matcher.group("minor"))
         );
+    }
+
+    /** Parses an OpenGL ES version and rejects desktop contexts returned by the driver. */
+    public static OpenGlVersion parseEs(String versionString) {
+        if (versionString == null || !versionString.startsWith(ES_PREFIX)) {
+            throw new IllegalArgumentException("Expected an OpenGL ES context, driver returned: " + versionString);
+        }
+        return parse(versionString.substring(ES_PREFIX.length()));
     }
 
     public boolean isAtLeast(int requiredMajor, int requiredMinor) {
