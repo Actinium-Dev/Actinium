@@ -24,6 +24,7 @@ import com.dhj.actinium.render.fps.FpsReducer;
 import dhj.embeddedt.embeddium.impl.render.chunk.MultiDrawMode;
 import dhj.embeddedt.embeddium.impl.render.culling.GpuCulling;
 import dhj.embeddedt.embeddium.impl.render.culling.GpuCullingMode;
+import dhj.embeddedt.embeddium.impl.render.culling.MultiDrawModeResolver;
 import com.dhj.actinium.render.terrain.GpuCullingSettings;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.gtnewhorizons.angelica.config.AngelicaConfig;
@@ -36,7 +37,6 @@ import dhj.embeddedt.embeddium.api.options.structure.OptionStorage;
 import dhj.embeddedt.embeddium.api.options.structure.StandardOptions;
 import com.dhj.actinium.compat.modernui.MuiGuiScaleHook;
 import com.dhj.actinium.render.FastLitItemDisplayListCache;
-import com.mitchej123.lwjgl.GLExtension;
 
 import static com.mitchej123.lwjgl.LWJGLServiceProvider.LWJGL;
 
@@ -963,13 +963,9 @@ public class ActiniumGameOptionPages {
     }
 
     private static MultiDrawMode[] allowedMultiDrawModes() {
-        return isIndirectMultiDrawSupported()
+        return MultiDrawModeResolver.supportsMultiDrawIndirect()
                 ? MultiDrawMode.values()
                 : new MultiDrawMode[] { MultiDrawMode.DIRECT, MultiDrawMode.INDIVIDUAL };
-    }
-
-    private static boolean isIndirectMultiDrawSupported() {
-        return LWJGL.isOpenGLVersionSupported(4, 3) || LWJGL.isExtensionSupported(GLExtension.ARB_multi_draw_indirect);
     }
 
     public static OptionStorage<GameSettings> getVanillaOpts() {

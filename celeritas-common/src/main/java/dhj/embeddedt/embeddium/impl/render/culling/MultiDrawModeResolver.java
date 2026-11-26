@@ -1,6 +1,5 @@
 package dhj.embeddedt.embeddium.impl.render.culling;
 
-import com.mitchej123.lwjgl.GLExtension;
 import dhj.embeddedt.embeddium.impl.render.chunk.MultiDrawMode;
 import dhj.embeddedt.embeddium.impl.runtime.EmbeddiumRuntimeOptions;
 
@@ -14,7 +13,7 @@ import static com.mitchej123.lwjgl.LWJGLServiceProvider.LWJGL;
  * draw: the configured mode comes from {@link EmbeddiumRuntimeOptions#chunkMultiDrawMode()}, the
  * {@code actinium.chunkMultiDrawMode} system property overrides it after trimming, an override the mode lookup does
  * not know resolves to {@link MultiDrawMode#DIRECT}, and a requested {@link MultiDrawMode#INDIRECT} is downgraded to
- * {@code DIRECT} when the driver exposes neither GL 4.3 nor {@code GL_ARB_multi_draw_indirect}.
+ * {@code DIRECT} when the active backend cannot submit indexed indirect batches.
  */
 public final class MultiDrawModeResolver {
 
@@ -38,6 +37,6 @@ public final class MultiDrawModeResolver {
      * {@return whether the current context can execute indirect multidraw}
      */
     public static boolean supportsMultiDrawIndirect() {
-        return LWJGL.isOpenGLVersionSupported(4, 3) || LWJGL.isExtensionSupported(GLExtension.ARB_multi_draw_indirect);
+        return LWJGL.supportsMultiDrawIndirect();
     }
 }

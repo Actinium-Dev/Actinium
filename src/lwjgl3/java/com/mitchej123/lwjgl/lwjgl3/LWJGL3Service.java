@@ -1,5 +1,7 @@
 package com.mitchej123.lwjgl.lwjgl3;
 
+import com.gtnewhorizons.angelica.glsm.GLSMDraws;
+import com.gtnewhorizons.angelica.lwjgl3.IndirectMultidraw;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.opengl.*;
@@ -77,6 +79,11 @@ public record LWJGL3Service(
             case ARB_base_instance -> caps.GL_ARB_base_instance;
             case ARB_compatibility -> caps.GL_ARB_compatibility;
         };
+    }
+
+    @Override
+    public boolean supportsMultiDrawIndirect() {
+        return IndirectMultidraw.supported();
     }
 
     @Override
@@ -463,7 +470,7 @@ public record LWJGL3Service(
 
     @Override
     public void glMultiDrawElementsIndirect(int mode, int type, long indirect, int drawcount, int stride) {
-        GL43C.glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
+        GLSMDraws.glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
     }
 
     @Override
@@ -879,4 +886,3 @@ public record LWJGL3Service(
         return MemoryUtil.memSlice(buffer, offset, capacity);
     }
 }
-
