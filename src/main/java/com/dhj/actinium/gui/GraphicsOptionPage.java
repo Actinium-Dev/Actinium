@@ -1,5 +1,6 @@
 package com.dhj.actinium.gui;
 
+import com.dhj.actinium.debug.OpenGlVersion;
 import com.dhj.actinium.startup.CoreProfileDisplayCreator;
 import com.dhj.actinium.startup.SdlGpuBootstrap;
 import com.gtnewhorizons.angelica.config.GLVersionChoice;
@@ -27,7 +28,7 @@ import dhj.embeddedt.embeddium.impl.gui.SodiumGameOptions.SdlGpuDriver;
 import dhj.embeddedt.embeddium.impl.gui.framework.TextComponent;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.SodiumVideoOptionsScreen;
 import net.minecraft.util.Util;
-import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL11;
 
 import java.util.Arrays;
 import java.util.List;
@@ -62,7 +63,8 @@ public final class GraphicsOptionPage {
         boolean sdlAvailable = missingRequirement == null;
         Boolean backendOverride = SystemProperties.SDL_GPU_OVERRIDE;
         String driverOverride = SystemProperties.SDL_GPU_DRIVER_OVERRIDE;
-        int glOverride = CoreProfileDisplayCreator.glVersionOverride();
+        boolean launcherControlsGlContext = CoreProfileDisplayCreator.launcherControlsGlContext();
+        int glOverride = launcherControlsGlContext ? -1 : CoreProfileDisplayCreator.glVersionOverride();
         int glCeiling = CoreProfileDisplayCreator.glVersionCeiling();
         boolean backendEditable = sdlAvailable && backendOverride == null;
         boolean driverEditable = sdlAvailable && driverOverride == null;
@@ -118,7 +120,7 @@ public final class GraphicsOptionPage {
                         .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
                         .setDefaultValue(sdlAvailable ? Boolean.TRUE : null)
                         .build())
-                .add(OptionImpl.createBuilder(GLVersionChoice.class, options)
+                .addConditionally(!launcherControlsGlContext, () -> OptionImpl.createBuilder(GLVersionChoice.class, options)
                         .setId(OptionIdentifier.create("actinium", "gl_version", GLVersionChoice.class))
                         .setName(TextComponent.translatable("options.actinium.graphics.gl_version"))
                         .setTooltip(tooltip("options.actinium.graphics.gl_version.tooltip", null,
@@ -215,7 +217,13 @@ public final class GraphicsOptionPage {
         RenderBackend backend = BackendManager.RENDER_BACKEND;
         String name = backend.getName();
         if (!backend.isSDLGPU() && backend.hasContext()) {
-            name += " " + backend.getInteger(GL30.GL_MAJOR_VERSION) + "." + backend.getInteger(GL30.GL_MINOR_VERSION);
+            String versionString = backend.getString(GL11.GL_VERSION);
+            if (versionString != null && versionString.startsWith("OpenGL ES")) {
+                name += " / " + versionString;
+            } else {
+                OpenGlVersion version = OpenGlVersion.parse(versionString);
+                name += " " + version.major() + "." + version.minor();
+            }
         }
         return TextComponent.literal(name);
     }

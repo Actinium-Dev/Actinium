@@ -11,6 +11,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CoreProfileDisplayCreatorTest {
 
+    @Test
+    void launcherRenderersStartAtTheCoreFloorRegardlessOfTheConfiguredRequest() {
+        for (String renderer : new String[]{"opengles3_mobileglues", "vulkan_zink", "opengles3"}) {
+            for (int requested : new int[]{0, 32, 46}) {
+                assertEquals(RenderSystem.MIN_CORE_VERSION, CoreProfileDisplayCreator.initialProbeVersion(
+                    CoreProfileDisplayCreator.launcherControlsGlContext(renderer), requested, 46), renderer);
+            }
+        }
+    }
+
+    @Test
+    void absentOrEmptyLauncherRendererRetainsDesktopVersionSelection() {
+        for (String renderer : new String[]{null, ""}) {
+            boolean launcherControlsGlContext = CoreProfileDisplayCreator.launcherControlsGlContext(renderer);
+            assertEquals(45, CoreProfileDisplayCreator.initialProbeVersion(launcherControlsGlContext, 45, 46));
+            assertEquals(41, CoreProfileDisplayCreator.initialProbeVersion(launcherControlsGlContext, 46, 41));
+        }
+    }
+
     private static final String REQUIRED_VERSION = RenderSystem.MIN_CORE_VERSION / 10
         + "." + RenderSystem.MIN_CORE_VERSION % 10;
 
