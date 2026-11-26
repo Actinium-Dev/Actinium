@@ -68,6 +68,7 @@ tasks.named('assemble') {
 tasks.register('distJar', Jar) {
     archiveBaseName = 'actinium-moltenvk'
     archiveVersion = moltenvkVersion
+    destinationDirectory = rootProject.layout.buildDirectory.dir('libs')
     from(sourceSets.main.output)
     manifest {
         attributes 'FMLCorePlugin': 'com.gtnewhorizons.angelica.moltenvk.loading.MoltenVKCorePlugin'

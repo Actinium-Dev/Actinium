@@ -59,7 +59,8 @@ Targets GL 3.3+ core profile.
 ## Building
 
 * `./gradlew build`, `./gradlew check`
-* The artifact is `build/libs/Actinium-<version>.jar`
+* Main mod: `build/libs/Actinium-<version>.jar`
+* macOS Vulkan add-on: `build/libs/actinium-moltenvk-<version>.jar`
 
 ## AI-Generated Code
 

@@ -61,7 +61,8 @@ Minecraft 1.12.2 的现代渲染与光影模组，移植自 Angelica：Iris 光�
 ## 构建
 
 * `./gradlew build`、`./gradlew check`
-* 产物为 `build/libs/Actinium-<version>.jar`
+* 主模组为 `build/libs/Actinium-<version>.jar`
+* macOS Vulkan 附加包为 `build/libs/actinium-moltenvk-<version>.jar`
 
 ## AI 声明
 
