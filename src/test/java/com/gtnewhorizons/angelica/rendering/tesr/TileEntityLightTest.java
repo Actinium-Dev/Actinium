@@ -1,5 +1,7 @@
 package com.gtnewhorizons.angelica.rendering.tesr;
 
+import com.dhj.actinium.render.dynamiclights.LightSnapshot;
+import com.dhj.actinium.render.dynamiclights.LightTracker;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
@@ -17,24 +19,11 @@ import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.gen.IChunkGenerator;
 import net.minecraft.world.storage.SaveHandlerMP;
 import net.minecraft.world.storage.WorldInfo;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import toni.sodiumdynamiclights.SodiumDynamicLights;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-/**
- * Covers the values the tile entity light path returns through the production bridge: the caller's
- * light for a block without neighbour brightness, the same early return for an opaque block, and the
- * recomputed neighbour-brightness value.
- *
- * <p>Each case runs against a real fixture world, so the merge goes through the addon method the
- * renderer reaches at runtime. The cached value
- * {@code MixinTileEntityRendererDispatcherTesrLight} returns when no shader pack is in use is merged
- * through the same call; that branch stays covered by code review because the handler is a private
- * mixin method.</p>
- */
 class TileEntityLightTest {
 
     private static final BlockPos POS = new BlockPos(3, 72, -8);
@@ -44,45 +33,57 @@ class TileEntityLightTest {
         Bootstrap.register();
     }
 
-    @AfterEach
-    void clearDynamicLightLevel() {
-        SodiumDynamicLights.setDynamicLightLevel(0);
-    }
-
     @Test
     void mergesTheDynamicLevelIntoTheCallersLightWithoutNeighbourBrightness() {
-        SodiumDynamicLights.setDynamicLightLevel(12);
         final LightWorld world = new LightWorld(new LightBlock(false, 0, 0));
 
-        assertEquals(15 << 20 | 12 << 4, packedLight(world, 15 << 20 | 3 << 4));
+        assertEquals(15 << 20 | 12 << 4, packedLight(world, 15 << 20 | 3 << 4, 12));
     }
 
     @Test
     void mergesTheDynamicLevelIntoTheCallersLightForOpaqueBlocks() {
-        SodiumDynamicLights.setDynamicLightLevel(12);
         final LightWorld world = new LightWorld(new LightBlock(true, 255, 0));
 
-        assertEquals(15 << 20 | 12 << 4, packedLight(world, 15 << 20 | 3 << 4));
+        assertEquals(15 << 20 | 12 << 4, packedLight(world, 15 << 20 | 3 << 4, 12));
     }
 
     @Test
     void mergesTheDynamicLevelIntoTheRecomputedLight() {
-        SodiumDynamicLights.setDynamicLightLevel(12);
         final LightWorld world = new LightWorld(new LightBlock(true, 0, 6)).withLight(11, 2);
 
-        assertEquals(11 << 20 | 12 << 4, packedLight(world, 0));
+        assertEquals(11 << 20 | 12 << 4, packedLight(world, 0, 12));
     }
 
     @Test
     void keepsTheRecomputedBlockLightAboveTheDynamicLevel() {
-        SodiumDynamicLights.setDynamicLightLevel(4);
         final LightWorld world = new LightWorld(new LightBlock(true, 0, 6)).withLight(11, 9);
 
-        assertEquals(11 << 20 | 9 << 4, packedLight(world, 0));
+        assertEquals(11 << 20 | 9 << 4, packedLight(world, 0, 4));
     }
 
-    private static int packedLight(LightWorld world, int callerLight) {
-        return TileEntityLight.packedLight(world, POS.getX(), POS.getY(), POS.getZ(), callerLight);
+    @Test
+    void preservesAnExternalModsMinimumAcrossTheShaderNeighbourCorrection() {
+        final LightWorld world = new LightWorld(new LightBlock(true, 0, 6)).withLight(11, 2);
+        assertEquals(11 << 20 | 13 << 4,
+                TileEntityLight.packedLight(world, POS, 15 << 20 | 13 << 4, 13, true, LightSnapshot.EMPTY));
+    }
+
+    @Test
+    void mergesIntoTheCachedLightWithoutShaders() {
+        final LightWorld world = new LightWorld(new LightBlock(true, 0, 6)).withLight(11, 2);
+        int cached = 7 << 20 | 3 << 4;
+        assertEquals(7 << 20 | 12 << 4, TileEntityLight.packedLight(world, POS, cached, 0, false, snapshot(12)));
+    }
+
+    private static int packedLight(LightWorld world, int callerLight, int luminance) {
+        return TileEntityLight.packedLight(world, POS, callerLight, 0, true, snapshot(luminance));
+    }
+
+    private static LightSnapshot snapshot(int luminance) {
+        LightTracker tracker = new LightTracker();
+        tracker.beginTick(0, 0, 0, 0, 0, 1, 1, false, 32, 64, 128, true);
+        tracker.visit(POS, 0, POS.getX() + 0.5, POS.getY() + 0.5, POS.getZ() + 0.5, pos -> luminance);
+        return tracker.endTick();
     }
 
     /** Block state data the light path reads: neighbour brightness, opacity and emitted light. */

@@ -180,6 +180,10 @@ Actinium 接管：`MixinRenderGlobal` 在 `loadRenderers` 的 HEAD 注入把 `mc
 - `GBUFFER_CUTOUT` 与 `SHADOW_CUTOUT` 的源码与阈值保持不变，继续按包的 `alphaTest` 指令剪纸。
 - 非 alpha 的 `discard`、含其它语句的分支、带非 discard `else` 的选择语句都不改动。
 
+## 动态光源
+
+视频设置的「动态光源」页沿用 `config/celeritasdynamiclights.cfg` 的 `general` 类别。更新模式控制最低采样间隔，`adaptiveTicking` 按距离和朝向进一步降低采样频率；`frustumCulling` 延迟视野外的地形更新，`maxWaitTicks` 限制等待时间。安装独立附属时由附属提供设置页。完整配置与验证场景见[动态光源](compat/celeritas-dynamic-lights.md)。
+
 ## 动态视野（`quality.dynamicFov`）
 
 默认开启；关闭后视野锁定在 `fovSetting`。

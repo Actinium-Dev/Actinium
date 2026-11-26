@@ -531,9 +531,7 @@ TESR 批处理的引入顺序按依赖链固定下来，每一步只需新增文
 `MixinRenderItemDroppedInstancing`。一次决策同时处理基础几何与两层 glint，回落时把实际 draw 数
 交给 `BatchEligibility.onPartFallback`。
 
-**动态光源桥**：`compat/celeritasdynamiclights` 的 `DynamicLightProvider`、
-`DynamicLightProviderImpl`、`CeleritasDynamicLightsCompat`，在 `TileEntityLight` 的两处返回与
-`MixinTileEntityRendererDispatcherTesrLight` 的缓存值上各合并一次。
+当时通过 `compat/celeritasdynamiclights` 向独立附属查询 TESR 的动态光。现行实现和 Angelica 的自适应更新、视锥外重建移植记录见[动态光源](compat/celeritas-dynamic-lights.md)。
 
 验证记录（2026-11-17）：
 

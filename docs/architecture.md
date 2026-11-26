@@ -697,6 +697,8 @@ Mixin 组织约定：
 
 ## 兼容层总览
 
+客户端动态光源由根项目的 `render/dynamiclights` 提供。主视图在提交地形构建前按客户端世界 tick 采样光源；每个 `ChunkRenderContext` 在创建时保存一份只读光源快照，工作线程和延迟构建都使用这份快照。模型、粒子、实体、第一人称手持物品和 TESR 只提高方块光分量。光源和区块重建队列随客户端世界释放。设置、上游来源及实测场景见[动态光源](compat/celeritas-dynamic-lights.md)。
+
 - Distant Horizons：API event、framebuffer、depth texture、LOD shader 和条件 Mixin。
 - Fluidlogged API：world slice 中的 fluid state 快照与渲染。
 - Gibbed：模型渲染快速路径及条件 Mixin。

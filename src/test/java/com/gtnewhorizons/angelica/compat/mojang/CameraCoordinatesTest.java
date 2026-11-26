@@ -47,6 +47,25 @@ class CameraCoordinatesTest {
         assertEquals(4, camera.getOffset().z, 0.00001);
     }
 
+    @Test
+    void forwardDirectionFollowsTheRenderedViewWhenTheCameraReverses() {
+        CameraCoordinates camera = new CameraCoordinates();
+        Matrix4f raw = new Matrix4f().translation(0, -1.62f, -4).rotateY(0.7f);
+        camera.update(raw, 10, 64, 20, 1.62f);
+        Vector3f backView = new Vector3f(camera.getForwardDirection());
+
+        raw.rotateY((float) Math.PI);
+        camera.update(raw, 10, 64, 20, 1.62f);
+        Vector3f frontView = new Vector3f(camera.getForwardDirection());
+        assertEquals(-backView.x, frontView.x, 0.00001);
+        assertEquals(-backView.z, frontView.z, 0.00001);
+
+        camera.getModelView().transformDirection(frontView);
+        assertEquals(0, frontView.x, 0.00001);
+        assertEquals(0, frontView.y, 0.00001);
+        assertEquals(-1, frontView.z, 0.00001);
+    }
+
     private static void assertVector(Vector3d expected, Vector3d actual, double delta) {
         assertEquals(expected.x, actual.x, delta);
         assertEquals(expected.y, actual.y, delta);

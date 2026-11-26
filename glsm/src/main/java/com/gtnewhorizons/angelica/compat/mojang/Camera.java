@@ -10,6 +10,7 @@ import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4fc;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
 /**
  * Singleton camera instance that tracks the current camera position and orientation.
@@ -35,6 +36,11 @@ public class Camera {
     /** Returns the captured main-view matrix, independent of temporary shadow render state. */
     public Matrix4fc getModelViewMatrix() {
         return coordinates.getModelView();
+    }
+
+    /** Returns the main view's world-space forward direction for camera-relative sampling. */
+    public Vector3fc getForwardDirection() {
+        return coordinates.getForwardDirection();
     }
 
     public void update(EntityLivingBase entity, float partialTicks) {

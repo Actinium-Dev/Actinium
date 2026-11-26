@@ -99,6 +99,8 @@ class MixinLateTest {
                 "mixins.actinium.betterfoliage.json",
                 "mixins.actinium.rlfoliage.json",
                 "mixins.actinium.ccl.json",
+                "mixins.actinium.galacticraft.json",
+                "mixins.actinium.galacticraft.playerapi.json",
                 "mixins.actinium.voxelmap.json",
                 "mixins.actinium.extrautils2.json",
                 "mixins.actinium.cofhcore.json",
@@ -120,6 +122,24 @@ class MixinLateTest {
             ),
             Set.copyOf(MixinLate.configsFor(modId -> true, className -> true))
         );
+    }
+
+    @Test
+    void galacticraftPlayerBaseRequiresPlayerApiAndItsGalacticraftIntegration() {
+        String lander = "micdoodle8.mods.galacticraft.core.entities.EntityLanderBase";
+        String player = "micdoodle8.mods.galacticraft.core.entities.player.GCPlayerBaseSP";
+        String api = "api.player.client.ClientPlayerBase";
+        String coreConfig = "mixins.actinium.galacticraft.json";
+        String playerConfig = "mixins.actinium.galacticraft.playerapi.json";
+
+        assertEquals(Set.of(), Set.copyOf(MixinLate.configsFor(mod -> false, Set.of(lander, player, api)::contains)));
+        assertEquals(Set.of(), Set.copyOf(MixinLate.configsFor("galacticraftcore"::equals, name -> false)));
+        assertEquals(Set.of(coreConfig),
+            Set.copyOf(MixinLate.configsFor("galacticraftcore"::equals, Set.of(lander, player)::contains)));
+        assertEquals(Set.of(coreConfig),
+            Set.copyOf(MixinLate.configsFor("galacticraftcore"::equals, Set.of(lander, api)::contains)));
+        assertEquals(Set.of(coreConfig, playerConfig),
+            Set.copyOf(MixinLate.configsFor("galacticraftcore"::equals, Set.of(lander, player, api)::contains)));
     }
 
     @Test

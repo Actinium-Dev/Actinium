@@ -1108,6 +1108,18 @@ public abstract class RenderSectionManager {
 
     }
 
+    /** Queues a render-only rebuild after the current mesh finishes, without invalidating static chunk data. */
+    public final boolean scheduleRenderOnlyRebuild(int x, int y, int z) {
+        if (Thread.currentThread() != this.renderThread) {
+            throw new IllegalStateException("Render-only rebuilds must be requested on the render thread");
+        }
+        RenderSection section = this.getRenderSection(x, y, z);
+        if (section == null) return true;
+        if (section.getBuildCancellationToken() != null) return false;
+        this.enqueueRebuild(section, ChunkUpdateType.REBUILD, false);
+        return true;
+    }
+
     protected void scheduleSectionForRebuild(int x, int y, int z, boolean important) {
         RenderSection section = this.sectionByPosition.get(PositionUtil.packSection(x, y, z));
 
@@ -1131,17 +1143,18 @@ public abstract class RenderSectionManager {
                 pendingUpdate = ChunkUpdateType.REBUILD;
             }
 
-            if (section.requestUpdate(pendingUpdate) || cancelledInFlightBuild) {
-                // Check importance using the section's new update type, as it may not be exactly what we requested
-                important = section.getPendingUpdate().isImportant();
+            this.enqueueRebuild(section, pendingUpdate, cancelledInFlightBuild);
+        }
+    }
 
-                if (important ||
-                        (!this.getCurrentRenderListManager().isNeedsUpdate() &&
-                            this.sectionsRequestingUpdate.size() < this.builder.getSchedulingBudget())) {
-                    this.sectionsRequestingUpdate.add(section);
-                } else {
-                    this.markGraphDirty();
-                }
+    private void enqueueRebuild(RenderSection section, ChunkUpdateType update, boolean wasCancelled) {
+        if (section.requestUpdate(update) || wasCancelled) {
+            if (section.getPendingUpdate().isImportant() ||
+                    (!this.getCurrentRenderListManager().isNeedsUpdate() &&
+                        this.sectionsRequestingUpdate.size() < this.builder.getSchedulingBudget())) {
+                this.sectionsRequestingUpdate.add(section);
+            } else {
+                this.markGraphDirty();
             }
         }
     }
