@@ -1,5 +1,6 @@
 package com.dhj.actinium.render.frustum;
 
+import dhj.embeddedt.embeddium.impl.render.viewport.Viewport;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 
@@ -13,4 +14,7 @@ public interface IClippingHelper {
 
     /** Rotation+projection only (no camera translation); feeds the raster occluder. */
     Matrix4f celeritas$getVpMatrix();
+
+    /** Creates camera-relative clipping using the matrices captured by this helper. */
+    Viewport celeritas$createViewport(double feetX, double feetY, double feetZ);
 }

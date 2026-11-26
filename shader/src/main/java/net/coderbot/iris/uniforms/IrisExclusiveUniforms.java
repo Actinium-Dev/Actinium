@@ -7,7 +7,6 @@ import net.coderbot.iris.gl.uniform.UniformUpdateFrequency;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.effect.EntityLightningBolt;
 import org.joml.Math;
 import org.joml.Vector3d;
@@ -17,8 +16,6 @@ import org.joml.Vector4f;
 import java.util.List;
 
 public class IrisExclusiveUniforms {
-	// Reusable vectors to avoid allocations every frame
-	private static final Vector3d eyePositionCache = new Vector3d();
 	private static final Vector3d relativeEyePositionCache = new Vector3d();
 	private static final Vector4f lightningBoltPositionCache = new Vector4f();
 	private static final Vector4f ZERO_VECTOR_4f = new Vector4f(0, 0, 0, 0);
@@ -107,8 +104,7 @@ public class IrisExclusiveUniforms {
 	}
 
 	private static Vector3d getEyePosition() {
-        final EntityLivingBase eye = (EntityLivingBase) Minecraft.getMinecraft().getRenderViewEntity();
-        return eyePositionCache.set(eye.posX, eye.posY + eye.getEyeHeight(), eye.posZ);
+        return Camera.INSTANCE.getEntityPos();
 	}
 
 	private static Vector3d getRelativeEyePosition() {

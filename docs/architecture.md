@@ -136,6 +136,7 @@ pack 变体与 FFP 都用常量法线 `(0, 0, 1)`，与 billboard 朝向一致�
 或捕获缓冲区，会使原版大爆炸粒子及 Dungeon Additions 等模组的自绘粒子在再次调用 `begin()` 时抛出
 `Already building!`。粒子捕获与实例化只在第 0–2 层运行。
 
+主视图的原始 model-view 以实体脚部为输入原点。捕获相机时从逆矩阵求出实际相机位置，缓存以该相机为原点的矩阵，供主地形、`gbufferModelView` 与阴影裁剪使用。阴影矩阵、网格吸附和阴影绘制原点使用同一实际相机位置。原版实体裁剪保留完整 model-view，Celeritas viewport 的裁剪平面与 raster occluder 则使用相机相对矩阵。[第三人称阴影坐标与验证方案](compat/third-person-shadows.md)
 ## 根项目包详解（`com.dhj.actinium`）
 
 ### 顶层与生命周期

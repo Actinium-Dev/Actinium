@@ -1,9 +1,9 @@
 package com.dhj.actinium.render.dynamiclights;
 
 import com.dhj.actinium.render.dynamiclights.DynamicLightsSettings.Mode;
-import com.dhj.actinium.render.terrain.CameraHelper;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.dhj.actinium.world.WorldSlice;
+import com.gtnewhorizons.angelica.compat.mojang.Camera;
 import dhj.embeddedt.embeddium.impl.render.viewport.Viewport;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.resources.IReloadableResourceManager;
@@ -91,8 +91,8 @@ public final class DynamicLights {
             lights.player = player;
             var camera = viewport.getTransform();
             if (settings.adaptiveTicking && settings.mode != Mode.OFF) {
-                var forward = CameraHelper.getForwardDirection();
-                lights.collect(tick, camera.x, camera.y, camera.z, forward.x, forward.z);
+                var forward = Camera.INSTANCE.getForwardDirection();
+                lights.collect(tick, camera.x, camera.y, camera.z, forward.x(), forward.z());
             } else {
                 lights.collect(tick, camera.x, camera.y, camera.z, 0, 0);
             }

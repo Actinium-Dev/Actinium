@@ -433,6 +433,9 @@ Ender IO 储罐外壳使用普通半透明地形批次，储罐内部的液体�
 | FindMe | 已验证 | 无侵入（延迟粒子批处理捕获并回放深度测试开关，刷新后恢复入口状态） | 1.1.0-8 + HEI 4.35.0（issue #202）：无光影时箱子定位粒子几乎不可见的问题已修复；原因为 FindMe 临时关闭深度测试的绘制被延迟到其重新开启深度测试后执行，而批处理遗漏了该状态。用户实机验证通过，详见 [docs/compat/findme.md](compat/findme.md) |
 | Farmers-Future-Delight | 已验证 | 兼容门控（`compat/farmersfuturedelight`：mesher 补含水方块的 translucent 层，含水渲染按水身份与 fluid 材质写出） | 含水方块的水面在光影下按承载方块材质渲染（没有波浪/反射/折射，包侧水下雾与水体合成不生效）：模组的水面 quads 只在 TRANSLUCENT 层输出，而它让原版方块进入该层、让水面带上水的 `mc_Entity` 各靠一处 OptiFine 侧 ASM，Actinium 的区块管线都不经过；识别依据为 `waterlogged` 属性、`Material.WATER` 与水面模型类名，不引用模组类。1.5.1 已由用户实机确认（Actinium `ef89ffd9`、Complementary Unbound r5.9.3 与 MakeUp-UltraFast 9.4c，2026-11-05）；stored-fluid 路径与非水流体见 [docs/compat/farmersfuturedelight.md](compat/farmersfuturedelight.md) |
 
+## 第三人称相机与阴影
+
+2026-11-26，修复相机眼高重复计算、主视图世界坐标重建参考点不一致，以及 viewport 和阴影视锥裁剪的重复平移。自动化数值与可见性回归覆盖第一人称、第三人称和不同相机朝向。游戏画面与性能尚未实测，验证场景见[第三人称阴影说明](compat/third-person-shadows.md)。
 ## 客户端窗口尺寸
 
 拖动窗口边缘或切换全屏后，画面偶尔仍按旧尺寸绘制。Cleanroom 的 LWJGLXX 和 Outlands

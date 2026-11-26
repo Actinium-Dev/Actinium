@@ -6,7 +6,7 @@ import dhj.embeddedt.embeddium.impl.render.viewport.Viewport;
 import dhj.embeddedt.embeddium.impl.render.viewport.ViewportProvider;
 import org.spongepowered.asm.mixin.*;
 import com.dhj.actinium.render.frustum.IClippingHelper;
-import com.dhj.actinium.render.terrain.CameraHelper;
+import com.dhj.actinium.render.frustum.ClippingHelperState;
 
 @Mixin(Frustum.class)
 public class MixinFrustum implements ViewportProvider {
@@ -19,17 +19,12 @@ public class MixinFrustum implements ViewportProvider {
 
     @Overwrite
     public boolean isBoxInFrustum(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
-        if (Double.isInfinite(minX) || Double.isInfinite(minY) || Double.isInfinite(minZ) || Double.isInfinite(maxX) || Double.isInfinite(maxY) || Double.isInfinite(maxZ)) {
-            return true;
-        }
-        return ((IClippingHelper)clippingHelper).celeritas$getJomlFrustum().testAab((float) (minX - this.x), (float) (minY - this.y), (float) (minZ - this.z), (float) (maxX - this.x), (float) (maxY - this.y), (float) (maxZ - this.z));
+        return ClippingHelperState.isBoxInFrustum(((IClippingHelper) clippingHelper).celeritas$getJomlFrustum(),
+            this.x, this.y, this.z, minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     @Override
     public Viewport sodium$createViewport() {
-        var helper = (IClippingHelper) clippingHelper;
-        var frustum = helper.celeritas$getJomlFrustum();
-        return new Viewport(frustum::testAab, new org.joml.Vector3d(this.x, this.y, this.z).add(CameraHelper.getThirdPersonOffset()), helper.celeritas$getVpMatrix());
+        return ((IClippingHelper) clippingHelper).celeritas$createViewport(this.x, this.y, this.z);
     }
 }
-
