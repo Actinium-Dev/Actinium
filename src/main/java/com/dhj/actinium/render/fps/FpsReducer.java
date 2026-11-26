@@ -17,12 +17,7 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
-
-import java.util.function.BooleanSupplier;
-import java.util.function.IntPredicate;
 
 /**
  * Lowers the frame rate and the master volume while the window is unfocused, minimized, or idle.
@@ -38,11 +33,6 @@ public final class FpsReducer {
 
     private static KeyBinding forceKey;
     private static KeyBinding disableKey;
-
-    private static final boolean[] MOUSE_BUTTONS = new boolean[3];
-    /** LWJGL's native key-down buffer has 256 entries, while KEYBOARD_SIZE is a key-code limit. */
-    private static final int KEY_STATE_COUNT = 256;
-    private static final boolean[] KEY_STATES = new boolean[KEY_STATE_COUNT];
 
     private static State applied;
     private static int appliedVolumePercent = 100;
@@ -63,10 +53,7 @@ public final class FpsReducer {
     /** Re-evaluates the state from the window and the config, and applies any transition. */
     public static void evaluateFrame() {
         final SodiumGameOptions.ReducerSettings settings = settings();
-        // Nothing to do while the reducer is off and has never been applied; the per-frame polling below would
-        // otherwise touch the keyboard and window bridge for every frame of every session.
         if (!settings.enabled && applied == State.DISABLED && !configDirty) return;
-        pollMouseActivity();
         final boolean created = settings.enabled && Display.isCreated();
         final boolean visible = !created || Display.isVisible();
         final boolean active = !created || Display.isActive();
@@ -106,36 +93,6 @@ public final class FpsReducer {
 
     private static SodiumGameOptions.ReducerSettings settings() {
         return ActiniumRuntime.options().reducer;
-    }
-
-    /**
-     * Feeds mouse and keyboard activity to the idle timer. The game consumes the input queues inside
-     * {@code runTick}/{@code runTickKeyboard} before the reducer runs, so both are polled as held state and a
-     * rising edge counts as input.
-     */
-    private static void pollMouseActivity() {
-        if (Mouse.isCreated()) {
-            for (int button = 0; button < MOUSE_BUTTONS.length; button++) {
-                final boolean down = Mouse.isButtonDown(button);
-                if (down && !MOUSE_BUTTONS[button]) MACHINE.onInput();
-                MOUSE_BUTTONS[button] = down;
-            }
-            if (Mouse.getDX() != 0 || Mouse.getDY() != 0) MACHINE.onInput();
-        }
-        pollKeyboardActivity();
-    }
-
-    private static void pollKeyboardActivity() {
-        pollKeyboardActivity(Keyboard::isCreated, Keyboard::isKeyDown);
-    }
-
-    static void pollKeyboardActivity(BooleanSupplier created, IntPredicate keyDown) {
-        if (!created.getAsBoolean()) return;
-        for (int key = 0; key < KEY_STATES.length; key++) {
-            final boolean down = keyDown.test(key);
-            if (down && !KEY_STATES[key]) MACHINE.onInput();
-            KEY_STATES[key] = down;
-        }
     }
 
     private static void applyTransition(SodiumGameOptions.ReducerSettings settings) {
