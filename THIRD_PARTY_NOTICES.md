@@ -1,103 +1,23 @@
-# Third-Party Notices
+# 第三方声明
 
-Actinium contains source code adapted from other projects. The root `LICENSE` applies to
-Actinium's original work; it does not replace notices or license terms attached to imported
-files. When a source file carries its own copyright or license header, that header takes
-precedence for that file.
-
-This inventory describes the code currently embedded in the repository. It is not a substitute
-for the full license text or legal advice.
-
-## Embedded source trees
-
-| Component | Repository | Local paths | Upstream license | Actinium import record |
-| --- | --- | --- | --- | --- |
-| Angelica / GLSM | https://github.com/GTNewHorizons/Angelica | `glsm/`, `sdl-gpu/`, portions of `src/main/java/com/gtnewhorizons/angelica/`, Angelica resources | LGPL-3.0, with additional file-level notices | GLSM introduced in `119f607`; expanded with GTNHLib in `83ea1b7`; SDL-GPU synchronized from `8e099e952921a53ea5db88414e1071135f716ed4`; display-list fixes adapted from `2b46b4f602dfd7c6b5dd67f42acd853adfa1d9c6` and `8840c2109ffb3603d95c72b18373abfb5fdd87b8` |
-| Angelica sky color blending | https://github.com/GTNewHorizons/Angelica | `src/main/java/com/dhj/actinium/world/biome/SkyColorCache.java`, `src/main/java/com/dhj/actinium/mixin/vintage/core/terrain/MixinWorldSkyColor.java` | LGPL-3.0 | adapted to Minecraft 1.12.2 from `233c74e0d71cb61a7046e06b085ea391c216e986` |
-| Angelica weather instancing API | https://github.com/GTNewHorizons/Angelica | `src/main/java/com/gtnewhorizons/angelica/api/weather/`, weather rendering in `src/main/`, `glsm/` and `shader/` | LGPL-3.0 | adapted to Minecraft 1.12.2 from `f2c07dea` and `996fb54cb05e256ea6039f4e2c8457a221a179b7` |
-| Angelica block entity depth ordering | https://github.com/GTNewHorizons/Angelica | `src/main/java/com/dhj/actinium/render/terrain/TileEntityDepthOrder.java` | LGPL-3.0 | adapted to Minecraft 1.12.2 from `eff6697583b59f579bf23ca50b2b9504865fa240` |
-| Angelica early block entity pass | https://github.com/GTNewHorizons/Angelica | Early TESR scheduling in `src/main/java/com/dhj/actinium/render/terrain/` | LGPL-3.0 | adapted to Minecraft 1.12.2 from `ef8648cdc06a85c793cad1874d6cbdacf3e09778` |
-| Angelica translucency layers | https://github.com/GTNewHorizons/Angelica | `src/main/java/com/dhj/actinium/render/translucency/`, `translucency_composite.frag`, terrain and GLSM integration | LGPL-3.0 | adapted to Minecraft 1.12.2 from `586cce1c40541deb3b4de0158f105eae61ae8c37` |
-| Angelica TESR glow depth | https://github.com/GTNewHorizons/Angelica | `DepthEcho`, `CoverageDiscard`, TESR replay and translucency depth merge | LGPL-3.0 | adapted to Minecraft 1.12.2 from `1758f3be1a543f253159bda6cf8ec7f7c15eee87` |
-| Celeritas Dynamic Lights / SodiumDynamicLights / LambDynamicLights | https://github.com/Karnatour/CeleritasDynamicLights | `src/main/java/com/dhj/actinium/{api,render}/dynamiclights/`, dynamic light mixins, options, translations and `assets/celeritasdynamiclights/dynamiclights/item/` | MIT; Karnatour (Vojtěch Šokala), Txni and LambdAurora. Both upstream notices are distributed under `META-INF/licenses/`. | 1.12.2 port `v1.2.11` (`4b61a0b40f300582dd0471e11bc75936a32bb931`) |
-| Angelica dynamic light scheduling | https://github.com/GTNewHorizons/Angelica | `src/main/java/com/dhj/actinium/render/dynamiclights/LightTracker.java` and dynamic light scheduling options | LGPL-3.0 (`META-INF/licenses/Angelica-LGPL-3.0.txt`) | adapted from `ad63d2d62ce333f92ddafcdd212c57f8b7d5b5a2` with the queue age and frustum corrections from `2f1f380e8ee4a17ca6dce908e86a6927b071525e` |
-| GTNHLib | https://github.com/GTNewHorizons/GTNHLib | `GTNHLib/` | LGPL-3.0, plus file-level notices | `83ea1b7` |
-| Iris | https://github.com/IrisShaders/Iris | `shader/src/main/java/net/coderbot/iris/`, Iris API/resources, Iris-oriented mixins | LGPL-3.0 | full pipeline import in `79306ba`; resource mappings below |
-| Celeritas renderer | historical Celeritas/Embeddium/Sodium-derived code | `celeritas-common/` | mixed upstream provenance; preserve file-level notices and consult source history | present in standalone extraction `6167e49`, split to its current tree in `2835afe` |
-| grondag bitraster | https://git.taumc.org/embeddedt/celeritas (`grondag/bitraster`, Canvas-derived) | `celeritas-common/src/main/java/grondag/bitraster/` | Apache-2.0 (`third-party/licenses/bitraster-APACHE-2.0.txt`); file-level headers preserved | imported with the rasterized occlusion culling port (upstream celeritas `7190f87d8`/`6169005d8`/`261f9f685`) |
-| Ithaka digraph | https://github.com/odysseus/ithaka-digraph | `src/main/java/de/odysseus/ithaka/digraph/` (22 files) | Apache-2.0 | imported with the batched TESR renderer in `819fbba2`; the tree matches upstream Angelica `8e099e952921a53ea5db88414e1071135f716ed4` |
-| Iris batched entity rendering | https://github.com/IrisShaders/Iris | `src/main/java/net/coderbot/batchedentityrendering/`, `src/test/java/net/coderbot/batchedentityrendering/` | LGPL-3.0 | imported with the batched TESR renderer in `819fbba2`, adapted to the local render layer and buffer sources |
-| LWJGL utility code | https://github.com/LWJGL/lwjgl3 | selected `GTNHLib/.../bytebuf/` and GL debug helpers | BSD-style LWJGL license, identified in file headers | imported through GTNHLib/GLSM; service layer work in `4826cf8` |
-| GLSL Transformation Library | https://github.com/GTNewHorizons/glsl-transformation-lib | binary contained dependency | consult the dependency's published license and POM | Maven coordinate `org.taumc:glsl-transformation-lib` |
-
-The exact upstream commit SHA used for the initial Angelica, GTNHLib, Iris, and Celeritas
-imports was not recorded in this repository. The Actinium commits above are the reproducible
-local import boundaries. Recovering and recording exact upstream SHAs is required before the
-next bulk upstream refresh.
-
-## Additional incorporated work
-
-- Parts of the renderer retain package names and implementation ideas from Embeddium and Sodium.
-- Several GTNHLib byte-buffer files carry explicit LWJGL copyright and license notices.
-- `MergeSort.java` carries Apache-2.0 and CERN notices in its source header.
-- The occluder-box decomposition sources under
-  `celeritas-common/.../render/chunk/occlusion/geometry/` are Canvas-derived; `Area`,
-  `AreaFinder`, and `BoxFinder` carry GNU LGPL-3.0 notices in their file headers
-  (`OccluderBoxes` has no header upstream).
-- ASM-derived utility code retains its upstream copyright notice.
-- Iris GUI resources are retained under the Iris namespace: upstream
-  `common/src/main/resources/assets/iris/textures/gui/widgets.png` maps to
-  `src/main/resources/assets/iris/textures/gui/widgets.png`, and upstream
-  `common/src/main/resources/assets/iris/textures/gui/config-icon.png` maps to
-  `src/main/resources/assets/iris/textures/gui/config-icon.png` (Iris commit
-  `844542b8440f1ce6479d2914c212d099ff9d264c`, LGPL-3.0).
-- Shader compatibility behavior is informed by OptiFine/ShadersMod conventions; shader packs
-  themselves are not distributed by this repository.
-- The public Sodium maintainer comment at
-  https://github.com/CaffeineMC/sodium/issues/2400#issuecomment-2038560656 states that ports to very
-  old Minecraft versions do not compete with Sodium. Actinium records this as public context for
-  its Minecraft 1.12.2 port, not as legal advice or a replacement for license compliance review.
-- The `net.caffeinemc.mods.sodium.client.gui` screens, the
-  `net.caffeinemc.mods.sodium.{api,client}.config` option model, and every resource under
-  `assets/sodium` previously licensed under the PolyForm Shield License 1.0.0 have been
-  **removed entirely** and are no longer distributed by this repository. The settings UI is now
-  the MIT-licensed Reese's Sodium Options port backed by the embeddium option model
-  (`docs/rso-port.md`); the translation keys it uses live under the celeritas namespace.
-
-## Binary dependencies
-
-The build also resolves libraries and optional Minecraft mods from Maven, Modrinth, and
-CurseMaven. Their artifacts are governed by their own licenses. Dependencies placed in the
-`contain` configuration are packaged as nested jars and must keep their original metadata.
-See `gradle/scripts/dependencies.gradle` and `build.gradle` for the authoritative coordinates.
-
-- **Mesa3D EGL runtime (JMH only)**: `celeritas-common/src/jmh/natives/mesa-windows-x64.zip` contains
-  `libEGL.dll`, `libgallium_wgl.dll`, and `opengl32.dll`, copied unmodified from the Mesa3D
-  26.1.8 MSVC x64 release package and repacked without changes. The checked-in ZIP SHA256 is
-  `77ca424f81ecfe3ba3e9871692f4e0d87347ead46a992d28e9492b98ad89c0bfd`; the upstream package is published by
-  [mesa-dist-win](https://github.com/pal1000/mesa-dist-win/releases/expanded_assets/26.1.8)
-  (archive SHA256 `4c6d32e653e0ff9ad07796e40c0bcfabf2764d849e3ce4f3b1590112c87e42f9`).
-  The bundled Mesa source corresponds to tag `mesa-26.1.8`, commit
-  `0fadfea4f394211946f308458f614839ef253ee8`. Mesa has component-level licenses; the upstream
-  license text set is copied to `third-party/licenses/mesa-26.1.8/`. See the
-  [Mesa license and copyright information](https://docs.mesa3d.org/license.html) and the
-  corresponding source tag for file-level SPDX notices. These DLLs are used only by the JMH
-  task and are not included in the distributed mod jar. The `mesa-dist-win` packaging source
-  MIT notice from commit `53ce894` is retained at
-  `third-party/licenses/mesa-dist-win-MIT.txt`.
-
-SDL-GPU 使用 LWJGL 3.4.3 的 shaderc、SPIRV-Cross Java 绑定及 Windows、Linux、macOS 的 x64/arm64 native 包。Java 绑定嵌入 Actinium 主 jar，平台 native 保留原始 jar 与许可文件，通过现有 `ContainedDeps` 声明加载。macOS 的 MoltenVK 由独立的 `actinium-moltenvk` 分发 jar 提供，其中包含 LWJGL Vulkan native 包提取的 x64、arm64 `libMoltenVK.dylib` 与上游 `LICENSE-MoltenVK`。
-
-Java 8 降级运行时来自 `xyz.wagyourtail.jvmdowngrader:jvmdowngrader-java-api:1.3.5:downgraded-8`，其类嵌入 Actinium 主 jar。上游同时提供 LGPL-2.1 与商业许可；原始 `LICENSE.md`、`license/LGPLv2.1.md`、`license/COMMERCIAL.md` 和 `license/CLA.md` 均保留在分发 Jar 中。
-
-## Maintenance rule
-
-For any future imported code:
-
-1. Record the upstream repository, exact commit/tag, local paths, license, and Actinium import
-   commit in this file.
-2. Preserve upstream headers and include any required license or notice text in distributions.
-3. Keep upstream synchronization separate from Actinium-specific behavior changes when practical.
-4. Do not infer a license from package names or from Actinium's root license.
-
-See `docs/upstream-maintenance.md` for the synchronization procedure and known provenance gaps.
+| 项目 | 对应目录 | 许可证 |
+| --- | --- | --- |
+| Angelica / GLSM | `glsm/`、`sdl-gpu/`、`src/main/java/com/gtnewhorizons/angelica/`、`src/main/resources/assets/angelica/`，以及 `src/main/java/com/dhj/actinium/` 中的部分渲染代码 | [LGPL-3.0](src/main/resources/META-INF/licenses/Angelica-LGPL-3.0.txt)（个别文件见文件头） |
+| GTNHLib | `GTNHLib/` | LGPL-3.0（个别文件见文件头） |
+| Iris | `shader/`、`src/main/java/net/coderbot/batchedentityrendering/`、`src/main/java/com/dhj/actinium/mixin/features/iris/`、`src/main/resources/assets/iris/` | LGPL-3.0 |
+| Celeritas / Embeddium / Sodium | `celeritas-common/` | LGPL-3.0（个别文件见文件头） |
+| Reese’s Sodium Options | `src/main/java/me/flashyreese/mods/reeses_sodium_options/`、`src/main/resources/assets/reeses-sodium-options/` | [MIT](LICENSE-REESES-SODIUM-OPTIONS.md) |
+| CeleritasDynamicLights / SodiumDynamicLights / LambDynamicLights | `src/main/java/com/dhj/actinium/api/dynamiclights/`、`src/main/java/com/dhj/actinium/render/dynamiclights/`、`src/main/java/com/dhj/actinium/mixin/vintage/features/dynamiclights/`、`src/main/resources/assets/celeritasdynamiclights/` | MIT（[CeleritasDynamicLights](src/main/resources/META-INF/licenses/CeleritasDynamicLights-MIT.txt)、[LambDynamicLights](src/main/resources/META-INF/licenses/LambDynamicLights-MIT.txt)） |
+| Canvas（bitraster 与遮挡盒分解） | `celeritas-common/src/main/java/grondag/bitraster/`、`celeritas-common/src/main/java/dhj/embeddedt/embeddium/impl/render/chunk/occlusion/geometry/` | bitraster 为 [Apache-2.0](third-party/licenses/bitraster-APACHE-2.0.txt)，遮挡盒分解见文件头（LGPL-3.0） |
+| Ithaka digraph | `src/main/java/de/odysseus/ithaka/digraph/` | Apache-2.0 |
+| Mesa | `glsm/src/main/java/com/gtnewhorizons/angelica/glsm/`（固定管线着色器与显示列表 ID 分配器）、`celeritas-common/src/jmh/natives/`（EGL） | 移植代码为 MIT，EGL 各组件见 [Mesa 许可文件](third-party/licenses/mesa-26.1.8/) |
+| mesa-dist-win | `celeritas-common/src/jmh/natives/` | [MIT](third-party/licenses/mesa-dist-win-MIT.txt) |
+| LWJGL | `GTNHLib/`、`glsm/` 和 `celeritas-common/` 的部分工具代码，另见 `gradle/scripts/dependencies.gradle` 中的 Shaderc 与 SPIRV-Cross Java 绑定 | BSD-3-Clause |
+| ASM | `GTNHLib/src/main/java/com/gtnewhorizon/gtnhlib/asm/` | BSD-3-Clause |
+| fastutil | `celeritas-common/src/main/java/dhj/embeddedt/embeddium/impl/util/sorting/`、`gradle/scripts/dependencies.gradle`（打包依赖） | Apache-2.0（排序代码另含 CERN 许可，见 `MergeSort.java` 文件头） |
+| GLSL Transformation Library | `gradle/scripts/dependencies.gradle`（打包依赖） | LGPL-3.0 |
+| JOML | `gradle/scripts/dependencies.gradle`（打包依赖） | MIT |
+| JCPP | `gradle/scripts/dependencies.gradle`（打包依赖） | Apache-2.0 |
+| ANTLR 4 Runtime | `gradle/scripts/dependencies.gradle`（打包依赖） | BSD-3-Clause |
+| JvmDowngrader Java API | `gradle/scripts/dependencies.gradle`（打包依赖） | LGPL-2.1 或商业许可 |
+| MoltenVK | `moltenvk/` | [Apache-2.0](moltenvk/src/main/resources/LICENSE-MoltenVK) |

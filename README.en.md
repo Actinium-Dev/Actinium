@@ -1,117 +1,93 @@
-# Actinium
+# Actinium<img src="src/main/resources/assets/actinium/icon.png" width="40" height="40" align="right">
 
-[简体中文](README.md)
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/actinium-1-12-2-optimization) | [简体中文](README.md)
 
-Actinium is an experimental rendering and shader compatibility mod for Minecraft 1.12.2 on Cleanroom Loader. It aims to bring a more modern rendering pipeline to the legacy client while keeping shader packs, classic modded content, and performance-oriented rendering work in the same world.
+A modern rendering and shader mod for Minecraft 1.12.2, ported from Angelica: Iris shaders, Celeritas terrain, and GL 3.3 core profile.
 
-The project currently combines work around Celeritas, GLSM, GTNHLib, and an Iris-style shader pipeline. Its focus is practical compatibility: terrain rendering, entity rendering, shadow passes, post-processing stages, shader uniforms, framebuffer ownership, and the OpenGL state transitions that old and new renderers both depend on.
-![actinium.png](docs/image/actinium.png)
-## What Actinium Does
+![Actinium](docs/image/actinium.png)
 
-- Reworks parts of the Minecraft 1.12.2 client rendering path around a modernized pipeline.
-- Integrates Celeritas terrain rendering concepts into the Cleanroom environment.
-- Takes over and stabilizes GLSM-related OpenGL state handling.
-- Implements an Iris-inspired shader pass model, including `shadow`, `gbuffers`, `prepare`, `deferred`, `composite`, and `final` stages.
-- Improves compatibility with shader packs that expect modern framebuffer, uniform, and program-binding behavior.
-- Keeps legacy modded rendering paths in view, including entities, block entities, particles, weather, sky rendering, water reflections, and shadow rendering.
+## Features
 
-## Current Status
+* Shaders: Iris port and enhancements
+* Terrain: Celeritas, with multithreaded chunk building, translucent sorting, GPU occlusion culling, and MultiDraw
+* GL 3.3 core profile, with the fixed-function pipeline emulated by generated GLSL shaders (FFP)
+* Selectable rendering backend: OpenGL, or SDL GPU (Vulkan / Metal / Direct3D 12)
+* Batching and instancing for entities, block entities, items, and particles
+* Held-item dynamic lighting
+* Performance HUD (FPS / 1% Low / CPU / GPU / memory / VRAM)
+* Embedded Reese's Sodium Options video settings
+* Distant Horizons LOD support
 
-Actinium is under active development. It is not a drop-in replacement for every Minecraft 1.12 rendering stack yet, and shader pack behavior can still vary by pack, preset, driver, and mod list.
+## Status
 
-The current development direction is compatibility-first:
+* OpenGL + Celeritas terrain: default
+* Shaders: available, with support for modern Iris 1.7+ shader packs
+* SDL GPU renderer: experimental
 
-- preserve expected vanilla and modded rendering behavior;
-- make shader pack pipeline stages predictable;
-- reduce hidden OpenGL state leaks between legacy rendering and shader rendering;
-- keep regressions visible through focused tests and manual shader-pack checks.
+## SDL GPU Renderer
 
-Shader packs such as MakeUp, BSL, and Complementary are useful compatibility targets during development, but support should be treated as ongoing work rather than a finished compatibility matrix.
+Optional; OpenGL is the default backend.
 
-## Device Compatibility
+* Vulkan, Metal (macOS), and Direct3D 12 (Windows) via SDL3
+* Requires the host SDL windowing system; falls back to OpenGL when it is missing or device creation fails
+* Vulkan on macOS is provided by a separate `actinium-moltenvk` jar through MoltenVK
 
-Desktops and phones share the same hard requirements:
+## Core Profile
 
-- Minecraft 1.12.2
-- Cleanroom Loader **0.6.13-alpha or older (below 0.7.0)**
-- Java 21 or newer at runtime; the toolchain is Java 25 and the produced bytecode targets Java 21
-- A graphics environment exposing an OpenGL 3.3+ core profile
+Targets GL 3.3+ core profile.
 
-> [!IMPORTANT]
-> **Actinium no longer supports Cleanroom Loader 0.7.0-alpha and newer.**
-> Starting with 0.7.0, CRL replaced GLFW with SDL 3 for windowing and input, and reworked its LWJGL modules and class-patching flow; Actinium is not adapted to those changes.
-> Run Actinium on 0.6.x (0.6.13-alpha recommended); issues seen on 0.7.0 and newer are outside the support scope.
+* Fixed-function pipeline emulated by generated GLSL shaders
+* Display list emulation
+* GLSM provides a software matrix stack and state management
+* GL_QUADS to GL_TRIANGLES conversion
+* Automatic transformation of mod shaders that rely on compat-only GLSL built-ins (`gl_ModelViewMatrix`, `texture2D`, and others)
 
-Every device needs exactly the requirements above; they differ only in who provides that core profile:
+## Runtime Requirements
 
-- **Desktop (Windows / Linux / macOS)**: the GPU driver does, and current mainstream drivers do so by default; shader pack usability still depends on GPU performance and driver behavior.
-- **Mobile (Android)**: the renderer selected in the launcher does. Pick a core-profile-capable renderer such as MobileGlues (MG); compatibility-profile renderers such as GL4ES cannot satisfy this requirement - Actinium requests a core profile context from 4.6 down to 3.3 at startup, so a renderer that cannot provide one makes the game fail to launch.
-  - **Instance**: create a 1.12.2 + Cleanroom instance with a phone launcher that supports Cleanroom Loader, then drop the Actinium jar into `mods/`.
-  - **Shaders**: phone GPUs and memory are limited, so start with a lower resolution, a shorter render distance, and a lighter shader pack before scaling up.
+* Minecraft 1.12.2
+* Outlands (2026-11-11+), Cleanroom (0.3.0 - 0.6.13), or Forge
+* A graphics environment with at least an OpenGL 3.3+ core profile
+
+## Known Incompatibilities
+
+* Cleanroom Loader 0.7.0+
+* Kirino Graphics mode: rendering pipelines are mutually exclusive, automatically falls back to Headless mode
+* RenderLib: mods in the RenderLib family
+* OptiFine (never compatible)
+* Smooth Font (only the font optimization is usable, fonts cannot be replaced)
 
 ## Building
 
-From the project root:
-
-```powershell
-.\gradlew.bat build --no-daemon
-```
-
-For a faster compile-only check:
-
-```powershell
-.\gradlew.bat compileJava --no-daemon
-```
-
-To run the automated tests and pre-release structure checks:
-
-```powershell
-.\gradlew.bat check --no-daemon
-```
-
-Install `build/libs/Actinium-<version>.jar` in a compatible Cleanroom instance. The `-sources.jar` file is for development.
-
-The jar version is derived from the git state at build time: an exact tag on HEAD wins; otherwise the base version from `gradle.properties` is used with the current commit's git sha appended (e.g. `2.4.0-dev-2dc019e`). It can be overridden explicitly with `-Pversion=...`.
-
-## Mod Metadata
-
-Actinium's Mod List metadata is configured from Gradle properties in `gradle.properties`. Main mod fields use the `mod_*` prefix (`mod_description`, `mod_url`, `mod_authors`, `mod_credits`, `mod_logo_path`). Values can also be overridden per build with `-P` arguments, for example `-Pmod_description=...`.
-
-## Repository Layout
-
-- `src/` contains Actinium integration, compatibility hooks, mixins, and runtime resources.
-- `shader/` contains the integrated Iris-style shader pipeline.
-- `glsm/` contains the embedded GLSM-side integration.
-- `GTNHLib/` contains the embedded GTNHLib pieces used by the project.
-- `celeritas-common/` contains the embedded Celeritas renderer implementation.
-- `docs/` contains development notes, compatibility gaps, and future documentation.
-- `gradle/scripts/` contains shared Gradle build and dependency logic.
-
-See [the architecture guide](docs/architecture.md), [current roadmap](docs/roadmap.md), and [compatibility matrix](docs/compatibility-matrix.md) before changing the render pipeline. Third-party source provenance and licenses are summarized in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Contributing
-
-Contributions of any kind are welcome: reporting issues, verifying shader pack compatibility, or submitting code and documentation. Please read the [contributing guide](CONTRIBUTING.md) first, and use the appropriate [issue template](.github/ISSUE_TEMPLATE/) when reporting problems.
+* `./gradlew build`, `./gradlew check`
+* Main mod: `build/libs/Actinium-<version>.jar`
+* macOS Vulkan add-on: `build/libs/actinium-moltenvk-<version>.jar`
 
 ## AI-Generated Code
 
-Nearly all code in this project is produced with AI coding agents, and changes may also be reviewed by AI: every change is reviewed, tested, and regression-verified by humans and AI before it is merged. If you do not want to use AI-generated code, feel free to look for alternative projects; if you have any concerns, reach out via issues.
+Nearly all code in this project is produced with the help of AI coding agents; every change is reviewed, tested, and regression-verified by humans and AI before it is merged.
 
-## Related Projects
+## Credits
 
-Actinium builds on ideas, code, and compatibility research from several projects. The items below are listed to make those roots visible; each upstream project remains governed by its own license and authorship.
-
-- Celeritas: provides much of the original Minecraft 1.12 performance-mod foundation and terrain-rendering direction that Actinium continues to adapt.
-- GLSM: provides shader-pack loading, shader state management, and compatibility behavior that Actinium integrates and stabilizes.
-- GTNHLib: provides utility code and compatibility infrastructure used by the embedded legacy rendering stack.
-- Iris: serves as a major reference for shader pipeline structure, pass ordering, framebuffer behavior, and shader-pack expectations.
-- GLSL Transformation Library: used for GLSL parsing and transformation work needed by shader compatibility code.
-- Sodium: informs the broader performance-oriented rendering model and modern Minecraft renderer design.
-- Angelica and the GTNH rendering ecosystem: useful references for Minecraft 1.7/1.12-era shader compatibility, legacy OpenGL behavior, and modded-client integration.
-- Cleanroom Loader: provides the target Minecraft 1.12.2 runtime environment.
+* [Angelica](https://github.com/GTNewHorizons/Angelica)
+  * mitchej123, Omni, Makamys, Embeddedt, NanoLive, Caedis, Cardinalstar, Alexdoru, Eigenraven, mist475, Clepto, and kurrycat: much of the GLSM, SDL GPU, and batched font rendering code is ported from Angelica
+* [Iris Shaders](https://github.com/IrisShaders/Iris)
+  * The Iris team: coderbot, IMS212, Justsnoopy30, FoundationGames
+  * [Oculus](https://github.com/Asek3/Oculus), Asek3's Iris Forge port
+  * Ported code follows the LGPL
+* [Sodium](https://github.com/CaffeineMC/sodium) / [Celeritas](https://git.taumc.org/embeddedt/celeritas)
+  * Sodium by JellySquid and CaffeineMC
+  * Celeritas by embeddedt, LGPL 3.0
+* [Reese's Sodium Options](https://github.com/FlashyReese/reeses-sodium-options)
+  * FlashyReese, MIT (embedded video settings screen)
+* [glsl-transformation-lib](https://github.com/TauMC/glsl-transformation-lib)
+  * embeddedt and ferriarnus, LGPL 3.0; Monocle as a reference implementation
+* [Mesa](https://gitlab.freedesktop.org/mesa/mesa)
+  * FFP vertex and fragment shader generation and the display list ID allocator are ported from Mesa, MIT
+* [GTNHLib](https://github.com/GTNewHorizons/GTNHLib)
+  * The GT New Horizons team and GTNHLib contributors. Actinium embeds its memory management, buffer, post-processing, and legacy rendering utility code. Upstream is LGPL-3.0.
+* [CeleritasDynamicLights](https://github.com/Karnatour/CeleritasDynamicLights.git)
+  * Karnatour's port of SodiumDynamicLights
 
 ## License
 
-Actinium is distributed under the license in `LICENSE`.
-
-Code originating from other projects, along with compatibility changes made to that code, remains under the original license of the respective upstream project unless explicitly stated otherwise in the relevant source files.
+See `LICENSE` for the license of Actinium's own code. Code from upstream projects, and the adaptation changes made around it, follow each upstream project's original license unless the source file states otherwise.

@@ -5,8 +5,6 @@ repositories {
     mavenCentral()
 }
 
-def moltenvkVersion = findProperty('moltenvk_version') ?: rootProject.ext.lwjglVersion
-
 configurations {
     moltenvkNativesX64 {
         canBeConsumed = false
@@ -67,7 +65,8 @@ tasks.named('assemble') {
 
 tasks.register('distJar', Jar) {
     archiveBaseName = 'actinium-moltenvk'
-    archiveVersion = moltenvkVersion
+    archiveVersion = rootProject.version
+    destinationDirectory = rootProject.layout.buildDirectory.dir('libs')
     from(sourceSets.main.output)
     manifest {
         attributes 'FMLCorePlugin': 'com.gtnewhorizons.angelica.moltenvk.loading.MoltenVKCorePlugin'

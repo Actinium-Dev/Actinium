@@ -436,6 +436,7 @@ tasks.named('preRunServer').configure {
 
 tasks.named('assemble').configure {
     dependsOn java8Jar
+    dependsOn ':moltenvk:distJar'
 }
 
 tasks.named('runClient', JavaExec).configure {

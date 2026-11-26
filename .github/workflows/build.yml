@@ -1,12 +1,6 @@
 name: Build mod jar
 
-on:
-  workflow_dispatch:
-  push:
-  # Pull requests need an explicit trigger: pushes to a fork never reach this
-  # repository, so without it a contribution gets no build at all.
-  pull_request:
-    branches: [main]
+on: push
 
 permissions:
   contents: read
@@ -36,8 +30,39 @@ jobs:
       run: chmod +x ./gradlew
     - name: Execute Gradle build
       run: ./gradlew build
-        
-    - name: Upload a Build Artifact
+
+    - name: Upload Actinium JAR
       uses: actions/upload-artifact@v7
       with:
-        path: build/libs
+        path: |
+          build/libs/Actinium-*.jar
+          !build/libs/Actinium-*-thin.jar
+          !build/libs/Actinium-*-sources.jar
+          !build/libs/Actinium-*-javadoc.jar
+        archive: false
+        if-no-files-found: error
+    - name: Upload thin JAR
+      uses: actions/upload-artifact@v7
+      with:
+        path: build/libs/Actinium-*-thin.jar
+        archive: false
+        if-no-files-found: error
+    - name: Upload sources JAR
+      uses: actions/upload-artifact@v7
+      with:
+        path: build/libs/Actinium-*-sources.jar
+        archive: false
+        if-no-files-found: error
+    - name: Upload Javadoc JAR
+      if: ${{ hashFiles('build/libs/Actinium-*-javadoc.jar') != '' }}
+      uses: actions/upload-artifact@v7
+      with:
+        path: build/libs/Actinium-*-javadoc.jar
+        archive: false
+        if-no-files-found: error
+    - name: Upload MoltenVK JAR
+      uses: actions/upload-artifact@v7
+      with:
+        path: build/libs/actinium-moltenvk-*.jar
+        archive: false
+        if-no-files-found: error

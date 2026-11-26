@@ -1,118 +1,95 @@
-# Actinium
-[English](README.en.md)
+# Actinium<img src="src/main/resources/assets/actinium/icon.png" width="40" height="40" align="right">
 
-Actinium 是一个面向 Minecraft 1.12.2 / Cleanroom Loader 的实验性渲染与光影兼容模组。它尝试把更现代的渲染管线带回旧版本客户端，同时兼顾经典模组内容、光影包行为和性能导向的渲染路径。
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/actinium-1-12-2-optimization) | [English](README.en.md)
 
-项目目前围绕 Celeritas、GLSM、GTNHLib 以及类似 Iris 的光影管线展开。重点不是单纯替换某一段渲染代码，而是让地形、实体、阴影、后处理、uniform、framebuffer 归属和 OpenGL 状态切换在旧版客户端中尽量稳定、可控。
-![actinium.png](docs/image/actinium.png)
-## 项目目标
+Minecraft 1.12.2 的现代渲染与光影模组，移植自 Angelica：Iris 光影、Celeritas 地形与 GL 3.3 core profile。
 
-- 重构 Minecraft 1.12.2 客户端的部分渲染路径，使其更接近现代渲染管线。
-- 将 Celeritas 的地形渲染思路接入 Cleanroom 环境。
-- 接管并稳定 GLSM 相关的 OpenGL 状态管理。
-- 实现类似 Iris 的光影阶段模型，包括 `shadow`、`gbuffers`、`prepare`、`deferred`、`composite` 和 `final`。
-- 改善依赖现代 framebuffer、uniform 和 program binding 行为的光影包兼容性。
-- 保留对旧版模组渲染路径的关注，包括实体、方块实体、粒子、天气、天空、水面反射和实体阴影。
+> 你说的对，但是《Actinium》是由 [Actinium-Dev](https://github.com/Actinium-Dev) 自主（并非）研发的一款全新开源客户端性能模组。游戏发生在一个被称作「[Minecraft 1.12.2](https://minecraft.wiki/w/Java_Edition_1.12.2)」的幻想世界，在这里，被 [Java](https://baike.baidu.com/item/Java/85979) 选中的人将被授予「[LWJGL](https://www.lwjgl.org/)」，导引 [OpenGL](https://www.opengl.org/) 之力。你将扮演一位名为「[Act-Dev](https://github.com/DHJComical)」的神秘开发团队，在自由的「[计算机图形学](https://baike.baidu.com/item/计算机图形学/279486)」 中邂逅性格各异、能力独特的同伴们——[IntelliJ IDEA](https://www.jetbrains.com/idea/)、[Codex](https://github.com/openai/codex)、[RenderDoc](https://renderdoc.org)——和它们一起击败 [OptiFine](https://optifine.net/)，找回失散的帧数，同时逐步发掘「为什么我的光影还是爆炸」的真相。
 
-## 当前状态
+![Actinium](docs/image/actinium.png)
 
-Actinium 仍处于活跃开发阶段。它还不是一个能覆盖所有 Minecraft 1.12 渲染场景的即插即用替代品；光影包表现也可能受到预设、显卡驱动、模组列表和具体场景影响。
+## 特性
 
-当前开发方向以兼容性为优先：
+* 光影：Iris 移植与增强
+* 地形：Celeritas，多线程区块构建、半透明排序、GPU 遮挡剔除与 MultiDraw
+* GL 3.3 core profile，固定管线由生成的 GLSL 着色器模拟（FFP）
+* 渲染后端选择：OpenGL，或 SDL GPU（Vulkan / Metal / Direct3D 12）
+* 实体、方块实体、物品与粒子的批处理与实例化
+* 手持动态光照
+* 性能指示器 HUD（FPS / 1% Low / CPU / GPU / 内存 / 显存）
+* 内嵌 Reese's Sodium Options 视频设置
+* Distant Horizons LOD 支持
 
-- 保持原版和模组渲染行为符合预期；
-- 让光影包各阶段的输入、输出和时序更可预测；
-- 减少旧渲染路径与光影渲染之间隐藏的 OpenGL 状态污染；
-- 通过针对性测试和手动光影包验证降低回归风险。
+## 状态
 
-MakeUp、BSL、Complementary 等光影包是开发过程中的重要验证目标，但它们目前更适合作为兼容性测试对象，而不是已经完成承诺的兼容矩阵。
+* OpenGL + Celeritas 地形：默认
+* 光影：可用，支持 Iris 1.7+ 的现代光影
+* SDL GPU 渲染器：实验性
 
-## 设备兼容性
+## SDL GPU 渲染器
 
-桌面端与手机端共用同一套硬性前提：
+可选，OpenGL 是默认后端。
 
-- Minecraft 1.12.2
-- Cleanroom Loader **0.6.13-alpha 或更早版本（低于 0.7.0）**
-- Java 21 及以上运行时；开发工具链为 Java 25，构建产物使用 Java 21 字节码
-- 支持 OpenGL 3.3 及以上 core profile 的图形环境
+* 经 SDL3 支持 Vulkan、Metal（macOS）与 Direct3D 12（Windows）
+* 依赖宿主 SDL 窗口系统，缺失或设备创建失败时回退 OpenGL
+* macOS 的 Vulkan 由独立的 `actinium-moltenvk` jar 经 MoltenVK 提供
 
-> [!IMPORTANT]
-> **Actinium 不再支持 Cleanroom Loader 0.7.0-alpha 及以上版本。**
-> 0.7.0 起 CRL 用 SDL 3 取代 GLFW 重写了窗口与输入层，并重构了 LWJGL 模块与类补丁流程，Actinium 未针对这些变更适配。
-> 请在 0.6.x（推荐 0.6.13-alpha）上运行 Actinium；在 0.7.0 及以上版本上出现的问题不在支持范围内。
+## Core Profile
 
-各设备要满足的都是上面这一套前提，差别只在 core profile 由谁提供：
+目标为 GL 3.3+ core profile。
 
-- **桌面端（Windows / Linux / macOS）**：由显卡驱动提供，近年主流驱动默认满足；光影包的可用性仍取决于显卡性能与驱动行为。
-- **手机（Android）**：由启动器所选的渲染器提供，需选择支持 core profile 的渲染器，例如 MobileGlues（MG）；GL4ES 一类只提供兼容 profile 的渲染器无法满足要求——Actinium 启动时会依次尝试申请 4.6 到 3.3 的 core profile 上下文，给不出 core profile 就会直接启动失败。
-  - **实例**：用支持 Cleanroom Loader 的手机启动器建立 1.12.2 + Cleanroom 实例，再把 Actinium 的 jar 放进 `mods/`。
-  - **光影**：手机 GPU 与显存有限，建议先用较低分辨率、较近渲染距离和较轻的光影包确认能正常进入世界，再逐步调高。
+* 固定管线经生成的 GLSL 着色器模拟
+* 显示列表模拟
+* GLSM 提供软件矩阵栈与状态管理
+* GL_QUADS 到 GL_TRIANGLES 的转换
+* 自动变换使用 compat-only GLSL 内置量（`gl_ModelViewMatrix`、`texture2D` 等）的模组着色器
+
+## 运行要求
+
+* Minecraft 1.12.2
+* Outlands （2026-11-11+）、Cleanroom （0.3.0 - 0.6.13）、Forge
+* 支持至少 OpenGL 3.3+ core profile 的图形环境
+
+## 已知不兼容
+
+* Cleanroom Loader 0.7.0+
+* Kirino Graphics 模式：渲染管线互斥，自动回退 Headless 模式
+* RenderLib：RenderLib 系列的 Mod
+* OptiFine（永不兼容）
+* Smooth Font（只能使用字体优化，无法更换字体）
 
 ## 构建
 
-在项目根目录执行：
+* `./gradlew build`、`./gradlew check`
+* 主模组为 `build/libs/Actinium-<version>.jar`
+* macOS Vulkan 附加包为 `build/libs/actinium-moltenvk-<version>.jar`
 
-```powershell
-.\gradlew.bat build --no-daemon
-```
+## AI 声明
 
-如果只需要快速检查 Java 编译：
+本项目代码几乎全部由 AI 编码代理辅助生成，所有改动经人工与 AI 审阅、测试与回归验证后合入。
 
-```powershell
-.\gradlew.bat compileJava --no-daemon
-```
+## Credits
 
-运行自动化测试与发布前结构校验：
-
-```powershell
-.\gradlew.bat check --no-daemon
-```
-
-可安装的模组文件是 `build/libs/Actinium-<version>.jar`。`-sources.jar` 仅供开发使用。
-
-jar 版本号由构建时的 git 状态推导：HEAD 上有 tag 时使用 tag；没有 tag 时使用 `gradle.properties` 中的基础版本并追加当前提交的 git sha（如 `2.4.0-dev-2dc019e`）；也可以用 `-Pversion=...` 显式覆盖。
-
-## 模组元数据
-
-Actinium 的 Mod List 元数据统一在 `gradle.properties` 中配置：主模组字段使用 `mod_*` 前缀（`mod_description`、`mod_url`、`mod_authors`、`mod_credits`、`mod_logo_path`）。每次构建也可以通过 `-P` 参数覆盖，例如 `-Pmod_description=...`。
-
-## 仓库结构
-
-- `src/`：Actinium 集成、兼容层、Mixin 和运行时资源。
-- `shader/`：集成后的 Iris 风格光影管线。
-- `glsm/`：内嵌的 GLSM 侧集成代码。
-- `GTNHLib/`：项目使用的 GTNHLib 相关代码。
-- `celeritas-common/`：内嵌的 Celeritas 渲染器实现。
-- `docs/`：开发记录、兼容性缺口和后续文档。
-- `gradle/scripts/`：共享的 Gradle 构建与依赖逻辑。
-
-修改渲染管线前，请先阅读[架构说明](docs/architecture.md)、[当前路线图](docs/roadmap.md)和[兼容性矩阵](docs/compatibility-matrix.md)。第三方源码来源与许可证汇总见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-## 参与开发
-
-欢迎任何形式的贡献：报告问题、验证光影包兼容性、提交代码或文档。请先阅读[贡献指南](CONTRIBUTING.md)；报告问题请使用对应的 [issue 模板](.github/ISSUE_TEMPLATE/)。
-
-## AI 生成代码声明
-
-本项目代码几乎全部由 AI 编码代理辅助生成，改动也可能由 AI 审核：
-所有改动均经过人工与 AI 的审阅、测试与 dev 回归验证后才合入。若您排斥 AI 生成的代码，
-可自行寻找其他替代品；如有疑虑，欢迎通过 issue 联系维护者。
-
-## 相关项目
-
-Actinium 的开发参考、整合并适配了多个项目中的思路、代码和兼容性经验。下面的列表用于说明这些来源；各上游项目仍遵循其原本的许可证和作者归属。
-
-- Celeritas：提供了 Minecraft 1.12 性能优化模组的基础结构和地形渲染方向，Actinium 在此基础上继续适配和扩展。
-- GLSM：提供光影包加载、光影状态管理和兼容性行为，Actinium 对其进行集成和稳定化处理。
-- GTNHLib：提供旧版渲染栈中使用的工具代码和兼容性基础设施。
-- Iris：作为光影管线结构、阶段顺序、framebuffer 行为和光影包预期的重要参考。
-- GLSL Transformation Library：用于光影兼容代码中的 GLSL 解析和转换。
-- Sodium：为性能导向的现代 Minecraft 渲染器设计提供参考。
-- Angelica 与 GTNH 渲染生态：为 Minecraft 1.7/1.12 时代的光影兼容、旧版 OpenGL 行为和模组客户端集成提供参考。
-- Cleanroom Loader：提供 Actinium 当前面向的 Minecraft 1.12.2 运行环境。
+* [Angelica](https://github.com/GTNewHorizons/Angelica)
+  * mitchej123、Omni、Makamys、Embeddedt、NanoLive、Caedis、Cardinalstar、Alexdoru、Eigenraven、mist475、Clepto、kurrycat：GLSM、SDL GPU、批处理字体渲染等大量代码移植自 Angelica
+* [Iris Shaders](https://github.com/IrisShaders/Iris)
+  * Iris 团队：coderbot、IMS212、Justsnoopy30、FoundationGames
+  * Asek3 的 Iris Forge 移植 [Oculus](https://github.com/Asek3/Oculus)
+  * 移植代码遵循 LGPL
+* [Sodium](https://github.com/CaffeineMC/sodium) / [Celeritas](https://git.taumc.org/embeddedt/celeritas)
+  * JellySquid 与 CaffeineMC 的 Sodium
+  * embeddedt 的 Celeritas，LGPL 3.0
+* [Reese's Sodium Options](https://github.com/FlashyReese/reeses-sodium-options)
+  * FlashyReese，MIT（内嵌视频设置界面）
+* [glsl-transformation-lib](https://github.com/TauMC/glsl-transformation-lib)
+  * embeddedt 与 ferriarnus，LGPL 3.0；Monocle 作为参考实现
+* [Mesa](https://gitlab.freedesktop.org/mesa/mesa)
+  * FFP 顶点与片元着色器生成、显示列表 ID 分配器移植自 Mesa，MIT
+* [GTNHLib](https://github.com/GTNewHorizons/GTNHLib)
+  * GT New Horizons 团队及 GTNHLib 贡献者。Actinium 内嵌其中的内存管理、缓冲区、后处理和旧版渲染工具代码。上游采用 LGPL-3.0。
+* [CeleritasDynamicLights](https://github.com/Karnatour/CeleritasDynamicLights.git)
+  * Karnatour 对 SodiumDynamicLights 的移植
 
 ## 许可证
 
-Actinium 的许可证见 `LICENSE`。
-
-来自其他项目的代码，以及围绕这些代码所做的适配性修改，除非相关源文件中另有明确说明，否则继续遵循各自上游项目原本的许可证。
+Actinium 自有代码的许可证见 `LICENSE`。来自上游项目的代码及围绕它的适配修改，除非源文件另有说明，否则遵循各自上游的原许可证。
