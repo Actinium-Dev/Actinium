@@ -1,5 +1,6 @@
 package com.dhj.actinium.world.cloned;
 
+import com.dhj.actinium.render.dynamiclights.LightSnapshot;
 import com.dhj.actinium.world.WorldSlice;
 import dhj.embeddedt.embeddium.impl.util.position.SectionPos;
 
@@ -21,14 +22,21 @@ public class ChunkRenderContext {
     private final ClonedChunkSectionCache sectionCache;
     private final SectionPos sectionCoord;
     private final ClonedChunkSection[] sections;
+    private final LightSnapshot dynamicLights;
 
     private boolean released;
     private boolean ownershipTransferred;
 
-    public ChunkRenderContext(ClonedChunkSectionCache sectionCache, SectionPos sectionCoord, ClonedChunkSection[] sections) {
+    public ChunkRenderContext(ClonedChunkSectionCache sectionCache, SectionPos sectionCoord, ClonedChunkSection[] sections,
+                              LightSnapshot dynamicLights) {
         this.sectionCache = sectionCache;
         this.sectionCoord = sectionCoord;
         this.sections = sections;
+        this.dynamicLights = dynamicLights;
+    }
+
+    public LightSnapshot dynamicLights() {
+        return dynamicLights;
     }
 
     public ClonedChunkSection[] getSections() {

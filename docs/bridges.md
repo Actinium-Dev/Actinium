@@ -36,7 +36,7 @@
 |----|------|------|
 | `IrisGLSMBridge` | 根项目 `com.gtnewhorizons.angelica.iris` | Iris 延迟状态机 ↔ GLSM DeferredHandler 接线 |
 | `PortalViewportProvider` / `OptionGUIConstructionBridge` | 根项目 compat | 各模组专用注入 |
-| `DynamicLightProvider` | 根项目 `compat/celeritasdynamiclights` | 可选附属 Celeritas Dynamic Lights 的动态光查询；`CeleritasDynamicLightsCompat` 用 `Class.forName` 解析一次，未安装、缺方法或失败时使用 `NONE` 原样返回入参，不加载附属类 |
+| `DynamicLightSampler` | 根项目 `render/dynamiclights` | 供 TESR 在静态光照修正后采样当前光源快照。独立附属在场时使用调用方传入的最低方块光。 |
 
 ## 新增桥的约定
 

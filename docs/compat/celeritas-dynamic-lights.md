@@ -1,116 +1,31 @@
-# Celeritas Dynamic Lights 兼容（celeritasdynamiclights）
+# 内置动态光源
 
-兼容状态：**未验证**。
-最后更新：2026-11-17。分支：`feat/ffp-instancing`。适配的附属版本：1.2.10 与 1.2.11，
-`getLightmapWithDynamicLight(BlockPos, int)` 在两个版本签名相同。
+Actinium 集成 Celeritas Dynamic Lights 1.2.11（`4b61a0b4`），手持物品、掉落物、展示框、装备、燃烧实体和已注册的方块实体可以照亮周围地形。动态光只参与客户端渲染，保持天空光和游戏世界的光照数据不变。光影包可以继续使用 Iris 的手持光 uniform；使用光影包时也可以从视频设置单独关闭自身动态光。
 
-## 背景
+## 安装与设置
 
-Celeritas Dynamic Lights（modid `celeritasdynamiclights`，Karnatour/CeleritasDynamicLights）为
-实体、方块实体与手持物品提供动态光等级，并把该等级合并进与位置相关的光照。公开入口是
-`toni.sodiumdynamiclights.SodiumDynamicLights.get()`，实例方法
-`getLightmapWithDynamicLight(BlockPos pos, int lightmap)` 返回合并后的 packed light：动态等级
-高于 packed 中的 block light 时替换 block light，sky light 保持不变，lightmap 低 4 位的子级
-归零；等级为 0 时原样返回入参。
+直接安装 Actinium 即可使用。视频设置的「动态光源」页沿用 `config/celeritasdynamiclights.cfg` 的 `general` 类别、旧键和原有取值。`dynamicLightsMode` 默认为 `REALTIME`；`FAST` 和 `SLOW` 分别至少间隔 5 和 10 个世界 tick，`OFF` 关闭内置光源。自身、其他实体、方块实体、液体敏感性、苦力怕和 TNT 的设置可分别修改。
 
-附属自身接入了原版 `TileEntityRendererDispatcher`、`Particle.getBrightnessForRender` 与手持
-`ItemRenderer`。设置入口随版本不同。1.2.10 只有 Celeritas 系设置页：
-`toni.sodiumdynamiclights.config.CeleritasOptionsListener` 在
-`org.taumc.celeritas.api.OptionGUIConstructionEvent` 下注册 `DynamicLightsCeleritasPage`，
-Actinium 环境里没有对应页面，开关通过 Forge 配置 `config/celeritasdynamiclights.cfg` 修改
-（`dynamicLightsMode`、`entitiesLightSource` 等静态字段）。1.2.11 起两个监听器移到
-`toni.sodiumdynamiclights.integration.celeritas` 与 `integration.actinium`，后者在
-`dhj.embeddedt.embeddium.api.OptionGUIConstructionEvent` 下注册 `DynamicLightsActiniumPage`，
-Actinium 环境中生效的是这一页。这些路径 Actinium 不改动。
+整合包仍安装独立附属（`celeritasdynamiclights`）时，Actinium 将设置、物品规则加载和光源更新交给独立附属。方块实体渲染保留附属在 `World.getCombinedLight` 调用点设置的最低方块光，包括光影包重算告示牌邻面亮度的分支。独立附属 1.2.11 在 `OFF` 模式下仍会按物品亮度提高第一人称手持模型的亮度。要使用内置的 Angelica 调度优化，移除独立附属并重启游戏。需要原附属 mod ID 或 Java API 的模组仍可配合独立附属运行。
 
-## 桥位置与合并点
+资源包继续使用 `assets/celeritasdynamiclights/dynamiclights/item/` 下的十个同名 JSON；F3+T 重载后生效。其他模组可以通过 `com.dhj.actinium.api.dynamiclights.DynamicLightHandlers` 注册实体和方块实体亮度，通过 `ItemLightSources.registerItemLightSource` 注册物品规则。注册的物品规则优先于资源包。
 
-`TileEntityLight.packedLight`
-（`src/main/java/com/gtnewhorizons/angelica/rendering/tesr/TileEntityLight.java`）与
-`MixinTileEntityRendererDispatcherTesrLight` 会整段替换 dispatcher 调用返回的 combined light，
-替换值因此丢失了附属已经并入的动态光。三条返回路径都经
-`CeleritasDynamicLightsCompat.mergeDynamicLight` 合并：
+## 区块更新
 
-| 路径 | 返回值 |
-| --- | --- |
-| 未启用光影包 | `TesrLightCache` 的缓存值，在 Mixin 中合并 |
-| 启用光影包、方块不使用 neighbor brightness 或 `getLightOpacity != 0` | 调用方传入的值，在 `TileEntityLight` 的早期返回里合并 |
-| 启用光影包、neighbor brightness 分支 | `sky << 20 \| max(worldBlockLight, state.getLightValue()) << 4`，重算后合并 |
+主视图采集光源后发布只读快照，每项地形构建任务保留创建时的快照。运动的光源会请求重建新旧位置附近的区块段，范围包含相邻方块的 AO 采样。如果区块段正在构建，后续动态光请求合并为一次重建，等待构建结束后再提交。物体和地形采样使用同一衰减公式，光源重叠时取最大亮度。关闭选项或移除光源时会刷新原先受光的网格；离开世界后丢弃该世界的光源和待重建区块。
 
-桥由三个类组成，位于 `src/main/java/com/dhj/actinium/compat/celeritasdynamiclights/`：
+Angelica 的 `ad63d2d6` 提供两项调度优化，`2f1f380e` 修正了区块的视锥检测和等待时间：
 
-| 类 | 职责 |
-| --- | --- |
-| `DynamicLightProvider` | 接口。`mergeDynamicLight(BlockPos, int)` 合并位置动态光；常量 `NONE` 是禁用实现，原样返回入参 |
-| `DynamicLightProviderImpl` | 唯一实现。反射调用附属的 `get()` 与 `getLightmapWithDynamicLight(BlockPos, int)` |
-| `CeleritasDynamicLightsCompat` | 静态入口。首次使用时解析一次，以接口类型持有实现，并负责唯一的日志标签 |
+- `adaptiveTicking` 根据相机位置和水平方向调整采样频率。默认三个距离为 32、64 和 128 格，前方光源分四档，每 1、5、10 或 20 个客户端 tick 更新一次；相机后方采用 20 tick。各光源按标识错开更新。
+- `frustumCulling` 先重建可见区块段。视锥外的区块进入视野或达到 `maxWaitTicks`（默认 100 个客户端 tick）后可以提交重建。重复请求保留首次入队时间，熄灭和移除跳过视锥等待。
 
-使用反射的原因：`toni.sodiumdynamiclights.SodiumDynamicLights` 只在安装附属时存在，构建中没有
-该依赖，任何编译产物都无法直接引用它；附属没有提供 ServiceLoader 声明或可编译的查询接口，
-调用点又处在每帧执行的光照查询里，没有其它可用的普通入口。因此两个成员在
-`CeleritasDynamicLightsCompat` 类初始化时用 `Class.forName(name, false, loader)` 解析一次并缓存
-`Method`，反射只出现在 `DynamicLightProviderImpl` 内，调用方只看到
-`CeleritasDynamicLightsCompat.mergeDynamicLight`。
+## 验证记录
 
-## 未安装、缺 API 与坏 jar 的行为
+2026 年 11 月 26 日，用户确认实机验证通过，使用的构建产物为 `Actinium-alpha-0.0.14-992ab6742.jar`。`./gradlew check --no-daemon` 通过，包含单元测试和分发 JAR 结构检查。
 
-未安装附属时 `Class.forName` 抛 `ClassNotFoundException`：调用带 `initialize=false`，附属的类
-不会被定义或初始化，桥使用 `DynamicLightProvider.NONE`，`mergeDynamicLight` 原样返回入参，
-DEBUG 记录一行说明。光影下三条返回路径的亮度与没有附属时一致。
+## 回归场景
 
-安装了缺少 `getLightmapWithDynamicLight(BlockPos, int)` 的旧版本时抛 `NoSuchMethodException`：
-ERROR 记录一次日志，正文包含缺失的方法签名与本次启动内关闭合并的结论，桥同样使用 `NONE`。
-
-附属 jar 损坏或在类链接阶段缺依赖时抛 `LinkageError`（含 `NoClassDefFoundError`）：解析处捕获
-并记录一次 ERROR，桥使用 `NONE`，不会在每帧的调用点抛出 `NoClassDefFoundError`。
-
-运行期调用失败（`get()` 返回 null、反射调用抛出异常、返回值不是 int）时，实现类把当前 provider
-换成 `NONE`，并 ERROR 记录一次；后续调用直接返回入参，不再进入反射路径。日志标签
-`ActiniumDynamicLightsCompat` 只定义在 `CeleritasDynamicLightsCompat` 一处，解析失败与调用失败
-共用。
-
-## 重复应用
-
-三条返回路径各自合并一次：未启用光影包时由 `MixinTileEntityRendererDispatcherTesrLight` 合并
-`TesrLightCache` 的缓存值，光影包启用时两处合并都在 `TileEntityLight` 内完成，没有一条路径会
-合并两次。
-
-幂等是这里的安全属性。合并规则是 block light 取动态等级与原值的较大值、sky light 不变、等级为 0
-时附属原样返回入参，同一个值再合并一次不会重复变亮。附属在
-`TileEntityRendererDispatcher.render` 的 `World.getCombinedLight` 调用点用 `@ModifyArgs` 把动态
-等级写进第二个参数（`lightValue`），该注解原地保留这个 INVOKE、只替换参与调用的参数表达式，
-因此它与 Actinium 在同一调用点上的 `@ModifyExpressionValue` 不互相改写注入目标，两者的应用顺序
-（先改参数、再改返回值）不影响结果。
-`CeleritasDynamicLightsCompatTest.mergingAnAlreadyMergedLightChangesNothing` 固定这条安全属性。
-
-## 自动化验证
-
-`CeleritasDynamicLightsCompatTest` 走生产桥（真实反射解析与真实方法调用），
-`toni.sodiumdynamiclights.SodiumDynamicLights` 替身只存在于 `src/test`，按附属的实现复刻合并
-规则。覆盖四项行为：动态等级高于 block light 时替换、低于时保持、等级为 0 时原样返回（含
-lightmap 低 4 位）、已合并的值再次合并不变。
-
-`TileEntityLightTest` 用真实 `World` 与 `Block` 夹具直接调用 `TileEntityLight.packedLight`，
-覆盖第 2、3 条路径的合并点：不使用 neighbor brightness 的早期返回、`getLightOpacity` 非 0 的
-早期返回、neighbor brightness 的重算值（世界 block light 与方块自发光取 max 后再合并）、重算值
-高于动态等级时保持。
-
-第 1 条路径（未启用光影包）的合并在
-`MixinTileEntityRendererDispatcherTesrLight.actinium$tesrLight` 的私有方法里，Mixin 处理器无法
-在不启用 Mixin 的测试 VM 中执行，这条路径由代码审查覆盖，测试不伪造该场景。
-
-## 实机待验证场景
-
-- 未安装附属：光影包下告示牌等使用 neighbor brightness 的方块实体亮度与改动前一致，日志无
-  `ActiniumDynamicLightsCompat` 的 ERROR。
-- 安装附属 1.2.10：光影包下手持火把或荧光物品靠近告示牌时告示牌随动态光变亮，走远后恢复；
-  在 `config/celeritasdynamiclights.cfg` 里把 `dynamicLightsMode` 置为 OFF 后画面不变（该版本
-  没有 Actinium 设置页）。
-- 安装附属 1.2.11：同上，关闭入口改为 Actinium 视频设置的 Dynamic Lights 页；确认页面出现且
-  开关立即生效。
-- 非光影路径：不启用光影包时，箱子等方块实体随动态光变化，确认缓存值与合并同时生效。
-- 注入共存：附属的 `ModifyArgs` 与 Actinium 的 `ModifyExpressionValue` 落在
-  `TileEntityRendererDispatcher.render` 的同一个 `World.getCombinedLight` 调用点，确认两者同时
-  生效且启动日志没有注入失败。
-- 测试环境选择：安装附属 jar，或自行在现有 dev runtime 的依赖配置里启用对应条目。本仓库不新增
-  Gradle 依赖，验证方式由使用者决定。
+1. 移除独立附属，在无光影的暗处交替使用主手和副手的火把。跨过区块边界后把火把丢下、捡起并收回。检查地面、粒子、邻近实体和箱子，原位置应恢复亮度。
+2. 启用 Complementary Reimagined，靠近告示牌，再关闭自身动态光和整个动态光源选项。比较启用与关闭之间的地形和方块实体亮度。手持活塞或粘性活塞时检查客户端是否正常渲染。
+3. 在镜头背后移动发光实体，转回查看，再切换维度并重进世界。检查区块更新和旧光斑是否消失。用相同场景分别关闭两项调度优化进行比较。
+4. 单独安装 Celeritas Dynamic Lights 1.2.11 后重启，确认只有一页动态光源设置，附属的开关和光影下的告示牌亮度仍然生效。

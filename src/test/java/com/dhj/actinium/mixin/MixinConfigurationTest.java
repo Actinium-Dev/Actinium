@@ -49,6 +49,8 @@ class MixinConfigurationTest {
         "mixins.actinium.betterfoliage.json",
         "mixins.actinium.rlfoliage.json",
         "mixins.actinium.ccl.json",
+        "mixins.actinium.galacticraft.json",
+        "mixins.actinium.galacticraft.playerapi.json",
         "mixins.actinium.voxelmap.json",
         "mixins.actinium.extrautils2.json",
         "mixins.actinium.cofhcore.json",

@@ -24,6 +24,8 @@ import dhj.embeddedt.embeddium.impl.util.position.SectionPos;
 import org.jetbrains.annotations.Nullable;
 import com.dhj.actinium.compat.depthsupdate.DepthsUpdateCompat;
 import com.dhj.actinium.compat.fluidlogged.FluidloggedCompat;
+import com.dhj.actinium.render.dynamiclights.DynamicLights;
+import com.dhj.actinium.render.dynamiclights.LightSnapshot;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.dhj.actinium.world.biome.BiomeColorCache;
 import com.dhj.actinium.world.biome.BiomeColorNoise;
@@ -84,6 +86,7 @@ public class WorldSlice implements DeferredSlice {
     // copyData and releaseContext.
     @Nullable
     private ClonedChunkSectionCache sectionCache;
+    private LightSnapshot dynamicLights = LightSnapshot.EMPTY;
 
     // Biome tables are per chunk, so this covers SECTION_LENGTH chunks per axis rather than one
     // table per section (see BiomeLookup).
@@ -117,8 +120,6 @@ public class WorldSlice implements DeferredSlice {
             return null;
         }
 
-        // The snapshot volume is derived from the origin by the consuming slice, so the context
-        // only carries the section coordinates and the cloned sections acquired here.
         final int minChunkX = origin.x() - NEIGHBOR_CHUNK_RADIUS;
         final int minChunkY = origin.y() - NEIGHBOR_CHUNK_RADIUS;
         final int minChunkZ = origin.z() - NEIGHBOR_CHUNK_RADIUS;
@@ -138,7 +139,12 @@ public class WorldSlice implements DeferredSlice {
             }
         }
 
-        return new ChunkRenderContext(sectionCache, origin, sections);
+        return new ChunkRenderContext(sectionCache, origin, sections, DynamicLights.snapshot(world));
+    }
+
+    /** Includes exactly the sources published when this section build was requested. */
+    public LightSnapshot dynamicLights() {
+        return this.dynamicLights;
     }
 
     private boolean hasSkyLight() {
@@ -187,6 +193,7 @@ public class WorldSlice implements DeferredSlice {
         // The cache reference moves with the entries: from here on this slice releases them.
         System.arraycopy(context.getSections(), 0, this.sections, 0, SECTION_TABLE_ARRAY_SIZE);
         this.sectionCache = context.getSectionCache();
+        this.dynamicLights = context.dynamicLights();
         context.transferOwnership();
 
         this.volumeBox.minX = origin.minX() - NEIGHBOR_BLOCK_RADIUS;
@@ -238,6 +245,7 @@ public class WorldSlice implements DeferredSlice {
     public void releaseContext() {
         ClonedChunkSectionCache cache = this.sectionCache;
         this.sectionCache = null;
+        this.dynamicLights = LightSnapshot.EMPTY;
 
         if (cache != null) {
             cache.release(this.sections);
@@ -556,5 +564,4 @@ public class WorldSlice implements DeferredSlice {
         return z << TABLE_BITS | x;
     }
 }
-
 

@@ -11,5 +11,9 @@ public class CameraHelper {
         inverseModelView.transformPosition(offset);
         return offset;
     }
-}
 
+    /** Returns the rendered camera's forward axis, including front-facing third person. */
+    public static Vector3f getForwardDirection() {
+        return new Matrix4f(AccessorActiveRenderInfo.getModelViewMatrix()).invert().transformDirection(0, 0, -1, new Vector3f());
+    }
+}

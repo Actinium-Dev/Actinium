@@ -8,6 +8,10 @@
   "mixins": [],
   "server": [],
   "client": [
+    "features.dynamiclights.MixinBlockStateBrightness",
+    "features.dynamiclights.MixinEntityBrightness",
+    "features.dynamiclights.MixinItemRendererBrightness",
+    "features.dynamiclights.MixinParticleBrightness",
     "features.tesr.MixinModelBoxCubeParams",
     "core.MinecraftAccessor",
     "core.MixinDirection",

@@ -13,6 +13,7 @@ import com.dhj.actinium.debug.ActiniumDiagnostics;
 import com.dhj.actinium.hud.runtime.PerformanceIndicators;
 import com.dhj.actinium.mixin.vintage.core.terrain.AccessorEntityRenderer;
 import com.dhj.actinium.render.CloudRenderer;
+import com.dhj.actinium.render.dynamiclights.DynamicLights;
 import com.dhj.actinium.render.FastLitItemDisplayListCache;
 import com.dhj.actinium.render.fps.FpsReducer;
 import com.dhj.actinium.render.terrain.ActiniumWorldRenderer;
@@ -200,6 +201,7 @@ public class Actinium {
         NeverEnoughAnimationsAlphaOverride.install();
         ClientProxy.configureShaderDiskCache();
         FpsReducer.init();
+        DynamicLights.initialize((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager());
 
         ((IReloadableResourceManager) Minecraft.getMinecraft().getResourceManager())
                 .registerReloadListener(resourceManager -> MissingModelCompat.onResourceManagerReload());
@@ -292,6 +294,13 @@ public class Actinium {
             GLSMPerfDebug.pollCounters();
         }
         PerformanceIndicators.onRenderTick(event);
+    }
+
+    @SubscribeEvent
+    public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && !Minecraft.getMinecraft().isGamePaused()) {
+            DynamicLights.tick();
+        }
     }
 
     @SubscribeEvent

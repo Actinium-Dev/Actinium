@@ -2,6 +2,7 @@ package com.dhj.actinium.render.terrain;
 
 import com.dhj.actinium.debug.WorldRenderInventory;
 import com.dhj.actinium.render.RenderWorldRecursionGuard;
+import com.dhj.actinium.render.dynamiclights.DynamicLights;
 import com.gtnewhorizons.angelica.glsm.DepthEcho;
 import com.gtnewhorizons.angelica.glsm.GLSMMatrices;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
@@ -90,6 +91,7 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
 
     @Override
     protected void unloadWorld() {
+        DynamicLights.unload(this.world);
         this.closeRenderInventory();
         super.unloadWorld();
     }
@@ -260,6 +262,10 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
     @Override
     public void setupTerrain(Viewport viewport, CameraState cameraState, int frame, boolean spectator, boolean updateChunksImmediately) {
         this.shadowPassPlayerViewport = null;
+        if (!this.portalCamera && !RenderWorldRecursionGuard.isNested()) {
+            DynamicLights.update(this.world, Minecraft.getMinecraft().player, viewport,
+                    this.renderSectionManager::scheduleRenderOnlyRebuild);
+        }
         super.setupTerrain(viewport, cameraState, frame, spectator, updateChunksImmediately);
 
         // The first main terrain draw prepares the compute culling ranges of these render lists. Doing it here would
