@@ -61,9 +61,8 @@ public final class CoreProfileDisplayCreator {
     }
 
     private static void createWithFallback(PixelFormat format, boolean lwjglDebug) throws LWJGLException {
-        final int ceiling = glVersionCeiling();
-        final GLVersionChoice requested = GLVersionChoice.of(requestedGlVersion(), ceiling);
-        int maxProbe = requested == GLVersionChoice.AUTO ? ceiling : requested.version();
+        int maxProbe = initialProbeVersion(launcherControlsGlContext() ? GLVersionChoice.AUTO.version()
+            : requestedGlVersion(), glVersionCeiling());
         final int maxMajor = maxProbe / 10;
         final int maxMinor = maxProbe % 10;
         Exception lastException = null;
@@ -74,8 +73,6 @@ public final class CoreProfileDisplayCreator {
             int endMinor = major == REQUIRED_MAJOR ? REQUIRED_MINOR : 0;
 
             for (int minor = startMinor; minor >= endMinor; --minor) {
-                // The configured version only narrows where the scan starts; a rejected context lowers
-                // the ceiling so the remaining versions are still probed downwards from it.
                 if (major * 10 + minor > maxProbe) continue;
                 // Legacy LWJGLXX reads ForgeEarlyConfig instead of ContextAttribs.
                 CoreProfileContextAttributes.applyForgeEarlyCoreProfile(major, minor, lwjglDebug);
@@ -105,7 +102,7 @@ public final class CoreProfileDisplayCreator {
                     if (!actualVersion.isAtLeast(REQUIRED_MAJOR, REQUIRED_MINOR)) {
                         throw new IllegalStateException(
                             "OpenGL " + REQUIRED_VERSION + " or newer is required, but the created context reports "
-                                + actualVersion
+                                + actualVersion.major() + '.' + actualVersion.minor()
                         );
                     }
                 } catch (RuntimeException e) {
@@ -119,10 +116,11 @@ public final class CoreProfileDisplayCreator {
                         RenderSystem.probeCapAfterRejection(major * 10 + minor, actualVersionPacked)
                     );
                     LOGGER.warn(
-                        "Created requested OpenGL {}.{} core profile context, but actual GL_VERSION is unusable: {}",
+                        "Rejected OpenGL {}.{} core profile request with GL_VERSION={}; next probe ceiling={}",
                         major,
                         minor,
                         actualVersionString,
+                        maxProbe,
                         e
                     );
                     destroyDisplayAfterFailure();
@@ -205,6 +203,20 @@ public final class CoreProfileDisplayCreator {
         } catch (RuntimeException destroyFailure) {
             LOGGER.warn("Failed to destroy an unsuccessful OpenGL context", destroyFailure);
         }
+    }
+
+    /** Returns whether the launcher owns the OpenGL version setting. */
+    public static boolean launcherControlsGlContext() {
+        return launcherControlsGlContext(System.getenv("POJAV_RENDERER"));
+    }
+
+    static boolean launcherControlsGlContext(String launcherRenderer) {
+        return launcherRenderer != null && !launcherRenderer.isEmpty();
+    }
+
+    static int initialProbeVersion(int requestedVersion, int ceiling) {
+        GLVersionChoice requested = GLVersionChoice.of(requestedVersion, ceiling);
+        return requested == GLVersionChoice.AUTO ? ceiling : requested.version();
     }
 
     /** Returns the highest core profile version the platform can request. */

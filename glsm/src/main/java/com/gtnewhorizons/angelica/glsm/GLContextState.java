@@ -79,6 +79,8 @@ public class GLContextState {
     public int lightingGeneration;
     public int fragmentGeneration;
     public int colorGeneration;
+    private long clipDistanceContextHandle;
+    volatile int nativeClipDistanceLimit = -1;
     public int clipPlaneGeneration;
     public int clipPlaneEnabledMask;
     public int programGeneration;
@@ -216,7 +218,7 @@ public class GLContextState {
     public final BooleanStateStack map2Vertex3State = track(new BooleanStateStack(GL11.GL_MAP2_VERTEX_3, false, true));
     public final BooleanStateStack map2Vertex4State = track(new BooleanStateStack(GL11.GL_MAP2_VERTEX_4, false, true));
     public final BooleanStateStack[] clipPlaneStates = new BooleanStateStack[GLStateManager.MAX_CLIP_PLANES];
-    public final ClipPlaneState clipPlaneState = new ClipPlaneState();
+    public final ClipPlaneState clipPlaneState = member(new ClipPlaneState());
     public final FloatBuffer queryScratch = BufferUtils.createFloatBuffer(16);
     public final DoubleBuffer queryScratchDouble = BufferUtils.createDoubleBuffer(16);
     public final MatrixModeStack matrixMode = member(new MatrixModeStack(StackIdAllocator.nextId()));
@@ -290,6 +292,13 @@ public class GLContextState {
         }
         for (int i = 0; i < GLStateManager.MAX_CLIP_PLANES; i++) {
             clipPlaneStates[i] = track(new ClipPlaneBooleanState(this, i, GL11.GL_CLIP_PLANE0 + i));
+        }
+    }
+
+    void bindClipDistanceContext(long nativeHandle) {
+        if (clipDistanceContextHandle != nativeHandle) {
+            clipDistanceContextHandle = nativeHandle;
+            nativeClipDistanceLimit = -1;
         }
     }
 

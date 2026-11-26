@@ -1,6 +1,7 @@
 package com.dhj.actinium.startup;
 
 import com.dhj.actinium.debug.OpenGlVersion;
+import com.gtnewhorizons.angelica.config.GLVersionChoice;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.LWJGLException;
@@ -10,6 +11,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CoreProfileDisplayCreatorTest {
+
+    @Test
+    void automaticProbeStartsAtThePlatformCeiling() {
+        assertEquals(46, CoreProfileDisplayCreator.initialProbeVersion(GLVersionChoice.AUTO.version(), 46));
+        assertEquals(41, CoreProfileDisplayCreator.initialProbeVersion(GLVersionChoice.AUTO.version(), 41));
+    }
+
+    @Test
+    void explicitProbeRespectsTheRequestedVersionAndPlatformCeiling() {
+        assertEquals(45, CoreProfileDisplayCreator.initialProbeVersion(45, 46));
+        assertEquals(41, CoreProfileDisplayCreator.initialProbeVersion(46, 41));
+    }
 
     private static final String REQUIRED_VERSION = RenderSystem.MIN_CORE_VERSION / 10
         + "." + RenderSystem.MIN_CORE_VERSION % 10;
@@ -62,9 +75,9 @@ class CoreProfileDisplayCreatorTest {
     @Test
     void driverAnswerInsideTheSupportedRangeBecomesTheNextCeiling() {
         assertEquals(
-            45,
-            capAfter(46, "4.5.0 NVIDIA 551.61"),
-            "a driver answering 4.5 to a 4.6 request leaves 4.5 as the highest version worth retrying"
+            40,
+            capAfter(46, "4.0.0 MobileGlues 2.0.1"),
+            "a driver answering 4.0 to a 4.6 request leaves 4.0 as the highest version worth retrying"
         );
     }
 

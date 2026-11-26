@@ -3,7 +3,9 @@ package net.coderbot.iris.pipeline.transform;
 import com.gtnewhorizons.angelica.glsm.GlslTransformUtils;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
+import com.gtnewhorizons.angelica.glsm.ffp.ClipDistanceGlsl;
 import net.coderbot.iris.gl.shader.ShaderType;
+import net.coderbot.iris.pipeline.transform.parameter.AttributeParameters;
 import net.coderbot.iris.pipeline.transform.parameter.Parameters;
 import org.taumc.glsl.ShaderParser;
 import org.taumc.glsl.Transformer;
@@ -88,9 +90,40 @@ public class CommonTransformer {
 		root.renameAndWrapShadow("shadow2DLod", "textureLod");
 		AdaptiveShadowBoundsTransformer.transform(root, parameters.type);
 
-		if (parameters.patch == Patch.ATTRIBUTES && parameters.type == ShaderType.VERTEX
-				&& RenderSystem.hasClipCullDistance()) {
-			injectNativeClipPlanes(root, BackendManager.RENDER_BACKEND.isSDLGPU());
+		if (parameters instanceof AttributeParameters attributes) {
+			injectClipDistances(root, attributes);
+		}
+	}
+
+	private static final String EMULATED_VERTEX_CLIP = buildEmulatedVertexClip();
+
+	private static String buildEmulatedVertexClip() {
+		String[] distances = new String[8];
+		for (int plane = 0; plane < distances.length; plane++) {
+			distances[plane] = "dot(actinium_ClipPlane[" + plane + "], _cp_ep)";
+		}
+		StringBuilder clip = new StringBuilder("{ vec4 _cp_ep = iris_ModelViewMatrix * iris_Vertex; ");
+		ClipDistanceGlsl.appendVsAssign(clip, distances);
+		return clip.append('}').toString();
+	}
+
+	private static void injectClipDistances(Transformer root, AttributeParameters parameters) {
+		if (RenderSystem.hasClipCullDistance()) {
+			if (parameters.type == ShaderType.VERTEX) {
+				injectNativeClipPlanes(root, BackendManager.RENDER_BACKEND.isSDLGPU());
+			}
+			return;
+		}
+		if (!parameters.clipDiscard || parameters.hasGeometry || parameters.hasTesselation) return;
+		if (parameters.type == ShaderType.VERTEX) {
+			root.injectVariable("uniform vec4 actinium_ClipPlane[8];");
+			root.injectVariable(ClipDistanceGlsl.VS_OUT_DIST0);
+			root.injectVariable(ClipDistanceGlsl.VS_OUT_DIST1);
+			root.prependMain(EMULATED_VERTEX_CLIP);
+		} else if (parameters.type == ShaderType.FRAGMENT) {
+			root.injectVariable(ClipDistanceGlsl.FS_IN_DIST0);
+			root.injectVariable(ClipDistanceGlsl.FS_IN_DIST1);
+			root.prependMain(ClipDistanceGlsl.FS_DISCARD);
 		}
 	}
 

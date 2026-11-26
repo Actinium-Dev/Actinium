@@ -10,6 +10,12 @@ public interface LWJGLService {
 
     boolean isOpenGLVersionSupported(int major, int minor);
     boolean isExtensionSupported(GLExtension extension);
+
+    /** Reports whether indexed indirect batches can be submitted on the current context. */
+    default boolean supportsMultiDrawIndirect() {
+        return isOpenGLVersionSupported(4, 3) || isExtensionSupported(GLExtension.ARB_multi_draw_indirect);
+    }
+
     int getPointerSize();
 
     int glGenBuffers();

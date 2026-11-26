@@ -391,7 +391,7 @@ public final class Lwjgl3GLRenderBackend extends RenderBackend {
 
     @Override
     public void multiDrawElementsIndirect(int mode, int type, long indirect, int drawcount, int stride) {
-        submitOpenGLDraw(() -> GL43C.glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride));
+        submitOpenGLDraw(() -> IndirectMultidraw.draw(mode, type, indirect, drawcount, stride));
     }
 
     @Override

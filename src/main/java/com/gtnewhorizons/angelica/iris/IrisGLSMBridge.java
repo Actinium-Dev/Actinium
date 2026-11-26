@@ -305,6 +305,12 @@ public final class IrisGLSMBridge {
             refreshBlendCondition();
         });
 
+        GLSMHooks.CLIP_PLANES_IN_USE.addListener(event -> {
+            if (Iris.enabled && Iris.getPipelineManager().getPipelineNullable() instanceof DeferredWorldRenderingPipeline pipeline) {
+                pipeline.onClipPlanesInUseChanged();
+            }
+        });
+
         GLSMHooks.FOREIGN_DRAW_END.addListener(event -> {
             if (!Iris.enabled) {
                 return;
@@ -341,7 +347,8 @@ public final class IrisGLSMBridge {
             }
 
             WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
-            if (!(pipeline instanceof DeferredWorldRenderingPipeline deferredPipeline)) {
+            if (!(pipeline instanceof DeferredWorldRenderingPipeline deferredPipeline)
+                || deferredPipeline.isBindingProgramVariant()) {
                 return;
             }
             boolean shouldOverrideShaders = deferredPipeline.shouldOverrideShaders();
@@ -400,7 +407,7 @@ public final class IrisGLSMBridge {
 
             WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
             if (!(pipeline instanceof DeferredWorldRenderingPipeline deferredPipeline)
-                || !deferredPipeline.shouldOverrideShaders()) {
+                || deferredPipeline.isBindingProgramVariant() || !deferredPipeline.shouldOverrideShaders()) {
                 return;
             }
 
