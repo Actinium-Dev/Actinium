@@ -1,13 +1,12 @@
 package net.coderbot.iris.uniforms;
 
 import com.gtnewhorizons.angelica.rendering.RenderingState;
+import com.gtnewhorizons.angelica.compat.mojang.Camera;
 import net.coderbot.iris.compat.dh.DHCompat;
 import net.coderbot.iris.gl.uniform.UniformHolder;
 import net.coderbot.iris.pipeline.ShadowRenderer;
 import net.coderbot.iris.shaderpack.PackDirectives;
 import net.coderbot.iris.shadow.ShadowMatrices;
-import net.minecraft.client.Minecraft;
-import net.minecraft.entity.Entity;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 
@@ -21,17 +20,9 @@ public final class MatrixUniforms {
 	private MatrixUniforms() {
 	}
 
-	private static final Matrix4f GBUFFER_MODELVIEW_SCRATCH = new Matrix4f();
-
-	private static Matrix4fc getGbufferModelView() {
-		final Matrix4fc raw = RenderingState.INSTANCE.getModelViewMatrix();
-		final Entity view = Minecraft.getMinecraft().getRenderViewEntity();
-		if (view == null) {
-			return raw;
-		}
-
-		return GBUFFER_MODELVIEW_SCRATCH.set(raw).translate(0f, view.getEyeHeight(), 0f);
-	}
+    static Matrix4fc getGbufferModelView() {
+        return Camera.INSTANCE.getModelViewMatrix();
+    }
 
 	public static void addMatrixUniforms(UniformHolder uniforms, PackDirectives directives) {
 		addMatrix(uniforms, "ModelView", MatrixUniforms::getGbufferModelView);

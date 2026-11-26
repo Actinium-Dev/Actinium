@@ -203,7 +203,7 @@ public class ShadowRenderer {
 	}
 
 	public static MatrixStack createShadowModelView(float sunPathRotation, float intervalSize) {
-		final Vector3d entityPos = getShadowCameraAnchor(CapturedRenderingState.INSTANCE.getTickDelta());
+		final Vector3d entityPos = getShadowCameraAnchor();
 
 		final float shadowAngle = Float.isNaN(activeShadowAngle) ? getShadowAngle() : activeShadowAngle;
 
@@ -214,15 +214,15 @@ public class ShadowRenderer {
 	}
 
 	private MatrixStack getShadowModelView(float shadowAngle) {
-		final Vector3d entityPos = getShadowCameraAnchor(CapturedRenderingState.INSTANCE.getTickDelta());
+		final Vector3d entityPos = getShadowCameraAnchor();
 
 		shadowModelView.reset();
 		ShadowMatrices.createModelViewMatrix(shadowModelView, shadowAngle, this.intervalSize, this.sunPathRotation, entityPos.x, entityPos.y, entityPos.z);
 		return shadowModelView;
 	}
 
-	private static Vector3d getShadowCameraAnchor(float tickDelta) {
-		return Camera.INSTANCE.getEntityPos();
+	private static Vector3d getShadowCameraAnchor() {
+		return Camera.INSTANCE.getPos();
 	}
 
 	private static WorldClient getLevel() {
@@ -390,11 +390,11 @@ public class ShadowRenderer {
 			if (hasSafeZone) {
 				BoxCuller distanceCuller = new BoxCuller(halfPlaneLength * renderMultiplier);
 				SafeZoneCullingFrustum safeZoneFrustum = new SafeZoneCullingFrustum(
-					RenderingState.INSTANCE.getModelViewMatrix(), projView,
+					Camera.INSTANCE.getModelViewMatrix(), projView,
 					shadowLightVectorCache, boxCuller, distanceCuller);
 				return holder.setInfo(safeZoneFrustum, distanceInfo, cullingInfo);
 		} else {
-			cachedAdvancedFrustum.init(RenderingState.INSTANCE.getModelViewMatrix(), projView, shadowLightVectorCache, boxCuller);
+			cachedAdvancedFrustum.init(Camera.INSTANCE.getModelViewMatrix(), projView, shadowLightVectorCache, boxCuller);
 			return holder.setInfo(cachedAdvancedFrustum, distanceInfo, cullingInfo);
 		}
 		}
@@ -861,9 +861,9 @@ public class ShadowRenderer {
 		terrainFrustumHolder = createShadowFrustum(renderDistanceMultiplier, terrainFrustumHolder);
 		FRUSTUM = terrainFrustumHolder.getFrustum();
 
-		// Use the player/entity position for shadow rendering
+		// Match the world origin used by camera uniforms and main-view reconstruction.
 		final float tickDelta = CapturedRenderingState.INSTANCE.getTickDelta();
-		final Vector3d entityPos = playerCamera.getEntityPos();
+		final Vector3d entityPos = playerCamera.getPos();
 		final double entityX = entityPos.x;
 		final double entityY = entityPos.y;
 		final double entityZ = entityPos.z;

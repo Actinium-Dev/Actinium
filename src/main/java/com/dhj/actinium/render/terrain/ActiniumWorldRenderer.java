@@ -28,6 +28,7 @@ import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraftforge.client.MinecraftForgeClient;
 import com.gtnewhorizons.angelica.rendering.RenderingState;
+import com.gtnewhorizons.angelica.compat.mojang.Camera;
 import com.dhj.actinium.compat.ichunutil.PortalChunkRenderMatrices;
 import dhj.embeddedt.embeddium.impl.gl.device.CommandList;
 import dhj.embeddedt.embeddium.impl.render.chunk.ChunkRenderMatrices;
@@ -47,8 +48,6 @@ import com.dhj.actinium.render.terrain.fog.GLStateManagerFogService;
 import com.dhj.actinium.runtime.ActiniumRuntime;
 import com.dhj.actinium.render.translucency.TranslucencyLayers;
 import com.dhj.actinium.render.translucency.TranslucentLayer;
-import org.joml.Matrix4f;
-import org.joml.Matrix4fc;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -156,15 +155,7 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
             return Objects.requireNonNull(this.portalMatrices, "Portal matrices must be captured before terrain rendering");
         }
 
-        Matrix4fc modelView = RenderingState.INSTANCE.getModelViewMatrix();
-        Entity view = Minecraft.getMinecraft().getRenderViewEntity();
-        if (view != null) {
-            // Vanilla's model-view is anchored at the player's feet while chunk vertices use that same origin.
-            // Restore the eye-height offset so terrain coordinates match the shader gbufferModelView uniform.
-            modelView = new Matrix4f(modelView).translate(0f, view.getEyeHeight(), 0f);
-        }
-
-        return new ChunkRenderMatrices(RenderingState.INSTANCE.getProjectionMatrix(), modelView);
+        return new ChunkRenderMatrices(RenderingState.INSTANCE.getProjectionMatrix(), Camera.INSTANCE.getModelViewMatrix());
     }
 
     @Override
@@ -176,6 +167,11 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
      * Performs a render pass for the given {@link BlockRenderLayer} and draws all visible chunks for it.
      */
     public void drawChunkLayer(BlockRenderLayer renderLayer, double x, double y, double z) {
+        if (!this.portalCamera) {
+            x = Camera.INSTANCE.getPos().x;
+            y = Camera.INSTANCE.getPos().y;
+            z = Camera.INSTANCE.getPos().z;
+        }
         this.prepareTerrainPasses(createChunkRenderMatrices(), x, y, z);
 
         RenderDebugHooksHolder.check("actinium:draw-chunk-layer:" + renderLayer + ":before-super");
@@ -200,6 +196,11 @@ public class ActiniumWorldRenderer extends SimpleWorldRenderer<WorldClient, Vint
 
     public void drawChunkLayersDeduplicated(Collection<BlockRenderLayer> renderLayers, double x, double y, double z,
                                             Consumer<BlockRenderLayer> beforePass) {
+        if (!this.portalCamera) {
+            x = Camera.INSTANCE.getPos().x;
+            y = Camera.INSTANCE.getPos().y;
+            z = Camera.INSTANCE.getPos().z;
+        }
         ChunkRenderMatrices matrices = createChunkRenderMatrices();
         this.prepareTerrainPasses(matrices, x, y, z);
         Map<TerrainRenderPass, BlockRenderLayer> passes = new LinkedHashMap<>();
