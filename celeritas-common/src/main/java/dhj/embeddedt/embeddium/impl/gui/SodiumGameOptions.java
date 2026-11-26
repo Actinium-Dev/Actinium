@@ -125,7 +125,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         public int itemRendererCacheSize = 512;
         public AsyncOcclusionMode asyncOcclusionMode = AsyncOcclusionMode.ONLY_SHADOW;
         public boolean useRasterOcclusionCulling = true;
-        public GpuCullingMode gpuCullingMode = GpuCullingMode.COMPUTE;
+        public GpuCullingMode gpuCullingMode = GpuCullingMode.CPU_ONLY;
     }
 
     public static class AdvancedSettings {

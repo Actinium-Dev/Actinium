@@ -595,7 +595,7 @@ public class ActiniumGameOptionPages {
                         .setEnabledPredicate(GpuCulling::isAvailable)
                         .setImpact(OptionImpact.HIGH)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setDefaultValue(GpuCullingMode.COMPUTE)
+                        .setDefaultValue(GpuCullingMode.CPU_ONLY)
                         .build()
                 )
                 .add(OptionImpl.createBuilder(SodiumGameOptions.StreamingUploadStrategy.class, sodiumOpts)
