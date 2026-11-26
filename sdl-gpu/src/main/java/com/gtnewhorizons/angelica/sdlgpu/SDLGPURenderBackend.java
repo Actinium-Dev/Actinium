@@ -4234,6 +4234,9 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
 
     @Override public int getInteger(int pname) {
+        if (pname == GL30.GL_MAX_CLIP_DISTANCES) {
+            return device.hasClipDistance() ? GLStateManager.MAX_CLIP_PLANES : 0;
+        }
         final ContextState cs = s();
         return switch (pname) {
             // Iris budgets unit assignments here; only 16 can be filtered, with up to 8 float 2D fetch-only samplers.

@@ -63,6 +63,8 @@ moltenvk（独立分发，不参与主 jar 合并）
 
 Outlands 管理窗口和输入，并提供与 lwjgl3ify 对应的创建、销毁、能力覆盖及共享 drawable 入口。Actinium 通过回调认领无 GL 窗口，显式 transformer 负责 SDL 专用的呈现与共享 drawable 生命周期。GLSM 继续持有每个 drawable 的逻辑状态，SDL 后端将其应用到自己的 frame/context。退出前必须等待执行中的 GPU 提交并释放窗口认领，再销毁宿主窗口。
 
+GLSM 在初始化时查询设备可用的原生裁剪平面数。少于八个时，固定管线与 Iris 的顶点、片元两阶段属性程序通过插值距离和片元舍弃实现裁剪。SDL Vulkan 在创建设备时协商原生裁剪能力。[裁剪状态与程序变体](mobileglues-clip-cull-distance.md)
+
 ## 初始化链路
 
 1. **`MixinEarly`**（`mixins/` 包，FML plugin 阶段）：实现 `IFMLLoadingPlugin` + `IEarlyMixinLoader`。

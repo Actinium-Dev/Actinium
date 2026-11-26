@@ -10,6 +10,7 @@ import com.gtnewhorizons.angelica.glsm.GLSMMatrices;
 import com.gtnewhorizons.angelica.glsm.GLSMRasterizer;
 import com.gtnewhorizons.angelica.glsm.GLSMVertexInput;
 import com.gtnewhorizons.angelica.glsm.GLStateManagerIntegrationFixture;
+import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import com.gtnewhorizons.angelica.glsm.backend.WindowBackends;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -22,6 +23,7 @@ import org.lwjgl.opengl.GL15;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -137,6 +139,42 @@ class WideLineClipGLTest extends GLStateManagerIntegrationFixture {
         GLSMMatrices.glMatrixMode(GL11.GL_PROJECTION);
         GLSMMatrices.glLoadIdentity();
         GLSMMatrices.glMatrixMode(GL11.GL_MODELVIEW);
+    }
+
+    @Test
+    void emulatedUserPlaneClipsTheExpandedLineInBothDirections() {
+        orthographic();
+        boolean nativeDistances = RenderSystem.hasClipCullDistance();
+        float[] left = {-0.8f, 0f, 0f};
+        float[] right = {0.8f, 0f, 0f};
+        try {
+            // Line expansion translates the endpoints by half a pixel. Keep the cut between sample centers.
+            GLSMRasterizer.glClipPlane(GL11.GL_CLIP_PLANE0, BufferUtils.createDoubleBuffer(4)
+                .put(new double[] {1, 0, 0, -0.5 / SIZE}).flip());
+            int[] nativeRightward = null;
+            int[] nativeLeftward = null;
+            if (nativeDistances) {
+                GLSMEnable.glEnable(GL11.GL_CLIP_PLANE0);
+                nativeRightward = drawLineOnce(left, right);
+                nativeLeftward = drawLineOnce(right, left);
+                GLSMEnable.glDisable(GL11.GL_CLIP_PLANE0);
+            }
+            RenderSystem.initializeClipCullDistanceSupportForTesting(false);
+            GLSMEnable.glEnable(GL11.GL_CLIP_PLANE0);
+            int[] emulatedRightward = drawLineOnce(left, right);
+            int[] emulatedLeftward = drawLineOnce(right, left);
+            assertEquals(0, litInColumn(emulatedRightward, SIZE / 4));
+            assertEquals(0, litInColumn(emulatedLeftward, SIZE / 4));
+            assertTrue(litInColumn(emulatedRightward, 3 * SIZE / 4) > 0);
+            assertTrue(litInColumn(emulatedLeftward, 3 * SIZE / 4) > 0);
+            if (nativeDistances) {
+                assertArrayEquals(nativeRightward, emulatedRightward);
+                assertArrayEquals(nativeLeftward, emulatedLeftward);
+            }
+        } finally {
+            GLSMEnable.glDisable(GL11.GL_CLIP_PLANE0);
+            RenderSystem.resetClipDistanceLimitForTesting();
+        }
     }
 
     private static float pixelCenter(int pixel) {

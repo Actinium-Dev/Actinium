@@ -3,6 +3,7 @@ package com.gtnewhorizons.angelica.glsm.ffp;
 import java.util.Arrays;
 
 import com.gtnewhorizons.angelica.glsm.CoverageDiscard;
+import com.gtnewhorizons.angelica.glsm.GLSMRasterizer;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.hooks.GLSMConfig;
 import com.gtnewhorizons.angelica.glsm.texture.TextureInfoCache;
@@ -15,7 +16,7 @@ import org.lwjgl.opengl.GL13;
  * Packed-long fragment shader permutation key for FFP emulation.
  *
  * Layout:
- *   long[0]: global bits (14), unit 0 (47 bits at offset 14), coverage discard (61), depth peel (62)
+ *   long[0]: global bits (14), unit 0 (47 bits at offset 14), coverage discard (61), depth peel (62), clip discard (63)
  *   long[1..3]: unit 1..3 (47 bits each, low-aligned)
  * Only max(1, nrEnabledUnits) longs are significant.
  *
@@ -71,6 +72,7 @@ public final class FragmentKey {
     public static final int FOG_EXP2   = 3;
 
     private static final int GLOBAL_BITS = 14;
+    private static final int BIT_CLIP_DISCARD = 63;
     private static final int BIT_COVERAGE_DISCARD = 61;
     private static final int BIT_DEPTH_PEEL = 62;
     private static final int BIT_FOG_MODE          = 0;  // 2 bits
@@ -113,7 +115,7 @@ public final class FragmentKey {
      * @return number of significant longs (1..4)
      */
     public static int packFromState(long[] out) {
-        long global = 0;
+        long global = GLSMRasterizer.clipEmulationActive() ? 1L << BIT_CLIP_DISCARD : 0;
         if (CoverageDiscard.active()) global |= 1L << BIT_COVERAGE_DISCARD;
         if (GLSMConfig.depthPeel()) global |= 1L << BIT_DEPTH_PEEL;
 
@@ -259,6 +261,7 @@ public final class FragmentKey {
     public int alphaTestFunc()        { return (int) ((packed[0] >> BIT_ALPHA_FUNC) & 0x7); }
     public boolean separateSpecular() { return ((packed[0] >> BIT_SEPARATE_SPECULAR) & 1) != 0; }
     public boolean colorSum()         { return ((packed[0] >> BIT_COLOR_SUM) & 1) != 0; }
+    public boolean clipDiscard()      { return (packed[0] & (1L << BIT_CLIP_DISCARD)) != 0; }
     public boolean lineStipple()      { return ((packed[0] >> BIT_LINE_STIPPLE) & 1) != 0; }
     public int nrEnabledUnits()       { return packed.length == 1 && !unitEnabled(0) ? 0 : packed.length; }
     public int textureSupersamplingSamples() { return 1 << (int) ((packed[0] >> BIT_TEXTURE_SUPERSAMPLING) & 0x7); }

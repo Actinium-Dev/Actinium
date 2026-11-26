@@ -60,8 +60,7 @@ public class RenderSystem {
     private static volatile boolean isGLES;
     private static volatile int glesVersion;
     private static volatile boolean glesDetected;
-    private static volatile boolean hasClipCullDistance;
-    private static volatile boolean isMobileGlues;
+    private static volatile int headlessClipDistanceLimitForTesting;
 
     private static volatile boolean isLTW;
     private static volatile boolean ltwDetected;
@@ -128,16 +127,7 @@ public class RenderSystem {
         supportsStencilTexturing = GLStateManager.capabilities.OpenGL43 || GLStateManager.capabilities.GL_ARB_stencil_texturing;
         supportsTextureStorage = isGLES ? glesVersion >= 300
             : GLStateManager.capabilities.OpenGL42 || GLStateManager.capabilities.GL_ARB_texture_storage;
-        // MobileGlues masquerades as desktop GL but compiles shaders through ESSL translation,
-        // where gl_ClipDistance needs GL_EXT_clip_cull_distance (issue #214). MobileGlues advertises
-        // that extension only when the real ES backend supports it, so the plain extension query
-        // stays authoritative; without the MobileGlues check it would be overruled by !isGLES.
-        final String glVersion = RENDER_BACKEND.getString(GL11.GL_VERSION);
-        isMobileGlues = (glVersion != null && glVersion.contains("MobileGlues")) || hasExtension("GL_MG_mobileglues");
-        hasClipCullDistance = resolveClipCullDistanceSupport(hasExtension("GL_EXT_clip_cull_distance"), isGLES, isMobileGlues);
-        if (isMobileGlues) {
-            GLStateManager.LOGGER.info("MobileGlues detected, clip distance support: {}", hasClipCullDistance);
-        }
+        hasClipCullDistance();
 
         if (supportsImageLoadStore) {
             if (GLStateManager.capabilities.OpenGL42) {
@@ -422,8 +412,29 @@ public class RenderSystem {
         return supportsImageLoadStore;
     }
 
+    public static boolean isClipDistanceEmulated() {
+        return !hasClipCullDistance();
+    }
+
     public static boolean hasClipCullDistance() {
-        return hasClipCullDistance;
+        if (!RENDER_BACKEND.hasContextOnThread()) {
+            return headlessClipDistanceLimitForTesting >= GLStateManager.MAX_CLIP_PLANES;
+        }
+        final GLContextState context = GLStateManager.ctx();
+        int limit = context.nativeClipDistanceLimit;
+        if (limit < 0) {
+            final String version = RENDER_BACKEND.getString(GL11.GL_VERSION);
+            if (version == null) return false;
+            final boolean gles = version.startsWith("OpenGL ES ");
+            final boolean mobileGlues = version.contains("MobileGlues") || hasExtension("GL_MG_mobileglues");
+            final boolean available = resolveClipCullDistanceSupport(hasExtension("GL_EXT_clip_cull_distance"), gles, mobileGlues);
+            limit = available ? RENDER_BACKEND.getInteger(GL30.GL_MAX_CLIP_DISTANCES) : 0;
+            context.nativeClipDistanceLimit = limit;
+            if (limit < GLStateManager.MAX_CLIP_PLANES) {
+                GLStateManager.LOGGER.info("Emulating clip distances (native clip distances: {}, required: {})", limit, GLStateManager.MAX_CLIP_PLANES);
+            }
+        }
+        return limit >= GLStateManager.MAX_CLIP_PLANES;
     }
 
     /**
@@ -700,7 +711,26 @@ public class RenderSystem {
 
     /** Supplies a deterministic clip-distance capability for headless shader transformation tests. */
     public static void initializeClipCullDistanceSupportForTesting(boolean supported) {
-        hasClipCullDistance = supported;
+        initializeClipDistanceLimitForTesting(supported ? GLStateManager.MAX_CLIP_PLANES : 0);
+    }
+
+    /** Overrides the current context's native clip-distance limit for integration tests. */
+    public static void initializeClipDistanceLimitForTesting(int limit) {
+        if (limit < 0) throw new IllegalArgumentException("Clip distance limit must not be negative");
+        if (RENDER_BACKEND.hasContextOnThread()) {
+            GLStateManager.ctx().nativeClipDistanceLimit = limit;
+        } else {
+            headlessClipDistanceLimitForTesting = limit;
+        }
+    }
+
+    /** Restores capability detection for the current context. */
+    public static void resetClipDistanceLimitForTesting() {
+        if (RENDER_BACKEND.hasContextOnThread()) {
+            GLStateManager.ctx().nativeClipDistanceLimit = -1;
+        } else {
+            headlessClipDistanceLimitForTesting = 0;
+        }
     }
 
     /**

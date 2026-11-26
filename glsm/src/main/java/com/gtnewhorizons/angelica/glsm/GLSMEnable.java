@@ -8,7 +8,6 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL20;
 
-import static com.gtnewhorizons.angelica.glsm.GLStateManager.MAX_CLIP_PLANES;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.ctx;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.disableAlphaTest;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.disableBlend;
@@ -48,9 +47,8 @@ public final class GLSMEnable {
                 return;
             }
         }
-        if (cap >= GL11.GL_CLIP_PLANE0 && cap < GL11.GL_CLIP_PLANE0 + MAX_CLIP_PLANES) {
+        if (ClipPlaneBooleanState.isClipPlane(cap)) {
             ctx().clipPlaneStates[cap - GL11.GL_CLIP_PLANE0].enable();
-            ctx().clipPlaneGeneration++;
             return;
         }
 
@@ -133,9 +131,8 @@ public final class GLSMEnable {
                 return;
             }
         }
-        if (cap >= GL11.GL_CLIP_PLANE0 && cap < GL11.GL_CLIP_PLANE0 + MAX_CLIP_PLANES) {
+        if (ClipPlaneBooleanState.isClipPlane(cap)) {
             ctx().clipPlaneStates[cap - GL11.GL_CLIP_PLANE0].disable();
-            ctx().clipPlaneGeneration++;
             return;
         }
 
@@ -213,10 +210,10 @@ public final class GLSMEnable {
 
     public static boolean glIsEnabled(int cap) {
         rejectExitCapture();
-        if (shouldBypassCache()) {
+        if (shouldBypassCache() && !(ClipPlaneBooleanState.isClipPlane(cap) && RenderSystem.isClipDistanceEmulated())) {
             return RENDER_BACKEND.getBoolean(cap);
         }
-        if (cap >= GL11.GL_CLIP_PLANE0 && cap < GL11.GL_CLIP_PLANE0 + MAX_CLIP_PLANES) {
+        if (ClipPlaneBooleanState.isClipPlane(cap)) {
             return ctx().clipPlaneStates[cap - GL11.GL_CLIP_PLANE0].isEnabled();
         }
 
