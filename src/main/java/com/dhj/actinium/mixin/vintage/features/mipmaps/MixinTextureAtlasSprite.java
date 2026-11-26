@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import com.dhj.actinium.texture.SpriteExtension;
+import com.dhj.actinium.texture.SpriteMipPixels;
 
 import java.util.List;
 
@@ -30,14 +31,10 @@ public abstract class MixinTextureAtlasSprite implements SpriteExtension, Sprite
         if (this.framesTextureData == null) {
             return;
         }
-        SpriteTransparencyLevel level = SpriteTransparencyLevel.OPAQUE;
         boolean shouldRewriteColors = mipLevel > 0 && iconName != null && isBlockTexture(iconName) && !iconName.contains("leaves");
-        for (int[][] frame : this.framesTextureData) {
-            if (frame != null && frame[0] != null) {
-                level = embeddium$processTransparentImages(level, frame[0], shouldRewriteColors);
-            }
-        }
-        this.embeddium$transparencyLevel = level;
+        this.embeddium$transparencyLevel = SpriteMipPixels.editBaseLevels(this.framesTextureData,
+                SpriteTransparencyLevel.OPAQUE,
+                (level, pixels) -> embeddium$processTransparentImages(level, pixels, shouldRewriteColors));
     }
 
     private static boolean isBlockTexture(String iconName) {

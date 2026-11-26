@@ -158,10 +158,15 @@ public final class MemoryUtilities {
         UNSAFE = getUnsafeInstance();
 
         try {
-            MARK = getMarkOffset();
-            POSITION = getPositionOffset();
-            LIMIT = getLimitOffset();
-            CAPACITY = getCapacityOffset();
+            // Match each field across two buffers with distinct, valid NIO states.
+            int firstMark = 67;
+            int secondMark = 83;
+            Buffer first = offsetProbe(firstMark, 149, 349, 509);
+            Buffer second = offsetProbe(secondMark, 239, 503, 743);
+            MARK = getFieldOffsetInt(first, firstMark, second, secondMark);
+            POSITION = getFieldOffsetInt(first, first.position(), second, second.position());
+            LIMIT = getFieldOffsetInt(first, first.limit(), second, second.limit());
+            CAPACITY = getFieldOffsetInt(first, first.capacity(), second, second.capacity());
 
             ADDRESS = getAddressOffset();
 
@@ -3149,8 +3154,15 @@ public final class MemoryUtilities {
         throw new UnsupportedOperationException("Failed to find field offset in class.");
     }
 
-    private static long getFieldOffsetInt(Object container, int value) {
-        return getFieldOffset(container.getClass(), int.class, offset -> UNSAFE.getInt(container, offset) == value);
+    private static Buffer offsetProbe(int mark, int position, int limit, int capacity) {
+        Buffer buffer = ByteBuffer.allocateDirect(capacity);
+        buffer.limit(limit).position(mark).mark().position(position);
+        return buffer;
+    }
+
+    private static long getFieldOffsetInt(Buffer first, int firstValue, Buffer second, int secondValue) {
+        return getFieldOffset(first.getClass(), int.class,
+                offset -> UNSAFE.getInt(first, offset) == firstValue && UNSAFE.getInt(second, offset) == secondValue);
     }
 
     private static long getFieldOffsetObject(Object container, Object value) {
@@ -3163,32 +3175,6 @@ public final class MemoryUtilities {
     private static long getAddressOffset() {
         ByteBuffer bb = ByteBuffer.allocateDirect(0).order(NATIVE_ORDER);
         return getFieldOffset(bb.getClass(), long.class, offset -> UNSAFE.getLong(bb, offset) != 0);
-    }
-
-    private static final int MAGIC_CAPACITY = 0x0D15EA5E;
-    private static final int MAGIC_POSITION = 0x00FACADE;
-
-    private static long getMarkOffset() {
-        ByteBuffer bb = Objects.requireNonNull(newDirectByteBuffer(1L, 0));
-        return getFieldOffsetInt(bb, -1);
-    }
-
-    private static long getPositionOffset() {
-        ByteBuffer bb = Objects.requireNonNull(newDirectByteBuffer(-1L, MAGIC_CAPACITY));
-        bb.position(MAGIC_POSITION);
-        return getFieldOffsetInt(bb, MAGIC_POSITION);
-    }
-
-    private static long getLimitOffset() {
-        ByteBuffer bb = Objects.requireNonNull(newDirectByteBuffer(-1L, MAGIC_CAPACITY));
-        bb.limit(MAGIC_POSITION);
-        return getFieldOffsetInt(bb, MAGIC_POSITION);
-    }
-
-    private static long getCapacityOffset() {
-        ByteBuffer bb = Objects.requireNonNull(newDirectByteBuffer(-1L, MAGIC_CAPACITY));
-        bb.limit(0);
-        return getFieldOffsetInt(bb, MAGIC_CAPACITY);
     }
 
     static ByteBuffer wrapBufferByte(long address, int capacity) {
@@ -3360,10 +3346,6 @@ public final class MemoryUtilities {
         UNSAFE.putObject(target, attachmentOffset, UNSAFE.getObject(source, attachmentOffset));
 
         return target;
-    }
-
-    private static ByteBuffer newDirectByteBuffer(long address, int capacity) {
-        return ByteBuffer.allocateDirect(capacity).order(NATIVE_ORDER);
     }
 
     private static String decodeUTF8(long source, int length) {
