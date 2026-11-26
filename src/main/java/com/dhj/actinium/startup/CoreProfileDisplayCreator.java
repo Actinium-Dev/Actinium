@@ -61,9 +61,8 @@ public final class CoreProfileDisplayCreator {
     }
 
     private static void createWithFallback(PixelFormat format, boolean lwjglDebug) throws LWJGLException {
-        final boolean launcherControlsGlContext = launcherControlsGlContext();
-        int maxProbe = initialProbeVersion(launcherControlsGlContext,
-            launcherControlsGlContext ? 0 : requestedGlVersion(), glVersionCeiling());
+        int maxProbe = initialProbeVersion(launcherControlsGlContext() ? GLVersionChoice.AUTO.version()
+            : requestedGlVersion(), glVersionCeiling());
         final int maxMajor = maxProbe / 10;
         final int maxMinor = maxProbe % 10;
         Exception lastException = null;
@@ -103,7 +102,7 @@ public final class CoreProfileDisplayCreator {
                     if (!actualVersion.isAtLeast(REQUIRED_MAJOR, REQUIRED_MINOR)) {
                         throw new IllegalStateException(
                             "OpenGL " + REQUIRED_VERSION + " or newer is required, but the created context reports "
-                                + actualVersion
+                                + actualVersion.major() + '.' + actualVersion.minor()
                         );
                     }
                 } catch (RuntimeException e) {
@@ -117,10 +116,11 @@ public final class CoreProfileDisplayCreator {
                         RenderSystem.probeCapAfterRejection(major * 10 + minor, actualVersionPacked)
                     );
                     LOGGER.warn(
-                        "Created requested OpenGL {}.{} core profile context, but actual GL_VERSION is unusable: {}",
+                        "Rejected OpenGL {}.{} core profile request with GL_VERSION={}; next probe ceiling={}",
                         major,
                         minor,
                         actualVersionString,
+                        maxProbe,
                         e
                     );
                     destroyDisplayAfterFailure();
@@ -205,7 +205,7 @@ public final class CoreProfileDisplayCreator {
         }
     }
 
-    /** Returns whether the Android launcher selects the OpenGL context. */
+    /** Returns whether the launcher owns the OpenGL version setting. */
     public static boolean launcherControlsGlContext() {
         return launcherControlsGlContext(System.getenv("POJAV_RENDERER"));
     }
@@ -214,10 +214,7 @@ public final class CoreProfileDisplayCreator {
         return launcherRenderer != null && !launcherRenderer.isEmpty();
     }
 
-    static int initialProbeVersion(boolean launcherControlsGlContext, int requestedVersion, int ceiling) {
-        if (launcherControlsGlContext) {
-            return RenderSystem.MIN_CORE_VERSION;
-        }
+    static int initialProbeVersion(int requestedVersion, int ceiling) {
         GLVersionChoice requested = GLVersionChoice.of(requestedVersion, ceiling);
         return requested == GLVersionChoice.AUTO ? ceiling : requested.version();
     }

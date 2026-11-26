@@ -1,6 +1,7 @@
 package com.dhj.actinium.startup;
 
 import com.dhj.actinium.debug.OpenGlVersion;
+import com.gtnewhorizons.angelica.config.GLVersionChoice;
 import com.gtnewhorizons.angelica.glsm.RenderSystem;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.LWJGLException;
@@ -12,22 +13,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CoreProfileDisplayCreatorTest {
 
     @Test
-    void launcherRenderersStartAtTheCoreFloorRegardlessOfTheConfiguredRequest() {
-        for (String renderer : new String[]{"opengles3_mobileglues", "vulkan_zink", "opengles3"}) {
-            for (int requested : new int[]{0, 32, 46}) {
-                assertEquals(RenderSystem.MIN_CORE_VERSION, CoreProfileDisplayCreator.initialProbeVersion(
-                    CoreProfileDisplayCreator.launcherControlsGlContext(renderer), requested, 46), renderer);
-            }
-        }
+    void automaticProbeStartsAtThePlatformCeiling() {
+        assertEquals(46, CoreProfileDisplayCreator.initialProbeVersion(GLVersionChoice.AUTO.version(), 46));
+        assertEquals(41, CoreProfileDisplayCreator.initialProbeVersion(GLVersionChoice.AUTO.version(), 41));
     }
 
     @Test
-    void absentOrEmptyLauncherRendererRetainsDesktopVersionSelection() {
-        for (String renderer : new String[]{null, ""}) {
-            boolean launcherControlsGlContext = CoreProfileDisplayCreator.launcherControlsGlContext(renderer);
-            assertEquals(45, CoreProfileDisplayCreator.initialProbeVersion(launcherControlsGlContext, 45, 46));
-            assertEquals(41, CoreProfileDisplayCreator.initialProbeVersion(launcherControlsGlContext, 46, 41));
-        }
+    void explicitProbeRespectsTheRequestedVersionAndPlatformCeiling() {
+        assertEquals(45, CoreProfileDisplayCreator.initialProbeVersion(45, 46));
+        assertEquals(41, CoreProfileDisplayCreator.initialProbeVersion(46, 41));
     }
 
     private static final String REQUIRED_VERSION = RenderSystem.MIN_CORE_VERSION / 10
@@ -81,9 +75,9 @@ class CoreProfileDisplayCreatorTest {
     @Test
     void driverAnswerInsideTheSupportedRangeBecomesTheNextCeiling() {
         assertEquals(
-            45,
-            capAfter(46, "4.5.0 NVIDIA 551.61"),
-            "a driver answering 4.5 to a 4.6 request leaves 4.5 as the highest version worth retrying"
+            40,
+            capAfter(46, "4.0.0 MobileGlues 2.0.1"),
+            "a driver answering 4.0 to a 4.6 request leaves 4.0 as the highest version worth retrying"
         );
     }
 
