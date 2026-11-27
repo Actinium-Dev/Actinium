@@ -73,6 +73,7 @@ public final class SdlGpuBootstrap {
         BackendOptions.latch(advanced.renderBackendSdlGpu, advanced.renderBackendDriver, advanced.glVersion);
         GLSMConfig.sdlGpuFramesInFlight = advanced.sdlGpuFramesInFlight;
         GLSMConfig.sdlGpuPresenterThread = advanced.sdlGpuPresenterThread;
+        GLSMConfig.sdlGpuInitializeFragmentOutputs = advanced.sdlGpuInitializeFragmentOutputs;
         requested = BackendOptions.sdlGpuRequested();
         startupSettings = StartupSettings.capture(advanced);
         if (!requested) return;
@@ -118,10 +119,11 @@ public final class SdlGpuBootstrap {
         GLStateManager.glClear(GL11.GL_COLOR_BUFFER_BIT);
     }
 
-    record StartupSettings(boolean sdlGpu, String driver, int glVersion, int framesInFlight, boolean presenterThread) {
+    record StartupSettings(boolean sdlGpu, String driver, int glVersion, int framesInFlight, boolean presenterThread,
+                           boolean initializeFragmentOutputs) {
         static StartupSettings capture(SodiumGameOptions.AdvancedSettings options) {
             return new StartupSettings(options.renderBackendSdlGpu, options.renderBackendDriver, options.glVersion,
-                options.sdlGpuFramesInFlight, options.sdlGpuPresenterThread);
+                options.sdlGpuFramesInFlight, options.sdlGpuPresenterThread, options.sdlGpuInitializeFragmentOutputs);
         }
 
         boolean differsFrom(SodiumGameOptions.AdvancedSettings current) {

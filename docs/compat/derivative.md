@@ -45,6 +45,7 @@
 - 触发机制：该像素 `colortex0 = [1, 0, 0, 0]`，按 `lib/Head/Material.inc` 的 `GetMaterialData(vec2)` 解码得到 `roughness = 1.0`、`hasReflections = max(0, 0.625 - roughness) = 0`，`main()` 里 `if (material.hasReflections)` 整段跳过，唯一输出 `reflectionData` 从未赋值。GLSL 未赋值输出是未定义值：GL 驱动写出 0，SPIR-V/Vulkan 路径写出寄存器残留（Inf）。
 - 放大链路：`deferred7`（`program/ReflectionFilter.frag`）把该 Inf 过滤后写回 colortex2；`deferred2`（`program/Deferred2.glsl`）的时域上采样把它混进 colortex1 历史缓冲，且棋盘格分支在非刷新相位直接 `skyboxData = prevData`，污染每帧原样保留。因此只在天空、只在转动时可见，呈网格状断续线。
 - 完整的源码、SPIR-V 与规范语义分析见 `docs/glsl-unwritten-fragment-output.md`。
-- 修复位置在光影包侧，不在 Actinium：`world0/deferred6.fsh` 的 `main()` 开头补 `reflectionData = vec4(0.0);`。修复包为 `shaderpacks/[真实&电影]Derivative Main d24.4.14-fix1.zip`，未修改的原包留作对照。
-- 验证记录：用户实机确认（2026-11-15，crl_t 整合包生产环境，SDL GPU/vulkan，NVIDIA 621.24）：同一场景同一机位切到修复包后绿线消失；切回原包必现。加载修复包的日志无着色器编译错误。
+- 2026-11-15，用户在 crl_t 实例（SDL GPU/Vulkan，NVIDIA 621.24）通过给 `reflectionData` 设置零初值验证了触发条件。同一机位切回原版光影包后绿线复现。
+- Actinium 在「视频设置 → 图形」提供「初始化片元颜色输出」开关，默认关闭，重启后生效。开启后，模组在把着色器交给 SDL GPU 前，根据 SPIR-V 片元入口的 `Location` 输出声明插入按类型写零的指令。`deferred6` 跳过反射分支时，`reflectionData` 因此为零。已有的颜色赋值随后执行，光影包可直接使用原版 ZIP。
+- 2026-11-27，用户在 crl_t 实例使用原版 Derivative Main d24.4.14，确认开启该选项并重启后天空绿线消失。验证使用基于 `ce77eed97` 的 `fix/sdl-fragment-output-init` 测试构建，系统为 Windows 11、Java 25.0.3、RTX 5070 Laptop GPU、驱动 621.40，后端为 SDL GPU/Vulkan。
 - 同类潜在问题（当前未观察到可见异常，暂不改动）：`program/Deferred0.glsl` 的 `colortex5Out` 在 `x == skyCaptureRes.x` 且 `y` 不属于 0 到 3、5 时不赋值，`transmittanceOut` 只在原始天空图分支赋值，两者同样依赖未定义输出在该分支下的具体取值。

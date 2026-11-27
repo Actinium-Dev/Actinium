@@ -1,6 +1,6 @@
 # Actinium 兼容性矩阵
 
-最后更新：2026-11-22。
+最后更新：2026-11-27。
 
 状态定义：`已验证` 表示在记录的版本和场景中通过；`部分` 表示能运行但存在已知缺口；
 `无法启用` 表示光影包不能成功开启；`未验证` 不代表不兼容。更新记录时必须填写 Actinium commit、
@@ -346,7 +346,7 @@ Windows 10、NVIDIA GeForce RTX 5070 Laptop GPU（驱动 610.74）。
 | iterationRP                        | 0.7.7 / 0.8.7 | 已验证  | 开启、世界渲染、Distant Horizons LOD、地形、实体、方块实体、水、天空、天气、阴影、手部、GUI、重载   | -         | `28d976d`   |
 | Photon                             | v1.3b         | 部分    | 开启、世界渲染、地形、水（2026-08-31 水面修复后）、GUI、LittleTiles/ArchitectureCraft 相邻方块光照（issue #193，2026-09-29） | IE Garden Cloche 玻璃发黑：1.12.2 配置禁用专用 `gbuffers_block_translucent` 程序并回退 solid block shader；阴影/实体/维度切换/重载等场景待补充验证；选项菜单部分元素缺失（GTAO 等 profile 项告警，与水面无关） | `fix/ie-cloche-transparency` (`c318ed54` 基线) |
 | Solas Shader                      | V3.7b         | 部分    | Immersive Engineering 0.12-98 Garden Cloche（泥土 + 种子）玻璃半透明，issue #197，用户确认（2026-09-30） | 其他渲染路径未验证 | `fix/ie-cloche-transparency` (`c318ed54` 基线) |
-| Derivative Main                  | d24.4.14      | 部分    | 开启、景深（DoF）开关与重复 Apply、维度切换、重载；手持动态光照；普通草、单格花、双格高草与 Farmer's Future Delight 1.5.1 蓝色矢车菊摆动（2026-11-07 用户实机确认） | 地形/实体/水/天空等完整场景清单与 Distant Horizons 组合未验证 | `fix/derivative-plant-materials` |
+| Derivative Main                  | d24.4.14      | 部分    | 开启、景深（DoF）开关与重复 Apply、维度切换、重载；手持动态光照；普通草、单格花、双格高草与 Farmer's Future Delight 1.5.1 蓝色矢车菊摆动（2026-11-07 用户实机确认）。原版 ZIP 在 SDL GPU/Vulkan 下开启「初始化片元颜色输出」后天空绿线消失（2026-11-27 用户实机确认），见 [Derivative 兼容记录](compat/derivative.md) | 地形/实体/水/天空等完整场景清单与 Distant Horizons 组合未验证 | `fix/derivative-plant-materials`、`fix/sdl-fragment-output-init`（基于 `ce77eed97`） |
 | SEUS PTGI HRR                      | Test 2.1      | 无法启用 | -                                                              | 光影包不能成功开启 | `f261611`   |
 
 ### 雨天云层与降水

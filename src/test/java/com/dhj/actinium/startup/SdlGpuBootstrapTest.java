@@ -18,7 +18,8 @@ class SdlGpuBootstrapTest {
             options -> options.renderBackendDriver = "vulkan",
             options -> options.glVersion = 45,
             options -> options.sdlGpuFramesInFlight = 1,
-            options -> options.sdlGpuPresenterThread = false
+            options -> options.sdlGpuPresenterThread = false,
+            options -> options.sdlGpuInitializeFragmentOutputs = true
         );
 
         for (Consumer<AdvancedSettings> apply : changes) {
