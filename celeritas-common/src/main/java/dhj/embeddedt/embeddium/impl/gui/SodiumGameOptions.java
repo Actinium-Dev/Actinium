@@ -139,6 +139,8 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         public int sdlGpuFramesInFlight = 2;
         /** Presents GPU frames on a separate executor. */
         public boolean sdlGpuPresenterThread = true;
+        /** Writes zero to shader pack fragment color outputs before running the original shader. */
+        public boolean sdlGpuInitializeFragmentOutputs = false;
         public boolean enableMemoryTracing = false;
         public boolean useAdvancedStagingBuffers = true;
         public boolean disableIncompatibleModWarnings = false;

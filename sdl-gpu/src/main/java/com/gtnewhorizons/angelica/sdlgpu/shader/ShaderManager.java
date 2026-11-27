@@ -2,6 +2,7 @@ package com.gtnewhorizons.angelica.sdlgpu.shader;
 
 import com.gtnewhorizons.angelica.config.SystemProperties;
 import com.gtnewhorizons.angelica.glsm.GlslTransformUtils;
+import com.gtnewhorizons.angelica.glsm.hooks.GLSMConfig;
 import com.gtnewhorizons.angelica.glsm.hooks.GLSMHooks;
 import com.gtnewhorizons.angelica.glsm.hooks.PerFrameUniformBlock;
 import com.gtnewhorizons.angelica.glsm.hooks.PerFrameUniformBlock.Member;
@@ -1260,8 +1261,12 @@ public final class ShaderManager {
     }
 
     public long createSDLShader(ByteBuffer spirv, int stage, int numSamplers, int numUniformBuffers, int numStorageBuffers, int numStorageTextures) {
-        final CrossCompiled cc = crossCompile(spirv, glShaderTypeForSdlStage(stage));
+        final int shaderType = glShaderTypeForSdlStage(stage);
+        final ByteBuffer shaderSpirv = shaderType == GL20.GL_FRAGMENT_SHADER && GLSMConfig.sdlGpuInitializeFragmentOutputs
+            ? FragmentOutputInitializer.initialize(spirv) : spirv;
+        CrossCompiled cc = null;
         try (var stack = stackPush()) {
+            cc = crossCompile(shaderSpirv, shaderType);
             final SDL_GPUShaderCreateInfo ci = SDL_GPUShaderCreateInfo.calloc(stack)
                 .code(cc.code())
                 .entrypoint(stack.ASCII(cc.entrypoint()))
@@ -1283,7 +1288,8 @@ public final class ShaderManager {
             }
             return handle;
         } finally {
-            if (cc.ownsCode()) memFree(cc.code());
+            if (cc != null && cc.ownsCode()) memFree(cc.code());
+            if (shaderSpirv != spirv) memFree(shaderSpirv);
         }
     }
 

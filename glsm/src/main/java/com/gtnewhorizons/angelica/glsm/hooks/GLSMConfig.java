@@ -66,5 +66,8 @@ public final class GLSMConfig {
     /** Whether SDL presentation runs on a dedicated executor. Requires a client restart to change. */
     public static boolean sdlGpuPresenterThread = true;
 
+    /** Enables shader pack fragment color initialization on SDL GPU for this client session. */
+    public static boolean sdlGpuInitializeFragmentOutputs;
+
     private GLSMConfig() {}
 }
