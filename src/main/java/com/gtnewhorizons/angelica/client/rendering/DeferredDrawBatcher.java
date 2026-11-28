@@ -66,6 +66,11 @@ public final class DeferredDrawBatcher {
         return active;
     }
 
+    /** Whether pausing particle capture must draw geometry under its saved material. */
+    public static boolean hasPendingDraws() {
+        return active && !RANGES.isEmpty();
+    }
+
     public static void enter() {
         if (!ActiniumRuntimeOptions.useDeferredParticleBatching() || flushing || !ActiniumRuntimeOptions.allowDirectMemoryAccess()) {
             return;
@@ -74,8 +79,11 @@ public final class DeferredDrawBatcher {
         active = true;
         batchPosition = 0;
         RANGES.clear();
-        DEFAULT_MODELVIEW.set(GLStateManager.getModelViewMatrix());
-        DEFAULT_MODELVIEW.invert(DEFAULT_MODELVIEW_INVERSE);
+        Matrix4fc modelView = GLStateManager.getModelViewMatrix();
+        if (!DEFAULT_MODELVIEW.equals(modelView)) {
+            DEFAULT_MODELVIEW.set(modelView);
+            DEFAULT_MODELVIEW.invert(DEFAULT_MODELVIEW_INVERSE);
+        }
     }
 
     public static boolean capture(BufferBuilder bufferBuilder) {
@@ -512,4 +520,3 @@ public final class DeferredDrawBatcher {
     private record DrawRange(long stateKey, int byteOffset, int byteLength, VertexFormat format, int vertexCount, int drawMode) {
     }
 }
-

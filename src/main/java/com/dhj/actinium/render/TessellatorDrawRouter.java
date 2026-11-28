@@ -5,6 +5,7 @@ import com.gtnewhorizons.angelica.client.rendering.DeferredDrawBatcher;
 import com.gtnewhorizons.angelica.glsm.GLSMLighting;
 import com.gtnewhorizons.angelica.glsm.ITessellatorData;
 import com.gtnewhorizons.angelica.glsm.hooks.BatchStateGuard;
+import com.gtnewhorizons.angelica.rendering.particles.ParticleDrawBoundary;
 import com.gtnewhorizons.angelica.rendering.tesr.FlattenedItemLighting;
 import com.gtnewhorizons.angelica.rendering.tesr.ModelPartBatcher;
 import net.minecraft.client.renderer.BufferBuilder;
@@ -29,6 +30,7 @@ public final class TessellatorDrawRouter {
      * @return whether the draw was handled here; {@code false} means vanilla's own path has to run
      */
     public static boolean draw(BufferBuilder buffer, ITessellatorData view) {
+        ParticleDrawBoundary.beforeDraw(buffer);
         if (VanillaBufferBuilderRenderer.shouldUseVanillaPositionDraw(buffer)) {
             if (buffer.getVertexCount() > 0) BatchStateGuard.beforeDraw();
             return false;

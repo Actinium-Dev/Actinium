@@ -1,11 +1,17 @@
 package com.gtnewhorizons.angelica.rendering.particles;
 
 import com.dhj.actinium.config.ActiniumRuntimeOptions;
+import com.dhj.actinium.mixinterface.features.iris.ParticleVertexRange;
+import com.dhj.actinium.render.VanillaBufferBuilderRenderer;
 import com.gtnewhorizon.gtnhlib.client.renderer.vertex.VertexFlags;
+import com.gtnewhorizons.angelica.client.rendering.DeferredDrawBatcher;
 import com.gtnewhorizons.angelica.glsm.GLSMAttribStack;
 import com.gtnewhorizons.angelica.glsm.GLSMBuffers;
 import com.gtnewhorizons.angelica.glsm.GLSMDraws;
+import com.gtnewhorizons.angelica.glsm.GLSMFramebuffer;
+import com.gtnewhorizons.angelica.glsm.GLSMMatrices;
 import com.gtnewhorizons.angelica.glsm.GLSMPrograms;
+import com.gtnewhorizons.angelica.glsm.GLSMRasterizer;
 import com.gtnewhorizons.angelica.glsm.GLSMVertexInput;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.StateSet;
@@ -16,6 +22,7 @@ import com.gtnewhorizons.angelica.glsm.ffp.ParticleQuadMesh;
 import com.gtnewhorizons.angelica.glsm.ffp.ShaderManager;
 import com.gtnewhorizons.angelica.glsm.hooks.GLSMHooks;
 import com.gtnewhorizons.angelica.glsm.hooks.ImmediateExtendedAttribHandler;
+import com.gtnewhorizons.angelica.glsm.states.ViewportState;
 import com.gtnewhorizons.angelica.rendering.ParticleRunSplitter;
 import com.gtnewhorizons.angelica.rendering.RenderFailures;
 import com.gtnewhorizons.angelica.rendering.tesr.InstanceRing;
@@ -25,11 +32,15 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.coderbot.iris.Iris;
 import net.coderbot.iris.layer.GbufferPrograms;
 import net.coderbot.iris.pipeline.DeferredWorldRenderingPipeline;
+import net.coderbot.iris.pipeline.TesrInstancingPipeline;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.entity.Entity;
+import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL30;
 
 import java.nio.ByteBuffer;
 
@@ -38,18 +49,8 @@ import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAddress0;
 /**
  * Turns a particle run into instanced quad draws.
  *
- * <p>Vanilla {@code ParticleManager.renderParticles} opens one buffer per layer and depth-mask
- * combination, lets every particle write four vertices, and draws the run once. This class sits
- * between the two ends: descriptors fill an instance payload without touching the buffer, and
- * particles without a descriptor write into {@link ParticleCaptureBuffer} so
- * {@link ParticleQuadDecoder} can turn their vertices into the same payload. Vertices the decoder
- * rejects are replayed into the run untouched, so a particle the batch cannot express still draws
- * exactly like vanilla.</p>
- *
- * <p>The instance groups are sorted by the blend, depth-mask and texture state sampled while the
- * particle was captured, and drawn when the run ends, with the same state re-applied. A particle
- * layer only opens for {@code renderParticles} runs: {@code renderLitParticles} has no
- * {@code begin}/{@code draw} pair in 1.12.2 and its particles keep going through vanilla.</p>
+ * <p>Descriptors emit instances directly. Custom renderers keep the vanilla buffer; only an
+ * appended billboard that has not been submitted can be replaced by an instance.</p>
  */
 public final class ParticleInstancer {
 
@@ -57,7 +58,10 @@ public final class ParticleInstancer {
     private static final int INITIAL_BYTES = 256 * STRIDE;
     private static final int DRAW_VERTEX_FLAGS = ParticleQuadMesh.VERTEX_FLAGS | VertexFlags.COLOR_BIT | VertexFlags.BRIGHTNESS_BIT;
 
-    private static final ParticleCaptureBuffer CAPTURE = new ParticleCaptureBuffer();
+    private static final Matrix4f LAYER_MODELVIEW = new Matrix4f();
+    private static final Matrix4f CUSTOM_MODELVIEW = new Matrix4f();
+    private static final ParticleTarget LAYER_TARGET = new ParticleTarget();
+    private static final ParticleTarget CUSTOM_TARGET = new ParticleTarget();
     private static final ParticleParams SCRATCH = new ParticleParams();
     private static final ParticleRenderState STATE = new ParticleRenderState();
     private static final ObjectArrayList<Group> GROUP_POOL = new ObjectArrayList<>();
@@ -71,9 +75,8 @@ public final class ParticleInstancer {
     }
 
     private static boolean layerActive;
-    private static DeferredWorldRenderingPipeline unavailableFor;
-    private static DeferredWorldRenderingPipeline deferred;
-    private static BufferBuilder run;
+    private static TesrInstancingPipeline deferred;
+    private static BufferBuilder immediateReplay;
 
     /** Rotation of the current run, in the order {@link ParticleQuadMesh} expects. */
     private static float rotX;
@@ -116,21 +119,24 @@ public final class ParticleInstancer {
      */
     public static void beginLayer() {
         layerActive = false;
+        if (!ActiniumRuntimeOptions.useDeferredParticleBatching() || !ShaderManager.getInstance().isEnabled()) return;
+        final DeferredWorldRenderingPipeline pipeline = pipeline();
+        if (pipeline == null || pipeline.supportsInstancing(Instancing.PARTICLE)) {
+            beginLayer(pipeline);
+        }
+    }
+
+    static void beginLayer(TesrInstancingPipeline pipeline) {
+        layerActive = true;
         groupCount = 0;
         rotX = 0.0f;
         rotXZ = 0.0f;
         rotZ = 0.0f;
         rotYZ = 0.0f;
         rotXY = 0.0f;
-        deferred = null;
-        if (!ActiniumRuntimeOptions.useDeferredParticleBatching()) return;
-
-        deferred = pipeline();
-        if (available()) {
-            layerActive = true;
-        } else {
-            deferred = null;
-        }
+        deferred = pipeline;
+        LAYER_MODELVIEW.set(GLSMMatrices.getModelViewMatrix());
+        LAYER_TARGET.save();
     }
 
     /**
@@ -150,9 +156,8 @@ public final class ParticleInstancer {
      */
     public static boolean renderParticle(Particle particle, BufferBuilder runBuffer, Entity entity, float partialTicks,
         float rotationX, float rotationXZ, float rotationZ, float rotationYZ, float rotationXY) {
-        if (!layerActive) return false;
+        if (!layerActive || ParticleDrawBoundary.isWatching()) return false;
 
-        run = runBuffer;
         rotX = rotationX;
         rotXZ = rotationXZ;
         rotZ = rotationZ;
@@ -170,35 +175,79 @@ public final class ParticleInstancer {
             return true;
         }
 
-        CAPTURE.begin();
-        particle.renderParticle(CAPTURE.buffer(), entity, partialTicks, rotationX, rotationXZ, rotationZ, rotationYZ, rotationXY);
-        // Sampled after the particle ran: a particle may change blend or depth state inside its own
-        // renderParticle, and the group has to draw under what it actually produced.
-        STATE.sample();
+        final int firstVertex = runBuffer.getVertexCount();
+        final TesrInstancingPipeline activePipeline = deferred;
+        final boolean wasDeferring = DeferredDrawBatcher.isActive();
+        boolean submitted;
+        ParticleDrawBoundary.watch(runBuffer);
+        try {
+            particle.renderParticle(runBuffer, entity, partialTicks, rotationX, rotationXZ, rotationZ, rotationYZ, rotationXY);
+        } finally {
+            submitted = ParticleDrawBoundary.endWatch();
+            if (submitted) {
+                beginLayer(activePipeline);
+                if (wasDeferring) DeferredDrawBatcher.enter();
+            }
+        }
+        if (submitted) return true;
 
-        if (CAPTURE.spilled()) {
-            CAPTURE.replayInto(runBuffer);
+        final int added = runBuffer.getVertexCount() - firstVertex;
+        if (added == 0) return true;
+        if (added != ParticleQuadMesh.VERTEX_COUNT) {
             spilled++;
             return true;
         }
-        if (CAPTURE.captured() == 0) return true;
-
-        if (!ParticleQuadDecoder.decode(CAPTURE.raw(), rotationX, rotationXZ, rotationZ, rotationYZ, rotationXY, SCRATCH)) {
-            CAPTURE.replayInto(runBuffer);
+        final ParticleVertexRange range = (ParticleVertexRange) runBuffer;
+        if ((firstVertex % ParticleQuadMesh.VERTEX_COUNT) != 0 || !range.actinium$canRewindParticleVertices()
+            || !ParticleQuadDecoder.decode(runBuffer.getByteBuffer(), firstVertex, rotationX, rotationXZ, rotationZ, rotationYZ, rotationXY, SCRATCH)) {
             undecodable++;
             return true;
         }
 
+        STATE.sample();
         emit(groupFor(STATE, currentTranslucent()));
+        range.actinium$rewindParticleVertices(firstVertex);
         captured++;
         return true;
     }
 
-    /**
-     * Draws every group the run collected and restores the state the draws replaced. A run may end
-     * with groups still pending when the batch became unusable mid-run; they are replayed as
-     * vertices into the run buffer so the run's own draw still covers them.
-     */
+    static void beforeCustomDraw() {
+        if (groupCount == 0 && !DeferredDrawBatcher.hasPendingDraws()) {
+            endLayer();
+            DeferredDrawBatcher.exitAndFlush();
+            return;
+        }
+        // A self-drawing particle may already have applied its local transform and material.
+        final int vao = GLStateManager.getBoundVAO();
+        final int vbo = GLStateManager.getBoundVBO();
+        CUSTOM_TARGET.save();
+        final boolean changedMatrix = !LAYER_MODELVIEW.equals(GLSMMatrices.getModelViewMatrix());
+        if (changedMatrix) {
+            CUSTOM_MODELVIEW.set(GLSMMatrices.getModelViewMatrix());
+            GLSMMatrices.setModelViewMatrix(LAYER_MODELVIEW);
+        }
+        try {
+            LAYER_TARGET.apply();
+            endLayer();
+            if (DeferredDrawBatcher.hasPendingDraws()) {
+                int depth = GLSMAttribStack.pushState(StateSet.BATCH);
+                try {
+                    DeferredDrawBatcher.exitAndFlush();
+                } finally {
+                    GLSMAttribStack.popStateTo(depth);
+                }
+            } else {
+                DeferredDrawBatcher.exitAndFlush();
+            }
+        } finally {
+            CUSTOM_TARGET.apply();
+            if (changedMatrix) GLSMMatrices.setModelViewMatrix(CUSTOM_MODELVIEW);
+            GLSMVertexInput.glBindVertexArray(vao);
+            GLSMBuffers.glBindBuffer(GL15.GL_ARRAY_BUFFER, vbo);
+        }
+    }
+
+    /** Submits each group under its own material, including passes without an instanced variant. */
     public static void endLayer() {
         if (!layerActive) {
             return;
@@ -242,7 +291,6 @@ public final class ParticleInstancer {
             }
             groupCount = 0;
             deferred = null;
-            run = null;
         }
         RenderFailures.rethrowWrapped(failure);
     }
@@ -251,8 +299,7 @@ public final class ParticleInstancer {
     public static void clear() {
         layerActive = false;
         deferred = null;
-        run = null;
-        unavailableFor = null;
+        immediateReplay = null;
         groupCount = 0;
         for (int i = 0; i < GROUP_POOL.size(); i++) {
             GROUP_POOL.get(i).list = null;
@@ -290,12 +337,6 @@ public final class ParticleInstancer {
         return group;
     }
 
-    private static boolean available() {
-        if (deferred != null && deferred == unavailableFor) return false;
-        if (!ShaderManager.getInstance().isEnabled()) return false;
-        return deferred == null || deferred.supportsInstancing(Instancing.PARTICLE);
-    }
-
     private static DeferredWorldRenderingPipeline pipeline() {
         if (!Iris.enabled) return null;
         return Iris.getPipelineManager().getPipelineNullable() instanceof DeferredWorldRenderingPipeline pipeline ? pipeline : null;
@@ -317,8 +358,12 @@ public final class ParticleInstancer {
             GbufferPrograms.setTranslucencyDeclaration(listTranslucent);
             deferred.rebindCurrentPass();
             if (!deferred.hasInstancedVariant(Instancing.PARTICLE)) {
-                unavailableFor = deferred;
-                replayGroupAsVertices(group.state, list, count, run, rotX, rotXZ, rotZ, rotYZ, rotXY);
+                // The shared buffer may already contain vertices for a different material or renderer.
+                if (immediateReplay == null) immediateReplay = new BufferBuilder(256);
+                immediateReplay.begin(GL11.GL_QUADS, DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP);
+                replayGroupAsVertices(group.state, list, count, immediateReplay, rotX, rotXZ, rotZ, rotYZ, rotXY);
+                immediateReplay.finishDrawing();
+                VanillaBufferBuilderRenderer.draw(immediateReplay, "ParticleReplay");
                 list.clear();
                 return;
             }
@@ -333,6 +378,25 @@ public final class ParticleInstancer {
             deferred.rebindCurrentPass();
         } else {
             issueDraw(base, count, true);
+        }
+    }
+
+    private static final class ParticleTarget {
+        private final ViewportState viewport = new ViewportState();
+        private int readFramebuffer, drawFramebuffer, program;
+
+        void save() {
+            readFramebuffer = GLSMFramebuffer.getReadFramebuffer();
+            drawFramebuffer = GLSMFramebuffer.getDrawFramebuffer();
+            program = GLSMPrograms.getActiveProgram();
+            viewport.set(GLSMRasterizer.getViewportState());
+        }
+
+        void apply() {
+            if (drawFramebuffer != GLSMFramebuffer.getDrawFramebuffer()) GLSMFramebuffer.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, drawFramebuffer);
+            if (readFramebuffer != GLSMFramebuffer.getReadFramebuffer()) GLSMFramebuffer.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFramebuffer);
+            GLSMRasterizer.glViewport(viewport.x, viewport.y, viewport.width, viewport.height);
+            if (program != GLSMPrograms.getActiveProgram()) GLSMPrograms.glUseProgram(program);
         }
     }
 
@@ -357,11 +421,7 @@ public final class ParticleInstancer {
         }
     }
 
-    /**
-     * Writes a group back into the run as plain vertices, for the case where the shader pipeline has
-     * no particle variant. The corners and texture coordinates are the ones the instance payload
-     * keeps, so the result is the quad vanilla would have drawn.
-     */
+    /** Rebuilds ordinary billboard vertices for a shader pass without a particle instance variant. */
     static void replayGroupAsVertices(ParticleRenderState state, ByteBuffer list, int count, BufferBuilder run,
                                       float rotX, float rotXZ, float rotZ, float rotYZ, float rotXY) {
         state.apply();

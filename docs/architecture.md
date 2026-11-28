@@ -131,6 +131,9 @@ pipeline 时先调用 `compileInstancedVariants()` 再编译地形程序，使�
 中心、半宽、颜色与 lightmap 来自实例属性，FFP 顶点着色器为 `PARTICLE` 单独声明
 `vec2 a_TexCoord0`，不声明顶点色、lightmap 与法线属性以免与实例属性共用槽位；网格没有法线，
 pack 变体与 FFP 都用常量法线 `(0, 0, 1)`，与 billboard 朝向一致，不再读取未提供的 location 4。
+
+第 0 至 2 层的自定义粒子直接写入当前批次的 `BufferBuilder`。绘制期间没有提交该缓冲，且新增顶点恰好构成一个可实例化的四边形时，`ParticleQuadDecoder` 从缓冲尾部读取顶点；实例化成功后只撤回这四个顶点。其余几何留在原批次中。粒子主动调用共享 `Tessellator.draw()` 时，`TessellatorDrawRouter` 在提交前绘制此前积累的实例并暂停延迟批处理；粒子按自己的顺序调用 `draw()` 和 `begin()`，返回后恢复批处理。其他缓冲的提交不触发这一处理。
+
 第 3 层（`renderLitParticles`）由各粒子的原渲染方法管理缓冲区和绘制提交。Actinium 保留视锥裁剪和粒子光影阶段，
 为每个可见粒子声明透明度并在调用后恢复。该调用点把原来的 `BufferBuilder` 直接交给粒子；预先开启共享缓冲区
 或捕获缓冲区，会使原版大爆炸粒子及 Dungeon Additions 等模组的自绘粒子在再次调用 `begin()` 时抛出
