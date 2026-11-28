@@ -193,18 +193,15 @@ public final class BatchEligibility {
     }
 
     public static void onStateChange(Object renderer, Object subject, byte state) {
-        if (state != DENIED) return;
-        if (ActiniumRuntime.options().debug.enableEntityRenderDiagnostics) {
-            final String name = renderer.getClass().getName();
-            final String reason = uncapturedState ? "uncaptured_state" : "mixed_renderer";
-            final String target = describeSubject(subject);
-            final String key = name + '|' + reason + '|' + describeSubjectType(subject);
-            if (loggedDiagnosticKeys.add(key)) {
-                LOGGER.warn("[ACTINIUM-ENTITY-DIAGNOSTICS] renderer={} reason={} target={} foreignDraws={} expectedDraws={} parts={} firstAllowedBail={}",
-                    name, reason, target, foreignDraws, expectedDraws, parts, allowedBail);
-            }
-        }
+        if (state != DENIED || !ActiniumRuntime.options().debug.enableEntityRenderDiagnostics) return;
         final String name = renderer.getClass().getName();
+        final String reason = uncapturedState ? "uncaptured_state" : "mixed_renderer";
+        final String target = describeSubject(subject);
+        final String key = name + '|' + reason + '|' + describeSubjectType(subject);
+        if (loggedDiagnosticKeys.add(key)) {
+            LOGGER.warn("[ACTINIUM-ENTITY-DIAGNOSTICS] renderer={} reason={} target={} foreignDraws={} expectedDraws={} parts={} firstAllowedBail={}",
+                name, reason, target, foreignDraws, expectedDraws, parts, allowedBail);
+        }
         if (uncapturedState) {
             GLStateManager.warnOnce("tesr-state:" + name, "{} changes state outside the batch format - keeping its model parts immediate", name);
             return;
