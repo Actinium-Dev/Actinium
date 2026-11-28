@@ -1,5 +1,6 @@
 package com.dhj.actinium.mixin.core.terrain;
 
+import com.dhj.actinium.mixinterface.features.iris.ParticleVertexRange;
 import com.dhj.actinium.render.ProjectiveTexCoordBuffer;
 import com.dhj.actinium.render.ProjectiveTexCoordWriter;
 import com.dhj.actinium.render.vertex.DirectBufferAddress;
@@ -9,6 +10,7 @@ import com.gtnewhorizons.angelica.glsm.ITessellatorData;
 import com.gtnewhorizons.angelica.rendering.tesr.SharedVertexLayout;
 import net.coderbot.iris.celeritas.buffer.ShaderMaterialOverrideState;
 import net.minecraft.client.renderer.BufferBuilder;
+import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.client.renderer.vertex.VertexFormatElement;
 import org.jetbrains.annotations.Nullable;
@@ -25,13 +27,21 @@ import dhj.embeddedt.embeddium.api.shader.buffer.BufferBuilderExtension;
 import dhj.embeddedt.embeddium.api.shader.buffer.VanillaQuadContext;
 
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 @Mixin(BufferBuilder.class)
-public abstract class BufferBuilderMixin implements BufferBuilderExtension, ProjectiveTexCoordBuffer, ITessellatorData {
+public abstract class BufferBuilderMixin implements BufferBuilderExtension, ProjectiveTexCoordBuffer, ITessellatorData, ParticleVertexRange {
     @Shadow
     private ByteBuffer byteBuffer;
+
+    @Shadow
+    private IntBuffer rawIntBuffer;
+
+    @Shadow
+    private ShortBuffer rawShortBuffer;
 
     @Shadow
     private int vertexCount;
@@ -251,6 +261,33 @@ public abstract class BufferBuilderMixin implements BufferBuilderExtension, Proj
     @Override
     public boolean actinium$isDrawing() {
         return this.isDrawing;
+    }
+
+    @Override
+    public boolean actinium$canRewindParticleVertices() {
+        return this.isDrawing && this.drawMode == GL11.GL_QUADS
+            && this.vertexFormat == DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP
+            && this.actinium$activeQuadContext == null && this.actinium$quadContexts.isEmpty();
+    }
+
+    @Override
+    public void actinium$rewindParticleVertices(int firstVertex) {
+        if (!this.actinium$canRewindParticleVertices()) {
+            throw new IllegalStateException("Rewinding requires an open standard particle quad buffer without terrain metadata");
+        }
+        if (firstVertex < 0 || firstVertex > this.vertexCount) {
+            throw new IndexOutOfBoundsException("Cannot rewind " + this.vertexCount + " particle vertices to " + firstVertex);
+        }
+
+        // Forge bulk writes advance the byte or int cursor; growBuffer mirrors the int cursor into the short view.
+        int byteOffset = firstVertex * this.vertexFormat.getSize();
+        this.byteBuffer.position(byteOffset);
+        this.rawIntBuffer.position(byteOffset / Integer.BYTES);
+        this.rawShortBuffer.position(byteOffset / Short.BYTES);
+        this.vertexCount = firstVertex;
+        this.vertexFormatIndex = 0;
+        this.vertexFormatElement = this.vertexFormat.getElement(0);
+        this.actinium$packedVertexCount = -1;
     }
 
     @Override

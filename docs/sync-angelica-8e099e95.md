@@ -475,7 +475,7 @@ TESR 批处理簇的完整依赖闭包是 233 个上游文件、26369 行。剔�
 
 1. `DirectTessellator` 在 1.7.10 是 `Tessellator` 子类，1.12.2 不是。`TesrMeshSink`、`ModelPartMeshBuilder` 与 `AngelicaTesrMeshCache.MeshBackend` 已统一使用 `DirectTessellator`，调用方同步调整。
 2. `RenderLivingBase` 没有 1.7.10 的 `renderPassModel` 字段，`DeferredEntityOverlay` 已按 1.12.2 的真实 `LayerRenderer` 实例捕获并重放。
-3. `ParticleCaptureTessellator` 已由 `ParticleCaptureBuffer` 与 `ParticleQuadDecoder` 替代，顶点捕获、解码和溢出的原版顺序回放均按 `BufferBuilder` 实现。
+3. `ParticleCaptureTessellator` 最初适配为独立 `ParticleCaptureBuffer`。现行实现让自定义粒子在共享 `BufferBuilder` 中绘制，再由 `ParticleQuadDecoder` 检查新增顶点，缓冲归属与自绘处理见[渲染执行链路](architecture.md#渲染执行链路)。
 
 ### 第 15 项逐文件依赖链与 GTNHLib/glsm 缺口
 
@@ -492,7 +492,7 @@ TESR 批处理的引入顺序按依赖链固定下来，每一步只需新增文
 
 `DeferredEntityOverlay` 不保存 `renderPassModel`，而是保存 `RenderLivingBase` 与实际 `LayerRenderer`，重放保留模组层和模型状态。`PassOverride` 不存在签名差异：上游当前 HEAD 的 `ModelPartBatcher` 只用 `PassOverride.capture()` 与 `PassOverride.NONE`，没有任何 `PassOverride.of` 调用，三参 `of` 由 `capture()` 内部使用。
 
-粒子实例化与掉落物实例化均已交付。粒子实例化覆盖 `ParticleManager.renderParticles` 的 6 个批次，通过 `ParticleCaptureBuffer` 和 `ParticleQuadDecoder` 捕获并解码顶点，`Instancing.PARTICLE` 提供 FFP 与光影包变体。第 3 层 `renderLitParticles` 交给粒子原有的渲染方法绘制，保留视锥裁剪和光影阶段。1.7.10 的 `Tessellator` 构造器和 `draw()` 返回值在 1.12.2 无对应签名，已按 `BufferBuilder` 重写捕获逻辑。掉落物通过 `RenderItem.renderQuads` 的顶点接入 `DroppedItemInstancer` 和 `ModelPartBatcher`。1.12.2 由 baked model 提供掉落物几何，`BlockRenderListManager` 和 `ItemRenderListManager` 不再移植。
+粒子实例化与掉落物实例化均已交付。粒子实例化覆盖 `ParticleManager.renderParticles` 的 6 个批次，通过 `ParticleQuadDecoder` 解码顶点，`Instancing.PARTICLE` 提供 FFP 与光影包变体。第 3 层 `renderLitParticles` 交给粒子原有的渲染方法绘制，保留视锥裁剪和光影阶段。1.7.10 的 `Tessellator` 构造器和 `draw()` 返回值在 1.12.2 无对应签名，已按 `BufferBuilder` 重写捕获逻辑。掉落物通过 `RenderItem.renderQuads` 的顶点接入 `DroppedItemInstancer` 和 `ModelPartBatcher`。1.12.2 由 baked model 提供掉落物几何，`BlockRenderListManager` 和 `ItemRenderListManager` 不再移植。
 
 ### 批次三第 15 项交付摘要
 

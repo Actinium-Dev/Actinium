@@ -10,6 +10,8 @@ public final class TesrLifecycle {
 
     public static void reset() {
         ImmediateDrawOrder.endPass();
+        ShadowFastTesr.clear();
+        ShadowTesrDraws.clear();
         TranslucentPeel.destroy();
         TesrBatchRenderer.INSTANCE.clearRetained();
         ModelPartBatcher.INSTANCE.clear();

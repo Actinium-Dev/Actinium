@@ -125,7 +125,8 @@ class ParticleDescriptorParityTest {
                 final BufferBuilder buffer = new BufferBuilder(64);
                 buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP);
                 particle.renderParticle(buffer, null, partialTicks, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY);
-                assertTrue(ParticleQuadDecoder.decode(buffer.getVertexState().getRawBuffer(), ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY, written));
+                assertEquals(4, buffer.getVertexCount());
+                assertTrue(ParticleQuadDecoder.decode(buffer.getByteBuffer(), 0, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY, written));
 
                 final String where = vanillaClass.getSimpleName() + " age " + age + " partial " + partialTicks;
                 assertEquals(written.centerX, described.centerX, 1.0e-5F, where);

@@ -1,5 +1,6 @@
 package com.gtnewhorizons.angelica.rendering.particles;
 
+import com.dhj.actinium.render.TessellatorDrawRouter;
 import com.gtnewhorizon.gtnhlib.client.renderer.vertex.VertexFlags;
 import com.gtnewhorizons.angelica.glsm.GLSMBlend;
 import com.gtnewhorizons.angelica.glsm.GLSMEnable;
@@ -32,15 +33,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAddress0;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Drives real instanced particle draws against a context: the uploaded instance bytes, the single
- * draw call a run produces, the state a particle run samples, and the per-vertex replay used when no
- * variant is available.
- */
 class ParticleInstancingGLTest extends GLStateManagerIntegrationFixture {
 
     private static final float HALF = 0.35F;
@@ -65,6 +62,7 @@ class ParticleInstancingGLTest extends GLStateManagerIntegrationFixture {
         ShaderManager.enable();
         ParticleInstancer.clear();
         TesrBatchRenderer.INSTANCE.instanceRing().delete();
+        previousObserver = GLSMHooks.drawCallObserver;
     }
 
     @AfterEach
@@ -78,23 +76,28 @@ class ParticleInstancingGLTest extends GLStateManagerIntegrationFixture {
     @Test
     void uploadsTheInstanceLayoutAndDrawsTheRunOnce() {
         final List<Integer> observedFlags = new ArrayList<>();
-        previousObserver = GLSMHooks.drawCallObserver;
         GLSMHooks.drawCallObserver = observedFlags::add;
 
         final long capturedBefore = ParticleInstancer.getCaptured();
         final long drawsBefore = ParticleInstancer.getDraws();
         final BufferBuilder run = beginRun();
         ParticleInstancer.beginLayer();
-        assertTrue(ParticleInstancer.renderParticle(new CaptureParticle(), run, null, 0.5F, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY),
-            "a particle with no descriptor has to be captured");
+        final float[] centers = {4.0F, -2.0F, 9.0F};
+        for (float x : centers) {
+            assertTrue(ParticleInstancer.renderParticle(new CaptureParticle(x), run, null, 0.5F, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY));
+        }
+        assertTrue(observedFlags.isEmpty(), "ordinary particles stay queued until the end of the layer");
         ParticleInstancer.endLayer();
+        assertEquals(0, run.getVertexCount(), "decoded quads must not also reach the layer's final draw");
+        assertTrue(TessellatorDrawRouter.draw(run, null));
 
-        assertEquals(capturedBefore + 1, ParticleInstancer.getCaptured());
-        assertEquals(drawsBefore + 1, ParticleInstancer.getDraws(), "one run with one quad is one instanced draw");
-        assertEquals(0, run.getVertexCount(), "a decoded quad must not also be written to the run");
+        assertEquals(capturedBefore + centers.length, ParticleInstancer.getCaptured());
+        assertEquals(drawsBefore + 1, ParticleInstancer.getDraws());
 
-        final ByteBuffer instance = readBackInstances();
-        assertEquals(4.0F, instance.getFloat(ParticleInstancedAttribs.OFFSET_CENTER_HALF));
+        final ByteBuffer instance = readBackInstances(centers.length);
+        for (int i = 0; i < centers.length; i++) {
+            assertEquals(centers[i], instance.getFloat(i * ParticleInstancedAttribs.STRIDE + ParticleInstancedAttribs.OFFSET_CENTER_HALF), 1.0e-5F);
+        }
         assertEquals(5.0F, instance.getFloat(ParticleInstancedAttribs.OFFSET_CENTER_HALF + 4));
         assertEquals(6.0F, instance.getFloat(ParticleInstancedAttribs.OFFSET_CENTER_HALF + 8));
         assertEquals(HALF, instance.getFloat(ParticleInstancedAttribs.OFFSET_CENTER_HALF + 12), 1.0e-5F);
@@ -111,6 +114,50 @@ class ParticleInstancingGLTest extends GLStateManagerIntegrationFixture {
         assertTrue((flags & VertexFlags.TEXTURE_BIT) != 0, "the particle program samples the bound texture");
         assertTrue((flags & VertexFlags.COLOR_BIT) != 0, "the particle program takes its colour from the instance");
         assertTrue((flags & VertexFlags.BRIGHTNESS_BIT) != 0, "the particle program takes its lightmap from the instance");
+    }
+
+    @Test
+    void decodingTheTailPreservesTheUndecodableQuadAtTheStartOfTheRun() {
+        final BufferBuilder run = beginRun();
+        final Particle gradient = new CaptureParticle() {
+            @Override
+            public void renderParticle(BufferBuilder buffer, Entity entity, float ticks, float x, float xz,
+                                       float z, float yz, float xy) {
+                super.renderParticle(buffer, entity, ticks, x, xz, z, yz, xy);
+                buffer.putColorRGB_F(1.0F, 0.0F, 0.0F, 1);
+            }
+        };
+        ParticleInstancer.beginLayer();
+        assertTrue(ParticleInstancer.renderParticle(gradient, run, null, 0.5F, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY));
+        assertEquals(4, run.getVertexCount());
+        final int[] prefix = run.getVertexState().getRawBuffer();
+        assertTrue(ParticleInstancer.renderParticle(new CaptureParticle(-2.0F), run, null, 0.5F, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY));
+        ParticleInstancer.endLayer();
+
+        assertArrayEquals(prefix, run.getVertexState().getRawBuffer(), "only the decodable tail may be removed");
+        assertEquals(-2.0F, readBackInstances(1).getFloat(ParticleInstancedAttribs.OFFSET_CENTER_HALF), 1.0e-5F);
+        assertTrue(TessellatorDrawRouter.draw(run, null));
+    }
+
+    @Test
+    void terrainMetadataAddedByTheParticleKeepsItsQuadInTheRun() {
+        final ParticleTestBuffer run = beginRun();
+        final List<Integer> submissions = new ArrayList<>();
+        GLSMHooks.drawCallObserver = flags -> submissions.add(run.getVertexCount());
+        final Particle particle = new CaptureParticle() {
+            @Override
+            public void renderParticle(BufferBuilder buffer, Entity entity, float ticks, float x, float xz,
+                                       float z, float yz, float xy) {
+                super.renderParticle(buffer, entity, ticks, x, xz, z, yz, xy);
+                run.markTerrainMetadata();
+            }
+        };
+        ParticleInstancer.beginLayer();
+        assertTrue(ParticleInstancer.renderParticle(particle, run, null, 0.5F, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY));
+        ParticleInstancer.endLayer();
+        assertTrue(submissions.isEmpty(), "the tagged quad must not produce an instance draw");
+        assertTrue(TessellatorDrawRouter.draw(run, null));
+        assertEquals(List.of(4), submissions, "the run submits all four tagged vertices together");
     }
 
     @Test
@@ -152,7 +199,7 @@ class ParticleInstancingGLTest extends GLStateManagerIntegrationFixture {
         ParticleInstancer.replayGroupAsVertices(state, list, 1, run, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY);
 
         assertEquals(4, run.getVertexCount());
-        assertTrue(ParticleQuadDecoder.decode(run.getVertexState().getRawBuffer(), ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY, decoded),
+        assertTrue(ParticleQuadDecoder.decode(run.getByteBuffer(), 0, ROT_X, ROT_XZ, ROT_Z, ROT_YZ, ROT_XY, decoded),
             "the replayed vertices are the quad the decoder recognises");
         assertEquals(4.0F, decoded.centerX, 1.0e-5F);
         assertEquals(5.0F, decoded.centerY, 1.0e-5F);
@@ -184,29 +231,29 @@ class ParticleInstancingGLTest extends GLStateManagerIntegrationFixture {
         assertEquals(GLSMTextures.getBoundTextureForServerState(), state.texture);
     }
 
-    private static BufferBuilder beginRun() {
-        final BufferBuilder run = new BufferBuilder(256);
+    private static ParticleTestBuffer beginRun() {
+        final ParticleTestBuffer run = new ParticleTestBuffer();
         run.begin(GL11.GL_QUADS, DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP);
         return run;
     }
 
-    private static ByteBuffer readBackInstances() {
+    private static ByteBuffer readBackInstances(int count) {
         final InstanceRing ring = TesrBatchRenderer.INSTANCE.instanceRing();
-        final ByteBuffer data = BufferUtils.createByteBuffer(ParticleInstancedAttribs.STRIDE);
+        final ByteBuffer data = BufferUtils.createByteBuffer(count * ParticleInstancedAttribs.STRIDE);
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, ring.bufferId());
         GL15.glGetBufferSubData(GL15.GL_ARRAY_BUFFER, 0L, data);
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
         return data;
     }
 
-    /**
-     * A particle the registry has no descriptor for, so the instancer runs its own
-     * {@code renderParticle} into the capture buffer and decodes the result.
-     */
     private static class CaptureParticle extends Particle {
 
         CaptureParticle() {
-            super(null, 4.0D, 5.0D, 6.0D);
+            this(4.0F);
+        }
+
+        CaptureParticle(float x) {
+            super(null, x, 5.0D, 6.0D);
         }
 
         @Override
@@ -216,13 +263,11 @@ class ParticleInstancingGLTest extends GLStateManagerIntegrationFixture {
 
         @Override
         public void renderParticle(BufferBuilder buffer, Entity entityIn, float partialTicks, float rotationX, float rotationZ, float rotationYZ, float rotationXY, float rotationXZ) {
-            // The five arguments arrive in the order ParticleManager passes them, which is the order
-            // the corner formulas read them in.
             for (int corner = 0; corner < ParticleQuadMesh.VERTEX_COUNT; corner++) {
                 final float a = ParticleQuadMesh.cornerA(corner) * HALF;
                 final float b = ParticleQuadMesh.cornerB(corner) * HALF;
                 buffer.pos(
-                        4.0D + ParticleQuadMesh.offsetX(a, b, rotationX, rotationXY),
+                        posX + ParticleQuadMesh.offsetX(a, b, rotationX, rotationXY),
                         5.0D + ParticleQuadMesh.offsetY(b, rotationZ),
                         6.0D + ParticleQuadMesh.offsetZ(a, b, rotationYZ, rotationXZ))
                     .tex(a < 0.0F ? 0.75F : 0.25F, b < 0.0F ? 0.5F : 0.125F)
@@ -233,7 +278,6 @@ class ParticleInstancingGLTest extends GLStateManagerIntegrationFixture {
         }
     }
 
-    /** Captured like any other particle, but leaves blend disabled behind it. */
     private static final class BlendDisablingParticle extends CaptureParticle {
         @Override
         public void renderParticle(BufferBuilder buffer, Entity entityIn, float partialTicks, float rotationX,

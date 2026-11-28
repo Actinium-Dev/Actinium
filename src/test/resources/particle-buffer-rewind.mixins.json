@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "compatibilityLevel": "JAVA_21",
+  "package": "com.dhj.actinium.mixin.core",
+  "mixins": ["terrain.BufferBuilderMixin", "vertex.MixinVertexFormat"],
+  "injectors": {"defaultRequire": 1}
+}

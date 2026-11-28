@@ -1,6 +1,7 @@
 package com.dhj.actinium.mixin.vintage.core;
 
 import com.gtnewhorizons.angelica.client.rendering.DeferredDrawBatcher;
+import com.gtnewhorizons.angelica.rendering.particles.ParticleDrawBoundary;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.WorldVertexBufferUploader;
 import com.gtnewhorizon.gtnhlib.client.renderer.TessellatorManager;
@@ -14,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinWorldVertexBufferUploader {
     @Inject(method = "draw", at = @At("HEAD"), cancellable = true)
     private void celeritas$coreProfileDraw(BufferBuilder bufferBuilder, CallbackInfo ci) {
+        ParticleDrawBoundary.beforeDraw(bufferBuilder);
         if (VanillaBufferBuilderRenderer.shouldUseVanillaPositionDraw(bufferBuilder)) {
             return;
         }
@@ -33,4 +35,3 @@ public class MixinWorldVertexBufferUploader {
         ci.cancel();
     }
 }
-

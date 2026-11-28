@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "compatibilityLevel": "JAVA_21",
+  "package": "com.dhj.actinium.mixin",
+  "mixins": [
+    "core.terrain.BufferBuilderMixin",
+    "core.vertex.MixinVertexFormat",
+    "features.iris.TileEntityRendererDispatcherIrisMixin",
+    "features.tesr.MixinTileEntityRendererDispatcherTesr",
+    "features.tesr.MixinTileEntitySpecialRendererBatchEligibility",
+    "vintage.core.MixinTileEntityRendererDispatcherBatch"
+  ],
+  "injectors": {"defaultRequire": 1}
+}

@@ -9,6 +9,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.opengl.GL11;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -20,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ParticleQuadDecoderTest {
 
-    private static final int VERTEX_INTS = 7;
+    private static final int STRIDE = DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP.getSize();
     private static final float EPSILON = 1.0e-6F;
-    static final int BRIGHTNESS = 0x00F00123;
+    private static final int BRIGHTNESS = 0x00F00123;
 
     /** Rotation arguments in the order {@code ParticleManager.renderParticles} passes them. */
     private record Rotation(float x, float xz, float z, float yz, float xy) {}
@@ -49,74 +52,90 @@ class ParticleQuadDecoderTest {
     void decodesTheQuadVanillaWritesForTheFiveRotationArguments() {
         final Probe probe = new Probe();
         probe.setScale(1.6F);
-        final int[] raw = probe.capture(0.5F, ROTATION);
+        final ByteBuffer vertices = probe.capture();
 
-        assertTrue(ParticleQuadDecoder.decode(raw, ROTATION.x(), ROTATION.xz(), ROTATION.z(), ROTATION.yz(), ROTATION.xy(), params));
+        assertTrue(decode(vertices, 0, ROTATION));
 
         assertEquals(1.5D, params.centerX, EPSILON);
         assertEquals(2.5D, params.centerY, EPSILON);
         assertEquals(3.5D, params.centerZ, EPSILON);
         assertEquals(0.1F * 1.6F, params.half, EPSILON);
         assertEquals(ParticleQuads.packColor(0.25F, 0.5F, 0.75F, 1.0F), params.colorABGR);
-        assertEquals(ParticleQuadDecoderTest.BRIGHTNESS, params.brightness);
+        assertEquals(BRIGHTNESS, params.brightness);
     }
 
     @Test
     void rejectsAQuadBuiltFromADifferentRotationBasis() {
-        final int[] raw = new Probe().capture(0.5F, ROTATION);
-
-        assertFalse(ParticleQuadDecoder.decode(raw, OTHER_ROTATION.x(), OTHER_ROTATION.xz(), OTHER_ROTATION.z(),
-            OTHER_ROTATION.yz(), OTHER_ROTATION.xy(), params));
+        assertFalse(decode(new Probe().capture(), 0, OTHER_ROTATION));
     }
 
     @Test
     void rejectsAQuadWhoseCornersDoNotFollowTheUvPattern() {
-        final Probe probe = new Probe();
-        final int[] raw = probe.capture(0.5F, ROTATION);
-        // Corner 2 must carry the min/min texture coordinate; a mismatch is not a vanilla quad.
-        raw[2 * VERTEX_INTS + 3] = Float.floatToRawIntBits(0.75F);
+        final ByteBuffer vertices = new Probe().capture();
+        vertices.putFloat(2 * STRIDE + DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP.getUvOffsetById(0), 0.75F);
 
-        assertFalse(ParticleQuadDecoder.decode(raw, ROTATION.x(), ROTATION.xz(), ROTATION.z(), ROTATION.yz(), ROTATION.xy(), params));
+        assertFalse(decode(vertices, 0, ROTATION));
     }
 
     @Test
     void rejectsAQuadWhoseVertexColorsDisagree() {
-        final int[] raw = new Probe().capture(0.5F, ROTATION);
-        raw[3 * VERTEX_INTS + 5] = 0xFF00FF00;
+        final ByteBuffer vertices = new Probe().capture();
+        vertices.putInt(3 * STRIDE + DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP.getColorOffset(), 0xFF00FF00);
 
-        assertFalse(ParticleQuadDecoder.decode(raw, ROTATION.x(), ROTATION.xz(), ROTATION.z(), ROTATION.yz(), ROTATION.xy(), params));
+        assertFalse(decode(vertices, 0, ROTATION));
     }
 
     @Test
     void rejectsAQuadWhoseVertexLightmapsDisagree() {
-        final int[] raw = new Probe().capture(0.5F, ROTATION);
-        raw[1 * VERTEX_INTS + 6] = 0x00F00000;
+        final ByteBuffer vertices = new Probe().capture();
+        vertices.putInt(STRIDE + DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP.getUvOffsetById(1), 0x00F00000);
 
-        assertFalse(ParticleQuadDecoder.decode(raw, ROTATION.x(), ROTATION.xz(), ROTATION.z(), ROTATION.yz(), ROTATION.xy(), params));
+        assertFalse(decode(vertices, 0, ROTATION));
     }
 
     @Test
     void rejectsTheQuaternionRotatedCornersOfASpinningParticle() {
         final Probe probe = new Probe();
         probe.setParticleAngle(0.8F);
-        final int[] raw = probe.capture(0.5F, ROTATION);
-
-        assertFalse(ParticleQuadDecoder.decode(raw, ROTATION.x(), ROTATION.xz(), ROTATION.z(), ROTATION.yz(), ROTATION.xy(), params),
-            "a particleAngle rotation leaves the axis aligned layout and has to be replayed as vertices");
+        assertFalse(decode(probe.capture(), 0, ROTATION));
     }
 
     @Test
-    void rejectsAQuadWithTheWrongVertexCount() {
-        final Probe probe = new Probe();
-        final int[] raw = probe.capture(0.5F, ROTATION);
-        final int[] three = new int[VERTEX_INTS * 3];
-        System.arraycopy(raw, 0, three, 0, three.length);
+    void decodesTheAppendedQuadWithoutMovingTheSharedBufferOnSuccessOrFailure() {
+        final BufferBuilder run = new BufferBuilder(64);
+        run.begin(GL11.GL_QUADS, DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP);
+        run.putBulkData(ByteBuffer.allocate(3 * STRIDE));
+        final int firstVertex = run.getVertexCount();
+        new Probe().writeTo(run);
+        assertEquals(4, run.getVertexCount() - firstVertex);
 
-        assertFalse(ParticleQuadDecoder.decode(three, ROTATION.x(), ROTATION.xz(), ROTATION.z(), ROTATION.yz(), ROTATION.xy(), params));
+        final int end = run.getVertexCount() * STRIDE;
+        final ByteBuffer vertices = run.getByteBuffer();
+        vertices.limit(end).mark().position(end);
+
+        assertTrue(decode(vertices, firstVertex, ROTATION));
+        assertEquals(1.5F, params.centerX, EPSILON);
+        assertEquals(BRIGHTNESS, params.brightness);
+        assertCursorUnchanged(vertices, end, firstVertex * STRIDE);
+        assertFalse(decode(vertices, firstVertex, OTHER_ROTATION));
+        assertCursorUnchanged(vertices, end, firstVertex * STRIDE);
+    }
+
+    private static void assertCursorUnchanged(ByteBuffer vertices, int end, int mark) {
+        assertEquals(end, vertices.position());
+        assertEquals(end, vertices.limit());
+        assertEquals(ByteOrder.nativeOrder(), vertices.order());
+        assertEquals(mark, vertices.reset().position());
+        vertices.position(end);
+    }
+
+    private boolean decode(ByteBuffer vertices, int firstVertex, Rotation rotation) {
+        return ParticleQuadDecoder.decode(vertices, firstVertex, rotation.x(), rotation.xz(), rotation.z(),
+            rotation.yz(), rotation.xy(), params);
     }
 
     /** Writes vertices through the vanilla {@code Particle.renderParticle} body. */
-    static final class Probe extends Particle {
+    private static final class Probe extends Particle {
 
         Probe() {
             super(null, 1.5D, 2.5D, 3.5D);
@@ -134,11 +153,16 @@ class ParticleQuadDecoderTest {
             this.prevParticleAngle = angle;
         }
 
-        int[] capture(float partialTicks, Rotation rotation) {
+        ByteBuffer capture() {
             final BufferBuilder buffer = new BufferBuilder(64);
             buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.PARTICLE_POSITION_TEX_COLOR_LMAP);
-            renderParticle(buffer, null, partialTicks, rotation.x(), rotation.xz(), rotation.z(), rotation.yz(), rotation.xy());
-            return buffer.getVertexState().getRawBuffer();
+            writeTo(buffer);
+            assertEquals(4, buffer.getVertexCount());
+            return buffer.getByteBuffer();
+        }
+
+        void writeTo(BufferBuilder buffer) {
+            renderParticle(buffer, null, 0.5F, ROTATION.x(), ROTATION.xz(), ROTATION.z(), ROTATION.yz(), ROTATION.xy());
         }
 
         @Override

@@ -25,7 +25,9 @@ public final class TesrProviderDispatch {
         if (key == null) return false;
 
         CapturedRenderingState.INSTANCE.pushCurrentBlockEntity();
-        CapturedRenderingState.INSTANCE.setCurrentBlockEntity(te == null ? null : te.getBlockType(), blockMetadata(te));
+        if (!ShadowFastTesr.active()) {
+            CapturedRenderingState.INSTANCE.setCurrentBlockEntity(te == null ? null : te.getBlockType(), blockMetadata(te));
+        }
         GLSMMatrices.glPushMatrix();
         try {
             provider.angelica$transform(te, x, y, z);

@@ -378,8 +378,36 @@ public final class ModelPartBatcher {
 
     void flushForStateChange() {
         if (!active) return;
+        if (shadow && mode == Mode.BLOCK_ENTITIES) {
+            if (!hasQueuedGeometry()) return;
+            active = false;
+            try {
+                drawBatches(false);
+            } finally {
+                active = true;
+                continueSegment();
+            }
+            return;
+        }
         flushNow(false);
         active = true;
+        continueSegment();
+    }
+
+    boolean hasQueuedShadowGeometry() {
+        return shadow && mode == Mode.BLOCK_ENTITIES && hasQueuedGeometry();
+    }
+
+    void discardShadowSegment() {
+        if (!active || !shadow || mode != Mode.BLOCK_ENTITIES) return;
+        try {
+            activeSource.discard();
+        } finally {
+            continueSegment();
+        }
+    }
+
+    private void continueSegment() {
         mvCaptured = false;
         texCaptured = false;
         activeGroups.continuePass(identity, 0, 0, 0, instancedThisCycle ? TesrBatchRenderer.INSTANCE.instancedRenderer : null, shaderPipeline);

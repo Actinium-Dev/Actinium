@@ -1,6 +1,6 @@
 # Actinium 架构说明
 
-最后更新：2026-11-17。
+最后更新：2026-11-28。
 
 ## 概述
 
@@ -111,6 +111,16 @@ TESR 实例化批次不新增 pass：`DeferredWorldRenderingPipeline` 为 `Insta
 alpha test 与混合覆盖，只替换 program，因此状态归属仍在 `Pass`。CUBE 变体由
 `InstancingSupportProvider` 的宿主开关决定可用性。
 
+阴影方块实体沿 Forge 的 `hasFastRenderer()` 选择普通或 fast 回调。根项目在
+`ShadowRenderer.renderTileEntity` 的 dispatcher 调用范围启用 `ShadowFastTesr`，fast 回调借用
+按嵌套深度复用的独立 `Tessellator`，由 AT 开放的 `batchBuffer`、`drawingBatch` 字段保存并恢复
+父批次。动画模型继续使用全局缓冲，图集顶点在当前方块实体的 NBT 优先 ID 有效时逐个提交。
+提交前恢复阴影入口状态，沿用 Forge `drawBatch(0)` 的图集绑定和绘制状态；覆盖层没有顶点时
+直接关闭空批。模型和 TESR 队列分别检查待绘制内容后提交，并保持阴影 pass 开启。
+子分派前提交父模型，子调用结束后恢复父 ID 和 GL 状态，父图集缓冲保留到父回调结束。
+异常只清理当前调用尚未提交的几何，世界卸载时释放复用缓冲。具体机制与验证场景见
+`docs/compat/thebetweenlands.md`。
+
 变体程序与基程序走同一条 `ProgramBuilder`/`ProgramCreator` 路径，因此
 `ProgramBinaryCache` 会缓存它们。`Iris.compilePackFolder` 为每个 folder 构建一次性
 pipeline 时先调用 `compileInstancedVariants()` 再编译地形程序，使这些二进制在预编译阶段
@@ -131,6 +141,9 @@ pipeline 时先调用 `compileInstancedVariants()` 再编译地形程序，使�
 中心、半宽、颜色与 lightmap 来自实例属性，FFP 顶点着色器为 `PARTICLE` 单独声明
 `vec2 a_TexCoord0`，不声明顶点色、lightmap 与法线属性以免与实例属性共用槽位；网格没有法线，
 pack 变体与 FFP 都用常量法线 `(0, 0, 1)`，与 billboard 朝向一致，不再读取未提供的 location 4。
+
+第 0 至 2 层的自定义粒子直接写入当前批次的 `BufferBuilder`。绘制期间没有提交该缓冲，且新增顶点恰好构成一个可实例化的四边形时，`ParticleQuadDecoder` 从缓冲尾部读取顶点；实例化成功后只撤回这四个顶点。其余几何留在原批次中。粒子主动调用共享 `Tessellator.draw()` 时，`TessellatorDrawRouter` 在提交前绘制此前积累的实例并暂停延迟批处理；粒子按自己的顺序调用 `draw()` 和 `begin()`，返回后恢复批处理。其他缓冲的提交不触发这一处理。
+
 第 3 层（`renderLitParticles`）由各粒子的原渲染方法管理缓冲区和绘制提交。Actinium 保留视锥裁剪和粒子光影阶段，
 为每个可见粒子声明透明度并在调用后恢复。该调用点把原来的 `BufferBuilder` 直接交给粒子；预先开启共享缓冲区
 或捕获缓冲区，会使原版大爆炸粒子及 Dungeon Additions 等模组的自绘粒子在再次调用 `begin()` 时抛出
