@@ -220,11 +220,9 @@ Actinium 接管：`MixinRenderGlobal` 在 `loadRenderers` 的 HEAD 注入把 `mc
 `COMPUTE`，已有的 `CPU_ONLY` 设置会保留。标签键为 `options.actinium.gpuCullingMode` 与
 `options.actinium.gpuCullingMode.{tooltip,cpu_only,compute}`，六份 lang 文件均已登记。
 
-选项只影响写入点，两条路径共用同一份持久化字段：`Actinium.onConstruct` 在
-`EmbeddiumRuntimeOptions.setChunkMultiDrawMode` 之后调用 `GpuCullingSettings.apply`，高级页的
-binding 写入字段后同样调用该方法。两者都把模式推给 `GpuCulling.setMode`，因此配置装载与 GUI
-切换不会出现两处状态不一致。选项带 `REQUIRES_RENDERER_RELOAD`，切换后重载区块渲染器让
-`VintageRenderSectionManager.ChunkRenderer` 重新决定是否创建 `GpuTerrainCuller`。
+`Actinium.onInit` 在图形上下文就绪后检查后端能力。缺少间接多重绘制时，配置中的 `INDIRECT` 改为
+`DIRECT`；缺少 GPU 剔除所需能力时，`COMPUTE` 改为 `CPU_ONLY`。值有变化且配置可写时保存到
+`config/actinium-options.json`。高级页恢复默认时同样检查设备能力。临时指定多重绘制模式的系统属性只影响本次运行。
 
 选项的可选性由 `GpuCulling::isAvailable` 决定：间接多重绘制、计算着色器与 SSBO 任一缺失时
 整项禁用，`CPU_ONLY` 不受影响。`CPU_ONLY` 下 `getRegionBatch` 仍走

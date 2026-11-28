@@ -92,7 +92,6 @@ public class Actinium {
         RuntimeOptionsBridge.setAllowDirectMemoryAccess(ActiniumRuntimeOptions::allowDirectMemoryAccess);
         FogDistanceModeBridge.setCircularFogEnabledProvider(() -> ActiniumRuntime.options().quality.circularFog);
         EmbeddiumRuntimeOptions.setChunkMultiDrawMode(() -> ActiniumRuntime.options().advanced.multiDrawMode);
-        GpuCullingSettings.apply(ActiniumRuntime.options());
         PostProcessingBridge.setDepthTextureProvider(framebuffer -> ((IRenderTargetExt) framebuffer).iris$getDepthTextureId());
         PostProcessingBridge.setLightmapColorAccessor(renderer -> ((AccessorEntityRenderer) renderer).getLightmapColors());
         PostProcessingBridge.setLightmapTextureAccessor(renderer -> ((AccessorEntityRenderer) renderer).getLightmapTexture());
@@ -193,6 +192,7 @@ public class Actinium {
 
     @EventHandler
     public void onInit(FMLInitializationEvent event) {
+        GpuCullingSettings.initialize(ActiniumRuntime.options());
         if (Mods.NEOFONTRENDER) {
             NeoFontRenderCompat.initialize();
         }

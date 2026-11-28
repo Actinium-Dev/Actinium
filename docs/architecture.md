@@ -412,9 +412,9 @@ bounded ByteBuffer 视图由 drawRaw 统一创建。此改动已通过自动化�
 
 ### GPU 地形剔除
 
-`render.culling` 为区块 pass 准备可见条目、section metadata 与间接绘制命令。仅当计算着色器、SSBO、
-GL 4.2、indirect multidraw 与 `MultiDrawMode.INDIRECT` 均可用且选择 `COMPUTE` 时，存储才发布
-section metadata 并执行 compute；`CPU_ONLY` 与能力不足时沿用 `DefaultChunkRenderer` 的 CPU 批次。
+`RenderSystem.supportsCompute()` 在 GLSM 初始化前后都按同一规则检测计算着色器：OpenGL 4.3 及以上提供核心支持，较低版本可通过 `ARB_compute_shader` 提供支持。
+
+地形剔除着色器 `chunk_cull.csh` 声明 `#version 430 core`，因此 `GpuCulling` 要求 OpenGL 4.3 及以上。仅当后端支持计算调度、SSBO 和间接多重绘制，且绘制模式为 `MultiDrawMode.INDIRECT`、剔除模式为 `COMPUTE` 时，区块存储才发布 section metadata 并执行 GPU 剔除。其余情况使用 `DefaultChunkRenderer` 的 CPU 批次。
 系统属性 `actinium.chunkMultiDrawMode` 与 GUI 的 MultiDraw 设置走同一解析路径。
 
 每个地形 pass 都有独立的可见条目与 indirect 命令区间，本地的 `water` 和 `translucent` 排序 pass
