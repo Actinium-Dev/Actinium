@@ -54,6 +54,7 @@ dependencies {
     // Same joml artifact bundled into the jar body and relocated under the shadow namespace by the
     // shadowRemapJar / devShadowJar tasks (upstream Celeritas distribution layout).
     shadowBundle 'org.joml:joml:1.10.5'
+    shadowBundle 'com.github.weisj:jsvg:2.2.0'
     shadowBundle('xyz.wagyourtail.jvmdowngrader:jvmdowngrader-java-api:1.3.5:downgraded-8') {
         transitive = false
     }

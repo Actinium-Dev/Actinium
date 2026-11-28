@@ -2,9 +2,9 @@ package me.flashyreese.mods.reeses_sodium_options.client.gui.frame.option.action
 
 import com.dhj.actinium.gui.rso.compat.CursorTypes;
 import com.dhj.actinium.gui.rso.compat.GuiGraphicsExtractor;
+import com.dhj.actinium.gui.svg.SvgIcon;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.layout.LayoutBounds;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.widget.BaseWidget;
-import net.minecraft.util.ResourceLocation;
 
 final class OptionActionButtonRenderer {
     private static final int ICON_SIZE = 10;
@@ -22,7 +22,7 @@ final class OptionActionButtonRenderer {
         return new LayoutBounds(x, rowBounds.y(), size, size);
     }
 
-    static void render(GuiGraphicsExtractor guiGraphics, ResourceLocation icon, LayoutBounds buttonBounds, int mouseX, int mouseY, boolean focused, boolean active) {
+    static void render(GuiGraphicsExtractor guiGraphics, SvgIcon icon, LayoutBounds buttonBounds, int mouseX, int mouseY, boolean focused, boolean active) {
         boolean hovered = active && buttonBounds.contains(mouseX, mouseY);
 
         guiGraphics.fill(buttonBounds.x(), buttonBounds.y(), buttonBounds.getLimitX(), buttonBounds.getLimitY(), active ? (hovered ? BACKGROUND_HOVERED : BACKGROUND) : BACKGROUND_DISABLED);
@@ -32,7 +32,7 @@ final class OptionActionButtonRenderer {
 
         int iconX = buttonBounds.getCenterX() - ICON_SIZE / 2;
         int iconY = buttonBounds.getCenterY() - ICON_SIZE / 2;
-        guiGraphics.blit(icon, iconX, iconY, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE, active ? ICON_COLOR : ICON_COLOR_DISABLED);
+        guiGraphics.blit(icon, iconX, iconY, ICON_SIZE, ICON_SIZE, active ? ICON_COLOR : ICON_COLOR_DISABLED);
 
         if (hovered) {
             guiGraphics.requestCursor(CursorTypes.POINTING_HAND);

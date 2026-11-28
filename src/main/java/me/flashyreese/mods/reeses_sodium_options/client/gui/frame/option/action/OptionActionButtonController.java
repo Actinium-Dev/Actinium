@@ -9,9 +9,9 @@ import com.dhj.actinium.gui.rso.compat.GuiGraphicsExtractor;
 import com.dhj.actinium.gui.rso.compat.KeyEvent;
 import com.dhj.actinium.gui.rso.compat.MouseButtonEvent;
 import com.dhj.actinium.gui.rso.compat.ScreenDirection;
+import com.dhj.actinium.gui.svg.SvgIcon;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.layout.LayoutBounds;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.option.RsoOption;
-import net.minecraft.util.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -33,7 +33,6 @@ public final class OptionActionButtonController {
     public OptionActionButtonController(Supplier<LayoutBounds> rowBoundsSupplier, Supplier<@Nullable RsoOption> optionSupplier, Runnable clickSound) {
         this.rowBoundsSupplier = rowBoundsSupplier;
         this.optionSupplier = optionSupplier;
-        // Ordered left-to-right: reset sits to the left of undo.
         this.buttons = new ArrayList<>(2);
         this.buttons.add(new ActionButton(0, OptionResetAction.ICON, Component.translatable("rso.controller.guide.reset"), option -> Component.translatable("rso.narration.reset_to_default", option.getName()), OptionResetAction::isVisible, OptionResetAction::isActive, OptionResetAction::resetToDefault, clickSound));
         this.undoButton = new ActionButton(1, OptionUndoAction.ICON, Component.translatable("rso.controller.guide.undo"), option -> Component.translatable("rso.narration.undo_changes", option.getName()), OptionUndoAction::isVisible, OptionUndoAction::isActive, OptionUndoAction::undoChanges, clickSound);
@@ -301,7 +300,7 @@ public final class OptionActionButtonController {
         private final OptionActionButtonElement element;
         private boolean heldVisible;
 
-        private ActionButton(int index, ResourceLocation icon, Component guideLabel, Function<RsoOption, Component> narrationLabelProvider, Predicate<RsoOption> visiblePredicate, Predicate<RsoOption> activePredicate, Consumer<RsoOption> action, Runnable clickSound) {
+        private ActionButton(int index, SvgIcon icon, Component guideLabel, Function<RsoOption, Component> narrationLabelProvider, Predicate<RsoOption> visiblePredicate, Predicate<RsoOption> activePredicate, Consumer<RsoOption> action, Runnable clickSound) {
             this.index = index;
             this.element = new OptionActionButtonElement(
                     OptionActionButtonController.this.rowBoundsSupplier,
