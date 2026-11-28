@@ -216,8 +216,8 @@ Actinium 接管：`MixinRenderGlobal` 在 `loadRenderers` 的 HEAD 注入把 `mc
 ## GPU 剔除模式（`performance.gpuCullingMode`）
 
 高级页的 `actinium:gpu_culling_mode` 绑定 `SodiumGameOptions.performance.gpuCullingMode`
-（枚举 `dhj.embeddedt.embeddium.impl.render.culling.GpuCullingMode`：`CPU_ONLY` 默认、
-`COMPUTE`），标签键为 `options.actinium.gpuCullingMode` 与
+（枚举 `dhj.embeddedt.embeddium.impl.render.culling.GpuCullingMode`）。新配置和缺少该项的配置默认使用
+`COMPUTE`，已有的 `CPU_ONLY` 设置会保留。标签键为 `options.actinium.gpuCullingMode` 与
 `options.actinium.gpuCullingMode.{tooltip,cpu_only,compute}`，六份 lang 文件均已登记。
 
 选项只影响写入点，两条路径共用同一份持久化字段：`Actinium.onConstruct` 在
