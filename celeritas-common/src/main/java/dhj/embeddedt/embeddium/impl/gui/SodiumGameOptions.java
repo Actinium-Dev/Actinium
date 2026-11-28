@@ -123,7 +123,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
 
         /** Upper bound for cached item meshes; larger values trade memory for fewer rebuilds. */
         public int itemRendererCacheSize = 512;
-        public AsyncOcclusionMode asyncOcclusionMode = AsyncOcclusionMode.ONLY_SHADOW;
+        public AsyncOcclusionMode asyncOcclusionMode = AsyncOcclusionMode.EVERYTHING;
         public boolean useRasterOcclusionCulling = true;
         public GpuCullingMode gpuCullingMode = GpuCullingMode.COMPUTE;
     }

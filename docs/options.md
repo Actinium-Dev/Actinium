@@ -66,9 +66,14 @@ DEBUG 页原先与高级/性能页重复的 5 项（模型渲染器批处理、�
 | 选项 | 字段 | 实现落点 |
 | --- | --- | --- |
 | 释放过大的区块构建缓冲（`actinium:trim_chunk_build_scratch`，默认开） | `performance.trimChunkBuildScratch` | `ScratchRetentionWindow`（开关 + 连续两个 64 任务窗口低负载才释放的判定）、`ChunkMeshBufferBuilder.finishTask` 与 `TranslucentQuadRecorder.finishTask`（释放点，分别回收原生顶点缓冲与半透明排序暂存数组）、`ActiniumRuntime.loadConfig`（配置装载出口统一同步开关） |
+| 异步遮挡剔除（默认全部） | `performance.asyncOcclusionMode` | `RenderListManager` 按 `AsyncOcclusionMode.EVERYTHING` 为主地形和阴影启用异步搜索，`SectionGraph` 提供共享搜索线程 |
 
 释放后容量不丢：后续构建任务需要更大缓冲时按原有扩容路径重新分配。关闭选项只停用
 释放判定，不影响已保留缓冲的复用。
+
+异步遮挡剔除的新配置默认值和 GUI「恢复默认」均为「全部」。配置文件中的字段为
+`performance.async_occlusion_mode`；已有配置保留已保存的选择，缺失该字段时使用新默认值。
+在 GUI 中更改此选项并应用后，会重载渲染器以切换搜索模式。
 
 ## 质量页 → DETAILS 分组
 
