@@ -418,7 +418,6 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         Path path = getConfigPath(name);
         Path readPath = getReadPath(name, path);
         SodiumGameOptions config;
-        boolean resaveConfig = true;
 
         if (Files.exists(readPath)) {
             try (Reader reader = Files.newBufferedReader(readPath)) {
@@ -426,9 +425,9 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
             } catch (IOException e) {
                 throw new RuntimeException("Could not parse config", e);
             } catch (JsonSyntaxException e) {
-                LOGGER.error("Could not parse config, will fallback to default settings", e);
+                LOGGER.error("Could not parse {}; using read-only default settings", readPath, e);
                 config = new SodiumGameOptions();
-                resaveConfig = false;
+                config.setReadOnly();
             }
         } else {
             config = new SodiumGameOptions();
@@ -460,7 +459,7 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
         }
 
         try {
-            if (resaveConfig || !readPath.equals(path)) {
+            if (!config.isReadOnly()) {
                 config.writeChanges();
                 if (!readPath.equals(path)) {
                     LOGGER.info("Migrated Actinium configuration from {} to {}", readPath.getFileName(), path.getFileName());
@@ -510,12 +509,10 @@ public class SodiumGameOptions implements OptionStorage<SodiumGameOptions> {
             throw new IOException("Not a directory: " + dir);
         }
 
-        // Use a temporary location next to the config's final destination
         Path tempPath = config.configPath.resolveSibling(config.configPath.getFileName() + ".tmp");
 
         Files.writeString(tempPath, GSON.toJson(config));
 
-        // Atomically replace the old config file (if it exists) with the temporary file
         Files.move(tempPath, config.configPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
 

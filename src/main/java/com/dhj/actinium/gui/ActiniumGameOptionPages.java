@@ -42,6 +42,7 @@ import static com.mitchej123.lwjgl.LWJGLServiceProvider.LWJGL;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 public class ActiniumGameOptionPages {
     private static final SodiumGameOptions sodiumOpts = ActiniumRuntime.options();
@@ -558,6 +559,12 @@ public class ActiniumGameOptionPages {
     }
 
     public static OptionPage advanced() {
+        return advanced(sodiumOpts, MultiDrawModeResolver::supportsMultiDrawIndirect, GpuCulling::isAvailable,
+                () -> GpuCulling.hardwareAvailability() == GpuCulling.Availability.AVAILABLE);
+    }
+
+    static OptionPage advanced(SodiumGameOptions sodiumOpts, BooleanSupplier supportsIndirect,
+                               BooleanSupplier cullingAvailable, BooleanSupplier supportsCulling) {
         List<OptionGroup> groups = new ArrayList<>();
 
         groups.add(OptionGroup.createBuilder()
@@ -576,10 +583,10 @@ public class ActiniumGameOptionPages {
                         .setId(StandardOptions.Option.MULTIDRAW_MODE.cast())
                         .setName(TextComponent.translatable("sodium.options.multidraw_mode.name"))
                         .setTooltip(TextComponent.translatable("sodium.options.multidraw_mode.tooltip"))
-                        .setControl(option -> new CyclingControl<>(option, ActiniumGameOptionPages::allowedMultiDrawModes))
+                        .setControl(option -> new CyclingControl<>(option, () -> allowedMultiDrawModes(supportsIndirect.getAsBoolean())))
                         .setBinding((opts, value) -> opts.advanced.multiDrawMode = value, opts -> opts.advanced.multiDrawMode)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setDefaultValue(MultiDrawMode.INDIRECT)
+                        .setDefaultValueSupplier(() -> MultiDrawModeResolver.defaultMode(supportsIndirect.getAsBoolean()))
                         .build()
                 )
                 .add(OptionImpl.createBuilder(GpuCullingMode.class, sodiumOpts)
@@ -592,10 +599,12 @@ public class ActiniumGameOptionPages {
                             opts.performance.gpuCullingMode = value;
                             GpuCullingSettings.apply(opts);
                         }, opts -> opts.performance.gpuCullingMode)
-                        .setEnabledPredicate(GpuCulling::isAvailable)
+                        .setEnabledPredicate(cullingAvailable)
+                        .setDisabledDisplayValue(GpuCullingMode.CPU_ONLY)
                         .setImpact(OptionImpact.HIGH)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setDefaultValue(GpuCullingMode.COMPUTE)
+                        .setDefaultValueSupplier(() -> supportsCulling.getAsBoolean()
+                                ? GpuCullingMode.COMPUTE : GpuCullingMode.CPU_ONLY)
                         .build()
                 )
                 .add(OptionImpl.createBuilder(SodiumGameOptions.StreamingUploadStrategy.class, sodiumOpts)
@@ -962,8 +971,8 @@ public class ActiniumGameOptionPages {
         return new OptionPage(StandardOptions.Pages.DEBUG, TextComponent.translatable("sodium.options.pages.debug"), ImmutableList.copyOf(groups));
     }
 
-    private static MultiDrawMode[] allowedMultiDrawModes() {
-        return MultiDrawModeResolver.supportsMultiDrawIndirect()
+    private static MultiDrawMode[] allowedMultiDrawModes(boolean supportsIndirect) {
+        return supportsIndirect
                 ? MultiDrawMode.values()
                 : new MultiDrawMode[] { MultiDrawMode.DIRECT, MultiDrawMode.INDIVIDUAL };
     }

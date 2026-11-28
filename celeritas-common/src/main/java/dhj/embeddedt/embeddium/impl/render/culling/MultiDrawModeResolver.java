@@ -27,10 +27,12 @@ public final class MultiDrawModeResolver {
         final String override = System.getProperty(OVERRIDE_PROPERTY, "").trim();
         final MultiDrawMode configured = EmbeddiumRuntimeOptions.chunkMultiDrawMode();
         final MultiDrawMode requested = override.isEmpty() ? configured : MultiDrawMode.fromProperty(override);
-        if (requested == MultiDrawMode.INDIRECT && !supportsMultiDrawIndirect()) {
-            return MultiDrawMode.DIRECT;
-        }
-        return requested;
+        return requested == MultiDrawMode.INDIRECT ? defaultMode(supportsMultiDrawIndirect()) : requested;
+    }
+
+    /** Selects the preferred batch submission mode supported by the backend. */
+    public static MultiDrawMode defaultMode(boolean supportsIndirect) {
+        return supportsIndirect ? MultiDrawMode.INDIRECT : MultiDrawMode.DIRECT;
     }
 
     /**

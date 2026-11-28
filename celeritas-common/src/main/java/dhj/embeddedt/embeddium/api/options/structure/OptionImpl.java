@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public class OptionImpl<S, T> implements Option<T> {
 
@@ -35,11 +36,8 @@ public class OptionImpl<S, T> implements Option<T> {
      */
     private @Nullable T modifiedValue;
 
-    /**
-     * Actinium extension: the declared default value used by reset-to-default.
-     * When null the binding's current value is treated as the default.
-     */
-    private @Nullable T defaultValue;
+    private @Nullable Supplier<T> defaultValue;
+    private @Nullable T disabledDisplayValue;
 
     private final BooleanSupplier enabled;
 
@@ -92,6 +90,9 @@ public class OptionImpl<S, T> implements Option<T> {
 
     @Override
     public T getValue() {
+        if (this.disabledDisplayValue != null && !this.isAvailable()) {
+            return this.disabledDisplayValue;
+        }
         return this.modifiedValue != null ? this.modifiedValue : this.binding.getValue(this.storage.getData());
     }
 
@@ -112,13 +113,12 @@ public class OptionImpl<S, T> implements Option<T> {
 
     @Override
     public T getDefaultValue() {
-        return this.defaultValue != null ? this.defaultValue : this.binding.getValue(this.storage.getData());
+        return this.defaultValue != null ? this.defaultValue.get() : this.getAppliedValue();
     }
 
     @Override
     public void resetToDefault() {
-        T fallback = this.binding.getValue(this.storage.getData());
-        this.modifiedValue = this.defaultValue != null ? this.defaultValue : fallback;
+        this.setValue(this.getDefaultValue());
     }
 
     @Override
@@ -166,7 +166,8 @@ public class OptionImpl<S, T> implements Option<T> {
         private static final BooleanSupplier ALWAYS_ENABLED = () -> true;
         private static final BooleanSupplier ALWAYS_DISABLED = () -> false;
         private BooleanSupplier enabled = ALWAYS_ENABLED;
-        private T defaultValue;
+        private Supplier<T> defaultValue;
+        private T disabledDisplayValue;
 
         private Builder(OptionStorage<S> storage, Class<T> type) {
             this.storage = storage;
@@ -229,13 +230,15 @@ public class OptionImpl<S, T> implements Option<T> {
             return this;
         }
 
-        /**
-         * Actinium extension: declares the default value used by
-         * {@code resetToDefault()}. When omitted the binding's current value
-         * at reset time is used as the fallback default.
-         */
         public Builder<S, T> setDefaultValue(T defaultValue) {
-            this.defaultValue = defaultValue;
+            this.defaultValue = defaultValue == null ? null : () -> defaultValue;
+
+            return this;
+        }
+
+        /** Defers capability checks until the options screen has a current graphics context. */
+        public Builder<S, T> setDefaultValueSupplier(Supplier<T> source) {
+            this.defaultValue = Objects.requireNonNull(source);
 
             return this;
         }
@@ -243,6 +246,12 @@ public class OptionImpl<S, T> implements Option<T> {
         public Builder<S, T> setEnabledPredicate(BooleanSupplier value) {
             this.enabled = value;
 
+            return this;
+        }
+
+        /** Shows the effective mode while a prerequisite is disabled, preserving the stored preference. */
+        public Builder<S, T> setDisabledDisplayValue(T value) {
+            this.disabledDisplayValue = Objects.requireNonNull(value);
             return this;
         }
 
@@ -279,6 +288,7 @@ public class OptionImpl<S, T> implements Option<T> {
 
             OptionImpl<S, T> impl = new OptionImpl<>(this.storage, this.id, this.name, this.tooltip, this.binding, this.control, this.flags, this.impact, this.enabled);
             impl.defaultValue = this.defaultValue;
+            impl.disabledDisplayValue = this.disabledDisplayValue;
             return impl;
         }
     }

@@ -15,11 +15,8 @@ import static com.mitchej123.lwjgl.LWJGLServiceProvider.LWJGL;
  * Entry point of the compute cull backend: the selected mode, whether the current context can provide it, and the
  * shared section mirror and compute program every terrain renderer uses.
  *
- * <p>Availability is decided once per renderer construction and requires all of: a backend that can run compute
- * dispatch, a GL 4.2 capable context, shader storage buffers, indirect multidraw, and an indirect multidraw mode. A
- * context that fails any of them keeps the CPU emitter, which is what {@link GpuCullingMode#CPU_ONLY} preserves. The
- * mirror and the compute program only live while the compute path is selected, so a switch to the CPU emitter and a
- * context without the compute path both release them.
+ * <p>The terrain cull shader targets GLSL 4.30 and requires a GL 4.3 context, backend compute dispatch,
+ * shader storage buffers, and indirect multidraw. Other draw modes use the CPU emitter.
  */
 public final class GpuCulling {
 
@@ -38,7 +35,7 @@ public final class GpuCulling {
     public enum Availability {
         AVAILABLE,
         NO_BACKEND_COMPUTE,
-        NO_GL42,
+        NO_GL43,
         NO_SSBO,
         NO_MULTI_DRAW_INDIRECT,
         MULTI_DRAW_NOT_INDIRECT
@@ -62,13 +59,22 @@ public final class GpuCulling {
     }
 
     public static Availability availability() {
+        Availability hardware = hardwareAvailability();
+        if (hardware == Availability.AVAILABLE && MultiDrawModeResolver.resolve() != MultiDrawMode.INDIRECT) {
+            return Availability.MULTI_DRAW_NOT_INDIRECT;
+        }
+        return hardware;
+    }
+
+    /** Checks backend capabilities independently of the user's draw mode and any temporary override. */
+    public static Availability hardwareAvailability() {
         final RenderBackend backend = BackendManager.RENDER_BACKEND;
         if (!backend.supportsGpuDrivenCulling()) {
             return Availability.NO_BACKEND_COMPUTE;
         }
 
-        if (!supportsGl42()) {
-            return Availability.NO_GL42;
+        if (!supportsGl43()) {
+            return Availability.NO_GL43;
         }
         if (!supportsShaderStorageBuffers()) {
             return Availability.NO_SSBO;
@@ -76,20 +82,12 @@ public final class GpuCulling {
         if (!MultiDrawModeResolver.supportsMultiDrawIndirect()) {
             return Availability.NO_MULTI_DRAW_INDIRECT;
         }
-        if (MultiDrawModeResolver.resolve() != MultiDrawMode.INDIRECT) {
-            return Availability.MULTI_DRAW_NOT_INDIRECT;
-        }
         return Availability.AVAILABLE;
     }
 
-    /**
-     * {@return whether the context is at least GL 4.2}. GLSM installs its capability facade during host startup, so
-     * before that the live context answers through the LWJGL service, the same fallback
-     * {@link RenderSystem#supportsCompute()} takes.
-     */
-    private static boolean supportsGl42() {
+    private static boolean supportsGl43() {
         final ContextCapabilities capabilities = GLStateManager.capabilities;
-        return capabilities != null ? capabilities.OpenGL42 : LWJGL.isOpenGLVersionSupported(4, 2);
+        return capabilities != null ? capabilities.OpenGL43 : LWJGL.isOpenGLVersionSupported(4, 3);
     }
 
     /**

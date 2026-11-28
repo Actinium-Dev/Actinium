@@ -620,15 +620,12 @@ public class RenderSystem {
     }
 
     /**
-     * {@return whether the context can run compute shaders} The tracked capability view is authoritative once the state
-     * manager has initialised; before that, the driver answers, so a query made during startup still describes the
-     * context instead of reporting no support. Compute shaders are core in GL 4.3, and {@code ARB_compute_shader}
-     * exposes them on a 4.2 context.
+     * {@return whether the context provides compute shaders through GL 4.3 or ARB_compute_shader}
      */
     public static boolean supportsCompute() {
         final ContextCapabilities capabilities = GLStateManager.capabilities;
         if (capabilities != null) {
-            return capabilities.GL_ARB_compute_shader;
+            return capabilities.OpenGL43 || capabilities.GL_ARB_compute_shader;
         }
         return LWJGL.isOpenGLVersionSupported(4, 3) || LWJGL.isExtensionSupported(GLExtension.ARB_compute_shader);
     }
