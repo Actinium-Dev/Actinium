@@ -101,7 +101,7 @@ public class CommonOptionPages {
                         .setImpact(OptionImpact.MEDIUM)
                         .setBinding((opts, value) -> opts.performance.asyncOcclusionMode = value, opts -> opts.performance.asyncOcclusionMode)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
-                        .setDefaultValue(AsyncOcclusionMode.ONLY_SHADOW)
+                        .setDefaultValue(AsyncOcclusionMode.EVERYTHING)
                         .build())
                 .build()
         );
