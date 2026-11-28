@@ -16,7 +16,7 @@ public final class PendingTesrDraws {
     }
 
     public static boolean canDefer() {
-        return inPass && !DepthEcho.replaying();
+        return inPass && !ShadowFastTesr.active() && !DepthEcho.replaying();
     }
 
     public static void hold(Pending owner) {

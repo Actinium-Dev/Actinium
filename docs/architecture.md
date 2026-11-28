@@ -1,6 +1,6 @@
 # Actinium 架构说明
 
-最后更新：2026-11-17。
+最后更新：2026-11-28。
 
 ## 概述
 
@@ -110,6 +110,16 @@ TESR 实例化批次不新增 pass：`DeferredWorldRenderingPipeline` 为 `Insta
 非顶点阶段会让该来源退回逐实例绘制。变体沿用所属 pass 的 framebuffer、viewport、
 alpha test 与混合覆盖，只替换 program，因此状态归属仍在 `Pass`。CUBE 变体由
 `InstancingSupportProvider` 的宿主开关决定可用性。
+
+阴影方块实体沿 Forge 的 `hasFastRenderer()` 选择普通或 fast 回调。根项目在
+`ShadowRenderer.renderTileEntity` 的 dispatcher 调用范围启用 `ShadowFastTesr`，fast 回调借用
+按嵌套深度复用的独立 `Tessellator`，由 AT 开放的 `batchBuffer`、`drawingBatch` 字段保存并恢复
+父批次。动画模型继续使用全局缓冲，图集顶点在当前方块实体的 NBT 优先 ID 有效时逐个提交。
+提交前恢复阴影入口状态，沿用 Forge `drawBatch(0)` 的图集绑定和绘制状态；覆盖层没有顶点时
+直接关闭空批。模型和 TESR 队列分别检查待绘制内容后提交，并保持阴影 pass 开启。
+子分派前提交父模型，子调用结束后恢复父 ID 和 GL 状态，父图集缓冲保留到父回调结束。
+异常只清理当前调用尚未提交的几何，世界卸载时释放复用缓冲。具体机制与验证场景见
+`docs/compat/thebetweenlands.md`。
 
 变体程序与基程序走同一条 `ProgramBuilder`/`ProgramCreator` 路径，因此
 `ProgramBinaryCache` 会缓存它们。`Iris.compilePackFolder` 为每个 folder 构建一次性

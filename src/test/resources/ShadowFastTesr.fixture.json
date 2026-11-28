@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "compatibilityLevel": "JAVA_21",
+  "package": "com.dhj.actinium.test.shadow.fixture",
+  "mixins": ["ShadowFastTesrUpload", "ShadowFastTesrDriver", "ShadowFastTesrLighting", "ShadowFastTesrAmbientOcclusion",
+    "ShadowFastTesrBackend"],
+  "injectors": {"defaultRequire": 1}
+}

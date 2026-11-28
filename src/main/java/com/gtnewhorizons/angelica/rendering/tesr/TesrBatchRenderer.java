@@ -204,11 +204,16 @@ public final class TesrBatchRenderer {
         return hasPendingGeometry() && bufferSource.hasPendingLayers();
     }
 
+    boolean hasQueuedShadowGeometry() {
+        return activePass == PASS_SHADOW && hasQueuedGeometry();
+    }
+
     void retire(TemplateBuffer template) {
         instancedRenderer.retire(template);
     }
 
     public void queue(TemplateBuffer template, ResourceLocation texture, TesrMaterial material) {
+        if (template.vertexCount == 0) return;
         final boolean replaying = DepthEcho.replaying();
         if (replaying && !canReplay(material)) return;
         modelView.set(GLSMMatrices.getModelViewMatrix());
@@ -416,6 +421,10 @@ public final class TesrBatchRenderer {
     }
 
     void flushForStateChange() {
+        if (activePass == PASS_SHADOW) {
+            if (hasQueuedGeometry()) flushAndContinue();
+            return;
+        }
         final RetainedTesrGroups hook = activePass >= 0 ? retained[activePass] : pendingDeferredHook;
         if (!hasPendingGeometry()) return;
         activePass = -1;
@@ -454,11 +463,24 @@ public final class TesrBatchRenderer {
     }
 
     void flushAndContinue() {
-        if (activePass < 0) return;
+        if (activePass < 0 || !hasQueuedGeometry()) return;
         final RetainedTesrGroups hook = retained[activePass];
         bufferSource.endBatchWithType(TransparencyType.OPAQUE, hook);
         bufferSource.endBatch(hook);
-        hook.continuePass(passBase, passCamX, passCamY, passCamZ, passInstanced, null);
+        continueSegment(hook);
+    }
+
+    void discardShadowSegment() {
+        if (activePass != PASS_SHADOW) return;
+        try {
+            bufferSource.discard();
+        } finally {
+            continueSegment(retained[activePass]);
+        }
+    }
+
+    private void continueSegment(RetainedTesrGroups hook) {
+        hook.continuePass(passBase, passCamX, passCamY, passCamZ, passInstanced, deferredPipeline());
     }
 
     private void flushNow() {
