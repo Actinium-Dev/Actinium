@@ -9,6 +9,7 @@ import net.coderbot.iris.pipeline.WorldRenderingPhase;
 import net.coderbot.iris.pipeline.WorldRenderingPipeline;
 import net.coderbot.iris.uniforms.CapturedRenderingState;
 import com.gtnewhorizons.angelica.glsm.GLSMCurrentAttribs;
+import com.gtnewhorizons.angelica.glsm.hooks.BatchStateGuard;
 
 public class GbufferPrograms {
 	private static boolean entities;
@@ -220,10 +221,16 @@ public class GbufferPrograms {
 	}
 
 	public static void setBlockEntityDefaults() {
-		GLSMCurrentAttribs.glVertexAttrib2s(ProgramCreator.MC_ENTITY, (short)-1, (short)-1);
-		GLSMCurrentAttribs.glVertexAttrib2f(ProgramCreator.MC_MID_TEX_COORD, 0.5f, 0.5f);
-		GLSMCurrentAttribs.glVertexAttrib4f(ProgramCreator.AT_TANGENT, 1.0f, 0.0f, 0.0f, 1.0f);
-		GLSMCurrentAttribs.glVertexAttrib4f(ProgramCreator.AT_MIDBLOCK, 0.0f, 0.0f, 0.0f, 0.0f);
+		// Pipeline defaults also apply to queued entity geometry; reapplying them must not split its batch.
+		BatchStateGuard.suspend();
+		try {
+			GLSMCurrentAttribs.glVertexAttrib2s(ProgramCreator.MC_ENTITY, (short)-1, (short)-1);
+			GLSMCurrentAttribs.glVertexAttrib2f(ProgramCreator.MC_MID_TEX_COORD, 0.5f, 0.5f);
+			GLSMCurrentAttribs.glVertexAttrib4f(ProgramCreator.AT_TANGENT, 1.0f, 0.0f, 0.0f, 1.0f);
+			GLSMCurrentAttribs.glVertexAttrib4f(ProgramCreator.AT_MIDBLOCK, 0.0f, 0.0f, 0.0f, 0.0f);
+		} finally {
+			BatchStateGuard.resume();
+		}
 	}
 
 	public static WorldRenderingPhase getCurrentPhase() {

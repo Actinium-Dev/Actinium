@@ -34,13 +34,14 @@ final class BatchStateFallback {
         if (!models.isActive() && !tesrs.hasPendingGeometry()) return;
         // Pass setup may establish defaults after beginPass, before any renderer or queued draw.
         if (!models.hasQueuedGeometry() && !tesrs.hasQueuedGeometry() && !BatchEligibility.insideRenderer()) return;
-        if (models.entityPassActive()) {
+        if (models.entityPassActive() && ActiniumRuntime.options().debug.enableEntityRenderDiagnostics) {
             final boolean inside = BatchEligibility.insideRenderer();
-            if (inside && ActiniumRuntime.options().debug.enableEntityRenderDiagnostics) {
-                logStateChangeSite(new Throwable());
+            final Throwable trace = new Throwable();
+            if (inside) {
+                logStateChangeSite(trace);
             }
             GLStateManager.warnOnce("batch-fallback-entities:" + inside, "Uncaptured state change {} a renderer flushed the entity batch early",
-                inside ? "inside" : "between", new Throwable());
+                inside ? "inside" : "between", trace);
         }
         final int mode = GLSMMatrices.getMatrixMode().getMode();
         final int unit = GLSMTextures.getActiveTextureUnit();
@@ -59,7 +60,8 @@ final class BatchStateFallback {
     }
 
     private static void logStateChangeSite(Throwable trace) {
-        for (StackTraceElement frame : trace.getStackTrace()) {
+        final StackTraceElement[] stack = trace.getStackTrace();
+        for (StackTraceElement frame : stack) {
             final String className = frame.getClassName();
             if (className.equals(BatchStateFallback.class.getName())
                 || className.equals(BatchStateGuard.class.getName())
@@ -68,7 +70,7 @@ final class BatchStateFallback {
                 continue;
             }
             final String site = frame.toString();
-            final String key = Arrays.toString(trace.getStackTrace());
+            final String key = Arrays.toString(stack);
             if (LOGGED_STATE_SITES.add(key)) {
                 LOGGER.warn("[ACTINIUM-ENTITY-DIAGNOSTICS] uncapturedStateChange site={} stack", site, trace);
             }

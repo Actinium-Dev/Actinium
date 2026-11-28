@@ -1,7 +1,7 @@
 sodium.options.actinium.production_diagnostics.name=生产环境诊断
 sodium.options.actinium.production_diagnostics.tooltip=输出 Actinium 环境、配置和关键 mixin 应用情况，方便对比开发环境和生产环境行为。
 sodium.options.actinium.entity_render_diagnostics.name=实体渲染诊断
-sodium.options.actinium.entity_render_diagnostics.tooltip=记录实体批处理拒绝原因、掉落物即时绘制和火焰批次拒绝条件。日志会增加，默认关闭。
+sodium.options.actinium.entity_render_diagnostics.tooltip=记录实体批处理拒绝原因、掉落物即时绘制和火焰批次拒绝条件。日志会增加，默认关闭。若需记录已被拒绝批处理的渲染器，请开启后重启客户端。
 sodium.options.actinium.render_inventory.name=世界渲染清单
 sodium.options.actinium.render_inventory.tooltip=累计记录地形方块、方块实体和实体，将清单写入 logs/actinium-render-inventory。切换此选项会重建地形网格。记录会增加 CPU、内存和磁盘 I/O 开销，仅在排查问题时启用。
 sodium.options.actinium.gl_debug.name=GL 状态 DEBUG
