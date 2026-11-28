@@ -1,5 +1,6 @@
 package me.flashyreese.mods.reeses_sodium_options.client.gui.frame.option.action;
 
+import com.dhj.actinium.gui.svg.SvgIcon;
 import com.dhj.actinium.gui.rso.compat.Component;
 import com.dhj.actinium.gui.rso.compat.ComponentPath;
 import com.dhj.actinium.gui.rso.compat.FocusNavigationEvent;
@@ -16,7 +17,6 @@ import me.flashyreese.mods.reeses_sodium_options.client.gui.control.ControlGuide
 import me.flashyreese.mods.reeses_sodium_options.client.gui.control.ControlGuideProvider;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.layout.LayoutBounds;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.option.RsoOption;
-import net.minecraft.util.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
@@ -31,7 +31,7 @@ final class OptionActionButtonElement implements GuiEventListener, NarratableEnt
     private final Supplier<LayoutBounds> rowBoundsSupplier;
     private final Supplier<@Nullable RsoOption> optionSupplier;
     private final IntSupplier buttonsFromRight;
-    private final ResourceLocation icon;
+    private final SvgIcon icon;
     private final Component guideLabel;
     private final Function<RsoOption, Component> narrationLabelProvider;
     private final Predicate<RsoOption> visiblePredicate;
@@ -43,7 +43,7 @@ final class OptionActionButtonElement implements GuiEventListener, NarratableEnt
     private boolean hovered;
 
     OptionActionButtonElement(Supplier<LayoutBounds> rowBoundsSupplier, Supplier<@Nullable RsoOption> optionSupplier,
-                              IntSupplier buttonsFromRight, ResourceLocation icon, Component guideLabel, Function<RsoOption, Component> narrationLabelProvider, Predicate<RsoOption> visiblePredicate, Predicate<RsoOption> activePredicate,
+                              IntSupplier buttonsFromRight, SvgIcon icon, Component guideLabel, Function<RsoOption, Component> narrationLabelProvider, Predicate<RsoOption> visiblePredicate, Predicate<RsoOption> activePredicate,
                               Consumer<RsoOption> action, Runnable clickSound, Runnable afterAction) {
         this.rowBoundsSupplier = rowBoundsSupplier;
         this.optionSupplier = optionSupplier;

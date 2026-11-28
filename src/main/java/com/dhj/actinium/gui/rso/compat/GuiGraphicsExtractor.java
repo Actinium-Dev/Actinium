@@ -1,5 +1,6 @@
 package com.dhj.actinium.gui.rso.compat;
 
+import com.dhj.actinium.gui.svg.SvgIcon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
@@ -19,7 +20,6 @@ public final class GuiGraphicsExtractor {
         Gui.drawRect(x1, y1, x2, y2, color);
     }
 
-    /** Fills a rectangle with the given ARGB color (pipeline overload retained for source compatibility). */
     public void fill(int pipeline, int x1, int y1, int x2, int y2, int color) {
         Gui.drawRect(x1, y1, x2, y2, color);
     }
@@ -72,6 +72,14 @@ public final class GuiGraphicsExtractor {
         this.blit(texture, x, y, u, v, width, height, textureWidth, textureHeight, 0xFFFFFFFF);
     }
 
+    public void blit(SvgIcon icon, int x, int y, int width, int height, int color) {
+        int scale = new ScaledResolution(Minecraft.getMinecraft()).getScaleFactor();
+        ResourceLocation texture = icon.texture(width * scale, height * scale);
+        if (texture != null) {
+            this.blit(texture, x, y, 0.0F, 0.0F, width, height, width, height, color);
+        }
+    }
+
     public void blit(ResourceLocation texture, int x, int y, float u, float v, int width, int height,
                      int textureWidth, int textureHeight, int color) {
         boolean blendWasEnabled = GL11.glIsEnabled(GL11.GL_BLEND);
@@ -92,7 +100,6 @@ public final class GuiGraphicsExtractor {
         }
     }
 
-    /** Enables a scissor box in GUI coordinates. */
     public void enableScissor(int x, int y, int width, int height) {
         Minecraft mc = Minecraft.getMinecraft();
         ScaledResolution resolution = new ScaledResolution(mc);

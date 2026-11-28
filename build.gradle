@@ -252,6 +252,7 @@ def devShadowJar = tasks.register('devShadowJar', ShadowJar) {
     relocate('org.antlr', 'com.gtnewhorizons.angelica.shadow.org.antlr')
     relocate('org.taumc.glsl', 'com.gtnewhorizons.angelica.shadow.org.taumc.glsl')
     relocate('org.anarres.cpp', 'com.gtnewhorizons.angelica.shadow.org.anarres.cpp')
+    relocate('com.github.weisj.jsvg', 'com.dhj.actinium.shadow.jsvg')
     mergeServiceFiles()
     // Deliberately no manifest inheritance from the jar task: that manifest carries the
     // FMLCorePlugin / FMLCorePluginContainsFMLMod entries the production jar needs, but at dev time
@@ -361,6 +362,7 @@ def shadowRemapJar = tasks.register('shadowRemapJar', ShadowJar) {
     relocate('org.antlr', 'com.gtnewhorizons.angelica.shadow.org.antlr')
     relocate('org.taumc.glsl', 'com.gtnewhorizons.angelica.shadow.org.taumc.glsl')
     relocate('org.anarres.cpp', 'com.gtnewhorizons.angelica.shadow.org.anarres.cpp')
+    relocate('com.github.weisj.jsvg', 'com.dhj.actinium.shadow.jsvg')
     mergeServiceFiles()
     manifest.inheritFrom(tasks.named('jar').get().manifest)
     destinationDirectory.set(layout.buildDirectory.dir('intermediates/shadow-remapped'))
@@ -842,6 +844,11 @@ def verifyDistributedJar = tasks.register('verifyDistributedJar') {
             'META-INF/licenses/CeleritasDynamicLights-MIT.txt',
             'META-INF/licenses/LambDynamicLights-MIT.txt',
             'META-INF/licenses/Angelica-LGPL-3.0.txt',
+            'META-INF/licenses/JSVG-MIT.txt',
+            'META-INF/licenses/MaterialIcons-Apache-2.0.txt',
+            'com/dhj/actinium/shadow/jsvg/parser/SVGLoader.class',
+            'assets/reeses-sodium-options/textures/gui/undo_to_unmodified.svg',
+            'assets/reeses-sodium-options/textures/gui/reset_to_default.svg',
             'com/dhj/actinium/render/dynamiclights/DynamicLights.class',
             'assets/celeritasdynamiclights/dynamiclights/item/torch.json',
             'com/dhj/actinium/Actinium.class',

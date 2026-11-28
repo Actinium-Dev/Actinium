@@ -6,7 +6,9 @@
 | GTNHLib | `GTNHLib/` | LGPL-3.0（个别文件见文件头） |
 | Iris | `shader/`、`src/main/java/net/coderbot/batchedentityrendering/`、`src/main/java/com/dhj/actinium/mixin/features/iris/`、`src/main/resources/assets/iris/` | LGPL-3.0 |
 | Celeritas / Embeddium / Sodium | `celeritas-common/` | LGPL-3.0（个别文件见文件头） |
-| Reese’s Sodium Options | `src/main/java/me/flashyreese/mods/reeses_sodium_options/`、`src/main/resources/assets/reeses-sodium-options/` | [MIT](LICENSE-REESES-SODIUM-OPTIONS.md) |
+| Reese’s Sodium Options | `src/main/java/me/flashyreese/mods/reeses_sodium_options/`、`src/main/resources/assets/reeses-sodium-options/`（SVG 图标见 Material Design Icons） | [MIT](LICENSE-REESES-SODIUM-OPTIONS.md) |
+| Material Design Icons | `src/main/resources/assets/reeses-sodium-options/textures/gui/*.svg`（Google `undo`、`settings_backup_restore` 图标，填充色采用原图标的橙色 `#FF8D30`） | [Apache-2.0](src/main/resources/META-INF/licenses/MaterialIcons-Apache-2.0.txt) |
+| JSVG | `gradle/scripts/dependencies.gradle`（SVG 栅格化依赖，打包至 `com.dhj.actinium.shadow.jsvg`） | [MIT](src/main/resources/META-INF/licenses/JSVG-MIT.txt) |
 | CeleritasDynamicLights / SodiumDynamicLights / LambDynamicLights | `src/main/java/com/dhj/actinium/api/dynamiclights/`、`src/main/java/com/dhj/actinium/render/dynamiclights/`、`src/main/java/com/dhj/actinium/mixin/vintage/features/dynamiclights/`、`src/main/resources/assets/celeritasdynamiclights/` | MIT（[CeleritasDynamicLights](src/main/resources/META-INF/licenses/CeleritasDynamicLights-MIT.txt)、[LambDynamicLights](src/main/resources/META-INF/licenses/LambDynamicLights-MIT.txt)） |
 | Canvas（bitraster 与遮挡盒分解） | `celeritas-common/src/main/java/grondag/bitraster/`、`celeritas-common/src/main/java/dhj/embeddedt/embeddium/impl/render/chunk/occlusion/geometry/` | bitraster 为 [Apache-2.0](third-party/licenses/bitraster-APACHE-2.0.txt)，遮挡盒分解见文件头（LGPL-3.0） |
 | Ithaka digraph | `src/main/java/de/odysseus/ithaka/digraph/` | Apache-2.0 |

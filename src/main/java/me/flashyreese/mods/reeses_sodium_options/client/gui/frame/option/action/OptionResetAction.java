@@ -1,5 +1,6 @@
 package me.flashyreese.mods.reeses_sodium_options.client.gui.frame.option.action;
 
+import com.dhj.actinium.gui.svg.SvgIcon;
 import me.flashyreese.mods.reeses_sodium_options.client.config.ReeseSodiumOptionsConfig;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.option.RsoOption;
 import net.minecraft.util.ResourceLocation;
@@ -7,7 +8,7 @@ import net.minecraft.util.ResourceLocation;
 import java.util.Objects;
 
 public final class OptionResetAction {
-    static final ResourceLocation ICON = new ResourceLocation("reeses-sodium-options", "textures/gui/reset_to_default.png");
+    static final SvgIcon ICON = SvgIcon.create(new ResourceLocation("reeses-sodium-options", "textures/gui/reset_to_default.svg"));
 
     public static boolean isVisible(RsoOption option) {
         return ReeseSodiumOptionsConfig.config().isResetButtonOverlay()
